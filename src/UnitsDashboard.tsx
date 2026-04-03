@@ -43,9 +43,15 @@ const STATUS_ORDER: Record<UnitStatus, number> = {
   "E shitur": 2,
 };
 
-const normalize = (v: string) => v.trim().toLowerCase();
+const normalize = (v: unknown) => typeof v === "string" ? v.trim().toLowerCase() : "";
 const fmtPrice = (n: number) =>
   `€${n.toLocaleString("de-DE")}`;
+
+const statusOrderValue = (status: unknown) =>
+  STATUS_ORDER[status as UnitStatus] ?? 99;
+
+const ownerColorFor = (ownerCategory: unknown) =>
+  OWNER_COLORS[ownerCategory as OwnerCategory] ?? OWNER_COLORS.Investitor;
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -281,27 +287,27 @@ export function UnitsDashboard() {
   const [typeF, setTypeF] = useState("");
   const [levelF, setLevelF] = useState("");
   const [statusF, setStatusF] = useState("");
-  const [ownerCategoryF, setOwnerCategoryF] = useState("");
   const [ownerNameF, setOwnerNameF] = useState("");
   const [search, setSearch] = useState("");
   const [selectedOwnerCategory, setSelectedOwnerCategory] = useState<OwnerCategory>("Investitor");
   const [selectedOwnerEntity, setSelectedOwnerEntity] = useState("");
   const [historyUnit, setHistoryUnit] = useState<Unit | null>(null);
 
-  const ownerNames = useMemo(() => {
-    const names = units
-      .filter((u) => u.owner_category === selectedOwnerCategory)
-      .map((u) => u.owner_name);
-    return [...new Set(names)];
+  const scopedUnits = useMemo(() => {
+    return units.filter((u) => normalize(u.owner_category) === normalize(selectedOwnerCategory));
   }, [units, selectedOwnerCategory]);
 
+  const ownerNames = useMemo(() => {
+    const names = scopedUnits.map((u) => u.owner_name);
+    return [...new Set(names)];
+  }, [scopedUnits]);
+
   const stockStatusUnits = useMemo(() => {
-    return units.filter((u) => {
-      const matchCategory = u.owner_category === selectedOwnerCategory;
+    return scopedUnits.filter((u) => {
       const matchEntity = !selectedOwnerEntity || u.owner_name === selectedOwnerEntity;
-      return matchCategory && matchEntity;
+      return matchEntity;
     });
-  }, [units, selectedOwnerCategory, selectedOwnerEntity]);
+  }, [scopedUnits, selectedOwnerEntity]);
 
   const stockKpis = useMemo(() => [
     { label: "Në dispozicion", value: stockStatusUnits.filter((u) => u.status === "Në dispozicion").length, icon: CheckCircle2, color: "#3c7a57", bg: "#edf7f1" },
@@ -321,23 +327,22 @@ export function UnitsDashboard() {
 
   const ownershipPieData = ownershipKpis.map((o) => ({ name: o.label, value: o.value, color: o.color }));
 
-  const allOwnerNames = useMemo(() => [...new Set(units.map((u) => u.owner_name))], [units]);
+  const registryOwnerNames = useMemo(() => [...new Set(stockStatusUnits.map((u) => u.owner_name))], [stockStatusUnits]);
 
   const filtered = useMemo(() => {
-    return [...units]
+    return [...stockStatusUnits]
       .filter((u) => {
         return (
           (!blockF || normalize(u.block) === normalize(blockF)) &&
           (!typeF || normalize(u.type) === normalize(typeF)) &&
           (!levelF || normalize(u.level) === normalize(levelF)) &&
           (!statusF || normalize(u.status) === normalize(statusF)) &&
-          (!ownerCategoryF || normalize(u.owner_category) === normalize(ownerCategoryF)) &&
           (!ownerNameF || normalize(u.owner_name) === normalize(ownerNameF)) &&
-          (!search || normalize(u.unit_id).includes(normalize(search)) || normalize(u.owner_name).includes(normalize(search)))
+          (!search || normalize(u.unit_id).includes(normalize(search)))
         );
       })
-      .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
-  }, [units, blockF, typeF, levelF, statusF, ownerCategoryF, ownerNameF, search]);
+      .sort((a, b) => statusOrderValue(a.status) - statusOrderValue(b.status));
+  }, [stockStatusUnits, blockF, typeF, levelF, statusF, ownerNameF, search]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f8f8fa]">
@@ -422,7 +427,7 @@ export function UnitsDashboard() {
                 const active = selectedOwnerCategory === o;
                 const c = OWNER_COLORS[o];
                 return (
-                  <button key={o} onClick={() => { setSelectedOwnerCategory(o); setSelectedOwnerEntity(""); }}
+                  <button key={o} onClick={() => { setSelectedOwnerCategory(o); setSelectedOwnerEntity(""); setOwnerNameF(""); }}
                     className="relative flex items-center gap-2 rounded-[11px] px-4 py-[8px] text-[13px] transition-all duration-200"
                     style={{ backgroundColor: active ? c.bg : "transparent", color: active ? c.color : "rgba(0,0,0,0.48)", fontWeight: active ? 600 : 450 }}>
                     <Users size={12} strokeWidth={2} style={{ color: active ? c.color : "rgba(0,0,0,0.28)" }} />
@@ -438,7 +443,7 @@ export function UnitsDashboard() {
             </div>
 
             <FilterSelect options={ownerNames} value={selectedOwnerEntity}
-              onChange={setSelectedOwnerEntity} placeholder="Të gjithë pronarët" />
+              onChange={(v) => { setSelectedOwnerEntity(v); setOwnerNameF(""); }} placeholder="Të gjithë pronarët" />
 
             <span className="text-[12px] text-black/30">
               {stockStatusUnits.length} njësi · {selectedOwnerEntity || selectedOwnerCategory}
@@ -484,7 +489,7 @@ export function UnitsDashboard() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0f0f2] px-6 py-5">
               <div>
                 <p className="text-[14px] tracking-[-0.2px] text-black" style={{ fontWeight: 550 }}>Të gjitha njësitë</p>
-                <p className="mt-0.5 text-[12px] text-black/35">{filtered.length} nga {units.length} njësi të shfaqura</p>
+                <p className="mt-0.5 text-[12px] text-black/35">{filtered.length} nga {stockStatusUnits.length} njësi të shfaqura</p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <div className="relative">
@@ -500,8 +505,13 @@ export function UnitsDashboard() {
                 <FilterSelect options={TYPES} value={typeF} onChange={setTypeF} placeholder="Të gjitha llojet" />
                 <FilterSelect options={LEVELS} value={levelF} onChange={setLevelF} placeholder="Të gjitha nivelet" />
                 <FilterSelect options={STATUSES} value={statusF} onChange={setStatusF} placeholder="Të gjitha statuset" />
-                <FilterSelect options={OWNER_CATEGORIES} value={ownerCategoryF} onChange={setOwnerCategoryF} placeholder="Të gjitha kategoritë" />
-                <FilterSelect options={allOwnerNames} value={ownerNameF} onChange={setOwnerNameF} placeholder="Të gjithë pronarët" />
+                <FilterSelect
+                  options={OWNER_CATEGORIES}
+                  value={selectedOwnerCategory}
+                  onChange={(v) => { setSelectedOwnerCategory(v as OwnerCategory); setSelectedOwnerEntity(""); setOwnerNameF(""); }}
+                  placeholder="Të gjitha kategoritë"
+                />
+                <FilterSelect options={registryOwnerNames} value={ownerNameF} onChange={setOwnerNameF} placeholder="Të gjithë pronarët" />
               </div>
             </div>
 
@@ -519,7 +529,7 @@ export function UnitsDashboard() {
                   </thead>
                   <tbody>
                     {filtered.map((u) => {
-                      const ownerStyle = OWNER_COLORS[u.owner_category];
+                      const ownerStyle = ownerColorFor(u.owner_category);
                       return (
                         <tr key={u.id} className="border-t border-[#f0f0f2] transition hover:bg-[#fafafc]">
                           <td className="py-3 pl-6 pr-3 text-black/72">{u.unit_id}</td>
