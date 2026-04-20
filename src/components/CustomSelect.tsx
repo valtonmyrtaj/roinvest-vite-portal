@@ -81,13 +81,16 @@ export function CustomSelect({
           >
             {/* Placeholder option */}
             {placeholder && (
-              <button
-                type="button"
-                onClick={() => { onChange(""); setOpen(false); }}
-                className={`flex w-full items-start ${s.pl} ${s.pr} py-2 text-left ${s.text} text-black/35 transition-colors hover:bg-[#f5f7fb]`}
-              >
-                <span className="flex-1 whitespace-normal text-left leading-[1.35]">{placeholder}</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => { onChange(""); setOpen(false); }}
+                  className={`flex w-full items-start ${s.pl} ${s.pr} py-2 text-left ${s.text} text-black/35 transition-colors hover:bg-[#f5f7fb]`}
+                >
+                  <span className="flex-1 whitespace-normal text-left leading-[1.35]">{placeholder}</span>
+                </button>
+                {safeOptions.length > 0 && <div className="mx-2 my-1 border-t border-black/[0.05]" />}
+              </>
             )}
 
             {/* Regular options */}

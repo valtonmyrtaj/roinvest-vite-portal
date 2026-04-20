@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ChevronRight, X } from "lucide-react";
 import type { Unit, UnitHistory } from "../hooks/useUnits";
 import { SQ_MONTHS_LONG } from "./shared";
+import { SkeletonRows } from "../components/SkeletonRows";
 
 export function HistoryDrawer({
   unit,
@@ -117,7 +118,7 @@ export function HistoryDrawer({
           </p>
 
           {loadingHistory ? (
-            <p className="text-[13px] text-black/30">Duke ngarkuar...</p>
+            <SkeletonRows rows={4} />
           ) : history.length === 0 ? (
             <p className="text-[13px] text-black/30">Asnjë ndryshim i regjistruar.</p>
           ) : (

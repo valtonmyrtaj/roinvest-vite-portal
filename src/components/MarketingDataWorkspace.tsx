@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { CustomSelect } from "./CustomSelect";
 import { useMarketing } from "../hooks/useMarketing";
+import { SkeletonRows } from "./SkeletonRows";
 import type { MarketingInput, MarketingRow, OfflineInput, OfflineEntry } from "../hooks/useMarketing";
 
 const NAVY = "#003883";
@@ -767,8 +768,8 @@ export function MarketingDataWorkspace() {
         </div>
 
         {loading ? (
-          <div className="rounded-[16px] border border-dashed border-[#e8e8ec] py-10 text-center text-[12px] text-black/35">
-            Duke ngarkuar të dhënat...
+          <div className="rounded-[16px] border border-dashed border-[#e8e8ec] px-5 py-6">
+            <SkeletonRows rows={3} />
           </div>
         ) : filteredDigitalEntries.length === 0 ? (
           <div className="rounded-[16px] border border-dashed border-[#e8e8ec] py-10 text-center">
@@ -863,8 +864,8 @@ export function MarketingDataWorkspace() {
         </div>
 
         {loading ? (
-          <div className="rounded-[16px] border border-dashed border-[#e8e8ec] py-10 text-center text-[12px] text-black/35">
-            Duke ngarkuar të dhënat...
+          <div className="rounded-[16px] border border-dashed border-[#e8e8ec] px-5 py-6">
+            <SkeletonRows rows={3} />
           </div>
         ) : filteredOffline.length === 0 ? (
           <div className="rounded-[16px] border border-dashed border-[#e8e8ec] py-10 text-center">

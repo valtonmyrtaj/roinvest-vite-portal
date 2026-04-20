@@ -5,7 +5,8 @@
       "Bash(/Users/valtonmyrtaj/.nvm/versions/node/v22.11.0/bin/npx tsc:*)",
       "Bash(export PATH=\"$PATH:/usr/local/bin:/opt/homebrew/bin:/usr/bin\")",
       "Bash(export PATH=\"$PATH:/usr/local/bin:/opt/homebrew/bin\")",
-      "Bash(export PATH=\"$PATH:/usr/local/bin\")"
+      "Bash(export PATH=\"$PATH:/usr/local/bin\")",
+      "Bash(npm run *)"
     ]
   }
 }

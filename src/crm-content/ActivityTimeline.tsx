@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { history } from "../lib/api";
 import { useUnits } from "../hooks/useUnits";
 import { Card } from "./primitives";
+import { SkeletonRows } from "../components/SkeletonRows";
 import {
   HISTORY_BORDER,
   NAVY,
@@ -126,7 +127,7 @@ export function ActivityTimeline({ refreshKey = 0 }: { refreshKey?: number }) {
       </div>
       <div className="max-h-[480px] overflow-y-auto px-5 pb-1 pt-3.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {loading ? (
-          <div className="py-10 text-center text-[13px] text-black/30">Duke ngarkuar...</div>
+          <SkeletonRows rows={5} className="py-4" />
         ) : entries.length === 0 ? (
           <div className="py-10 text-center text-[13px] text-black/30">Asnjë aktivitet i regjistruar</div>
         ) : (

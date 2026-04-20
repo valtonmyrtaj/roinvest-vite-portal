@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { ComponentType, CSSProperties } from "react";
+import { Bookmark } from "lucide-react";
 import { Card, KpiCard, MetricSkeleton } from "./primitives";
 import { GREEN, NAVY } from "./shared";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
@@ -164,7 +165,7 @@ export function SalesSummary({
 
       {reservationSummary && (
         <div className="mt-4 flex items-center gap-2 text-[12px] text-black/42">
-          <span>🔖</span>
+          <Bookmark size={13} strokeWidth={2} className="shrink-0" style={{ color: NAVY, opacity: 0.55 }} />
           <span>
             <span className="font-medium text-black/58">
               Rezervimet aktuale · {reservationSummary.activeCount} aktive

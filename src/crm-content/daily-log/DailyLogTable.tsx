@@ -5,6 +5,7 @@ import type { CreateDailyLogInput, DailyLogEntry } from "../../hooks/useCRM";
 import { ConfirmDeleteModal } from "../ConfirmDeleteModal";
 import { Card } from "../primitives";
 import { MONTH_LABELS, NAVY, SOFT_EASE, TODAY_ISO, fmtDate, toDateOnly } from "../shared";
+import { SkeletonRows } from "../../components/SkeletonRows";
 
 interface DraftLogRow {
   date: string;
@@ -195,7 +196,7 @@ export function DailyLogTable({
 
         <Card className="overflow-hidden p-0">
           {loading ? (
-            <div className="py-10 text-center text-[13px] text-black/30">Duke ngarkuar...</div>
+            <SkeletonRows rows={3} className="px-5 py-8" />
           ) : (
             <div className="max-h-[350px] overflow-x-auto overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <table className="w-full text-[12px]">

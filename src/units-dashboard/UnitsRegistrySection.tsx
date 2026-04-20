@@ -3,6 +3,7 @@ import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { PillBadge } from "../components/ui/PillBadge";
 import type { Block, Level, Unit, UnitStatus } from "../hooks/useUnits";
 import { getOwnerCategoryStyle } from "../lib/ownerColors";
+import { SkeletonRows } from "../components/SkeletonRows";
 import { getUnitContractValue } from "../lib/unitFinancials";
 import { Card, FilterSelect } from "./primitives";
 import {
@@ -146,9 +147,7 @@ export function UnitsRegistrySection({
 
         <div className="max-h-[560px] overflow-auto">
           {loading ? (
-            <div className="py-16 text-center text-[13px] text-black/30">
-              Duke ngarkuar njësitë...
-            </div>
+            <SkeletonRows rows={7} className="px-5 py-6" />
           ) : (
             <table className="w-full min-w-[1080px] text-[12px] font-normal">
               <thead className="sticky top-0 z-10 bg-[#f9f9fb]">

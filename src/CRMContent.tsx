@@ -22,6 +22,7 @@ import { PageHeader } from "./components/ui/PageHeader";
 import { NAVY, SOFT_EASE, sectionMotion } from "./crm-content/shared";
 import "./crm-content/dailyDateSync";
 import { PAGE_BG } from "./ui/tokens";
+import { SkeletonRows } from "./components/SkeletonRows";
 
 export default function CRMContent() {
   const {
@@ -254,7 +255,9 @@ export default function CRMContent() {
 
         <motion.div {...sectionMotion(0.07)} className="mb-7">
           {showingsLoading ? (
-            <div className="py-10 text-center text-[13px] text-black/30">Duke ngarkuar shfaqjet...</div>
+            <div className="rounded-[18px] border border-[#e8e8ec] bg-white px-5 py-5" style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}>
+              <SkeletonRows rows={4} />
+            </div>
           ) : (
             <ShowingsSection
               showings={showings}

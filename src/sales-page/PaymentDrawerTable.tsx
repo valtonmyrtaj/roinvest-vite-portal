@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import type { Payment } from "../hooks/usePayments";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { fmtDate, NAVY } from "./shared";
+import { SkeletonRows } from "../components/SkeletonRows";
 
 /**
  * "Lista e kësteve" — the detailed installment table. Triggers the
@@ -30,7 +31,7 @@ export function PaymentDrawerTable({
 
       <div className="overflow-x-auto">
         {loading ? (
-          <p className="px-5 py-4 text-[13px] text-black/35">Duke ngarkuar këstët...</p>
+          <SkeletonRows rows={3} className="px-5 py-4" />
         ) : payments.length === 0 ? (
           <p className="px-5 py-4 text-[13px] text-black/35">Asnjë këst i regjistruar.</p>
         ) : (

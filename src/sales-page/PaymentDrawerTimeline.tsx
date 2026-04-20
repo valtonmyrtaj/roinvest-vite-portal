@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type { Payment } from "../hooks/usePayments";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { fmtDateCompact, GREEN, NAVY, RED } from "./shared";
+import { SkeletonRows } from "../components/SkeletonRows";
 
 /**
  * "Plani i pagesave" card — horizontal installment timeline plus a
@@ -55,7 +56,7 @@ export function PaymentDrawerTimeline({
       </div>
 
       {loading ? (
-        <p className="mt-5 text-[13px] text-black/35">Duke ngarkuar këstët...</p>
+        <SkeletonRows rows={3} className="mt-5" />
       ) : payments.length === 0 ? (
         <p className="mt-5 text-[13px] text-black/35">
           Nuk ka këste të regjistruara ende për këtë njësi.

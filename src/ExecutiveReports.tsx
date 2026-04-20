@@ -11,7 +11,7 @@ import { InvestmentSection } from "./executive-reports/InvestmentSection";
 import { MarketingSection } from "./executive-reports/MarketingSection";
 import { OperationalSection } from "./executive-reports/OperationalSection";
 import { PageHeader } from "./components/ui/PageHeader";
-import { PAGE_BG } from "./ui/tokens";
+import { PAGE_BG, SURFACE_BORDER } from "./ui/tokens";
 
 /**
  * Executive Reports page — thin shell that:
@@ -112,8 +112,8 @@ export default function ExecutiveReports() {
                 onClick={() => {
                   if (typeof window !== "undefined") window.print();
                 }}
-                className="print-hide executive-reports-print-hide inline-flex h-[40px] items-center gap-2 rounded-[12px] border border-[#d7deea] bg-white px-4 text-[13px] font-medium transition hover:border-[#c3d2ea] hover:bg-[#fafcff]"
-                style={{ color: NAVY }}
+                className="print-hide executive-reports-print-hide inline-flex h-[40px] items-center gap-2 rounded-[12px] border bg-white px-4 text-[13px] font-medium transition hover:border-[#c3d2ea] hover:bg-[#fafcff]"
+                style={{ color: NAVY, borderColor: SURFACE_BORDER }}
               >
                 <Printer size={15} strokeWidth={2} />
                 Eksporto PDF

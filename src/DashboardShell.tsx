@@ -142,9 +142,14 @@ function NotificationPanel({
       {/* List */}
       <div className="max-h-[400px] overflow-y-auto">
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <Bell size={24} className="mb-2 text-black/15" />
-            <p className="text-[12.5px] text-black/30">Asnjë njoftim</p>
+          <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/[0.03]">
+              <Bell size={15} className="text-black/30" strokeWidth={2} />
+            </div>
+            <p className="text-[12.5px] font-medium text-black/55">Asnjë njoftim i ri</p>
+            <p className="mt-1 text-[11.5px] text-black/32">
+              Njoftimet e reja do të shfaqen këtu
+            </p>
           </div>
         ) : (
           notifications.map((n) => {
