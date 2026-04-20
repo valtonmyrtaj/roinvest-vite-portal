@@ -755,7 +755,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
         {/* Header */}
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <motion.h1 {...fadeUp(0)} className="text-[26px] tracking-wide" style={{ fontWeight: 700, color: NAVY }}>
+            <motion.h1 {...fadeUp(0)} className="text-[24px] font-semibold tracking-[-0.03em]" style={{ color: NAVY }}>
               Marketingu
             </motion.h1>
             <motion.p {...fadeUp(0.06)} className="mt-0.5 text-[13px]" style={{ color: NAVY, opacity: 0.65 }}>

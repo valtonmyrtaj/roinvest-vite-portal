@@ -145,7 +145,6 @@ export function UnitsDashboard() {
 
       <div className="mx-auto max-w-[1280px] px-10 py-10">
         <PageHeader
-          as="h2"
           title="Të gjitha njësitë"
           subtitle="Pamje e plotë e inventarit të njësive, me filtrim sipas llojit, nivelit, statusit dhe kategorisë së pronësisë."
           titleClassName="text-black/92"

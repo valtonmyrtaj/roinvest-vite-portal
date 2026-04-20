@@ -26,7 +26,7 @@ export function SalesHeader({
         className="mb-4 flex flex-wrap items-stretch justify-between gap-x-6 gap-y-4 pt-1"
         bodyClassName="min-w-[320px] flex-1"
         contentClassName="flex min-h-[74px] max-w-[620px] flex-col justify-center"
-        titleClassName="inline-block text-[30px] leading-none tracking-[-0.02em]"
+        titleClassName="inline-block text-[24px] leading-none tracking-[-0.03em]"
         titleStyle={{ color: NAVY }}
         subtitleClassName="mt-[4px] max-w-[500px] text-[13.5px] leading-[1.4]"
         subtitleStyle={{ color: NAVY, opacity: 0.72 }}

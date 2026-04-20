@@ -48,7 +48,7 @@ export function PageHeader({
             </p>
           ) : null}
           <TitleTag
-            className={`text-[22px] font-semibold tracking-[-0.03em] text-black/90 ${titleClassName}`.trim()}
+            className={`text-[24px] font-semibold tracking-[-0.03em] text-black/90 ${titleClassName}`.trim()}
             style={titleStyle}
           >
             {title}

@@ -449,8 +449,8 @@ export default function OverviewPage() {
           <div>
             <motion.h1
               {...fadeUp(0)}
-              className="text-[26px] tracking-wide"
-              style={{ fontWeight: 700, color: "#003883" }}
+              className="text-[24px] font-semibold tracking-[-0.03em]"
+              style={{ color: "#003883" }}
             >
               UF Partners Residence
             </motion.h1>

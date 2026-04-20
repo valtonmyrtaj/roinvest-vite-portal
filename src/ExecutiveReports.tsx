@@ -102,7 +102,6 @@ export default function ExecutiveReports() {
             title="Raportet"
             subtitle="Pasqyra e plotë e investimit — UF Partners Residence"
             className="mb-0"
-            titleClassName="text-[24px] tracking-[-0.03em]"
             titleStyle={{ color: NAVY }}
             subtitleClassName="mt-[2px] text-[13px] font-normal"
             subtitleStyle={{ color: "#9ca3af" }}
