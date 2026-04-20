@@ -1,648 +1,1050 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, ArrowDownRight, TrendingUp } from "lucide-react";
-import { motion, useInView } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  TrendingUp, TrendingDown, Eye, Users, Database,
+  Plus, X, Trash2, AlertTriangle,
+} from "lucide-react";
+import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
 } from "recharts";
-import { useDashboard } from "./context/DashboardContext";
+import { CustomSelect } from "./components/CustomSelect";
+import { useMarketing, type MarketingInput, type OfflineInput } from "./hooks/useMarketing";
 
-const cumulativeData = [
-  { month: "Oct", spend: 120000 },
-  { month: "Nov", spend: 245000 },
-  { month: "Dec", spend: 390000 },
-  { month: "Jan", spend: 540000 },
-  { month: "Feb", spend: 710000 },
-  { month: "Mar", spend: 862000 },
+const NAVY = "#003883";
+const FB_COLOR = "#003883";
+const VIEWS_COLOR = "#003883";
+const LEADS_COLOR = "#3c7a57";
+
+const SQ_MONTHS = [
+  "Janar", "Shkurt", "Mars", "Prill", "Maj", "Qershor",
+  "Korrik", "Gusht", "Shtator", "Tetor", "Nëntor", "Dhjetor",
 ];
+const SQ_MONTHS_SHORT = ["Jan", "Shk", "Mar", "Pri", "Maj", "Qer", "Kor", "Gus", "Sht", "Tet", "Nën", "Dhj"];
+const YEAR_OPTIONS = ["2026", "2027", "2028", "2029", "2030"] as const;
+const YEARS = YEAR_OPTIONS.map(Number);
+const CHANNELS = ["Billboard", "Fletushka", "Radio", "Evente", "Tjetër"] as const;
+const OFFLINE_FILTERS = ["E gjitha", "Mujore", "Vjetore"] as const;
 
-const viewsTrend = [
-  { month: "Oct", current: 48000, previous: 32000 },
-  { month: "Nov", current: 62000, previous: 41000 },
-  { month: "Dec", current: 54000, previous: 45000 },
-  { month: "Jan", current: 78000, previous: 52000 },
-  { month: "Feb", current: 91000, previous: 60000 },
-  { month: "Mar", current: 104000, previous: 68000 },
-];
-
-function useCountUp(end: number, startAnimation: boolean, duration = 1200) {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    if (!startAnimation) return;
-
-    let frame = 0;
-    let startTime: number | null = null;
-
-    const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-
-      setValue(Math.round(end * eased));
-
-      if (progress < 1) {
-        frame = requestAnimationFrame(animate);
-      }
-    };
-
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [end, startAnimation, duration]);
-
-  return value;
-}
-
-function useHasEnteredView(amount = 0.28) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const inView = useInView(ref, { once: true, amount });
-  const [hasEntered, setHasEntered] = useState(false);
-
-  useEffect(() => {
-    if (inView) setHasEntered(true);
-  }, [inView]);
-
-  return { ref, inView, hasEntered };
-}
-
-function formatCurrency(v: number) {
-  return v >= 1000000
-    ? `€${(v / 1000000).toFixed(1)}M`
-    : v >= 1000
-      ? `€${(v / 1000).toFixed(0)}K`
-      : `€${v}`;
-}
-
-function formatViews(v: number) {
-  return v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`;
-}
-
-function formatFullEuro(v: number) {
-  return `€${v.toLocaleString("en-US")}`;
-}
-
-function formatPlainNumber(v: number) {
-  return v.toLocaleString("en-US");
-}
-
-function parseNumericValue(value: string) {
-  return Number(value.replace(/[^\d]/g, ""));
-}
-
-function pctChange(curr: number, prev: number) {
-  if (prev === 0) return curr === 0 ? 0 : 100;
-  return ((curr - prev) / prev) * 100;
-}
-
-const CustomTooltip = ({ active, payload, label, isCurrency }: any) => {
-  if (!active || !payload?.length) return null;
-
-  return (
-    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm">
-      <p className="mb-1 text-[11px] text-gray-400">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} className="text-[12px] text-gray-800">
-          {p.name}: {isCurrency ? formatCurrency(p.value) : formatViews(p.value)}
-        </p>
-      ))}
-    </div>
-  );
+const CHANNEL_COLOR: Record<string, string> = {
+  Billboard: "#003883",
+  Fletushka: "#3c7a57",
+  Radio:     "#b0892f",
+  Evente:    "#7b4bb0",
+  Tjetër:    "#6b7280",
 };
 
-function AnimatedSectionTitle({
-  title,
-  subtitle,
-  startAnimation,
-}: {
-  title: string;
-  subtitle?: string;
-  startAnimation: boolean;
-}) {
-  return (
-    <div className="mb-6 flex items-end justify-between">
-      <div className="flex items-stretch gap-3.5">
-        <motion.div
-          initial={{ scaleY: 0, opacity: 0.45 }}
-          animate={startAnimation ? { scaleY: 1, opacity: 0.8 } : { scaleY: 0, opacity: 0.45 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="origin-top w-[3px] rounded-full bg-[#003883]"
-        />
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={startAnimation ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-          transition={{ duration: 0.45, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <h2
-            className="text-[17px] tracking-[0.005em] text-gray-900"
-            style={{ fontWeight: 600, letterSpacing: "-0.01em" }}
-          >
-            {title}
-          </h2>
-          {subtitle && <p className="mt-0.5 text-[12px] text-gray-400">{subtitle}</p>}
-        </motion.div>
-      </div>
-    </div>
-  );
+function fmtEur(n: number) {
+  return `€${n.toLocaleString("de-DE")}`;
 }
 
-function AnimatedKpiCard({
-  label,
-  value,
-  change,
-  positive,
-  subtitle,
-  startAnimation,
-  delay = 0,
-  valueType = "currency",
-}: {
-  label: string;
-  value: string;
-  change?: string;
-  positive?: boolean;
-  subtitle?: string;
-  startAnimation: boolean;
-  delay?: number;
-  valueType?: "currency" | "number";
-}) {
-  const numericValue = useMemo(() => parseNumericValue(value), [value]);
-  const animatedValue = useCountUp(numericValue, startAnimation, 1200);
+function fmtNum(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString("de-DE");
+}
 
-  const displayValue =
-    valueType === "currency"
-      ? formatFullEuro(animatedValue)
-      : formatPlainNumber(animatedValue);
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.38, delay, ease: [0.22, 1, 0.36, 1] as const },
+});
+
+function useCountUp(end: number, active: boolean, duration = 1200) {
+  const [val, setVal] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    let frame = 0;
+    let t0: number | null = null;
+
+    const tick = (ts: number) => {
+      if (!t0) t0 = ts;
+      const p = Math.min((ts - t0) / duration, 1);
+      setVal(Math.round(end * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [end, active, duration]);
+
+  return val;
+}
+
+interface HeroCardProps {
+  label: string;
+  value: number;
+  prevValue: number | null;
+  format: (n: number) => string;
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties; strokeWidth?: number }>;
+  delay: number;
+  active: boolean;
+}
+
+type SpendTooltipPayloadItem = {
+  value?: number | string;
+};
+
+type SpendTooltipProps = {
+  active?: boolean;
+  payload?: SpendTooltipPayloadItem[];
+  label?: string;
+};
+
+type LineTooltipPayloadItem = {
+  name?: string;
+  stroke?: string;
+  value?: number | string;
+};
+
+type LineTooltipProps = {
+  active?: boolean;
+  payload?: LineTooltipPayloadItem[];
+  label?: string;
+};
+
+function HeroCard({ label, value, prevValue, format, icon: Icon, delay, active }: HeroCardProps) {
+  const animated = useCountUp(value, active, 1400);
+  const delta = prevValue !== null && prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : null;
+  const deltaPos = delta !== null && delta >= 0;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 22 }}
-      animate={startAnimation ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
-      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-5"
+      {...fadeUp(delay)}
+      whileHover={{ y: -4, boxShadow: "0 12px 28px rgba(0,0,0,0.09)" }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      className="flex-1 rounded-[20px] border border-[#E8E8EC] bg-white px-6 py-6"
+      style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.06)" }}
     >
-      <p className="text-[11px] uppercase tracking-[0.06em] text-gray-400">{label}</p>
-
-      <div className="flex items-end justify-between">
-        <p className="leading-none text-[26px] tracking-tight text-gray-900">
-          {displayValue}
-        </p>
-
-        {change && (
-          <motion.span
-            initial={{ opacity: 0, x: 10 }}
-            animate={startAnimation ? { opacity: 1, x: 0 } : { opacity: 0, x: 10 }}
-            transition={{ duration: 0.4, delay: delay + 0.24 }}
-            className={`flex items-center gap-0.5 text-[12px] ${
-              positive ? "text-emerald-500" : "text-red-400"
-            }`}
-          >
-            {positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-            {change}
-          </motion.span>
+      <div className="mb-4 flex items-start justify-between">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#eaf0fa]">
+          <Icon size={16} style={{ color: NAVY }} strokeWidth={1.8} />
+        </div>
+        {delta !== null && (
+          <div className="flex items-center gap-1">
+            {deltaPos ? (
+              <TrendingUp size={12} style={{ color: "#3c7a57" }} strokeWidth={2} />
+            ) : (
+              <TrendingDown size={12} style={{ color: "#b14b4b" }} strokeWidth={2} />
+            )}
+            <span className="text-[12px]" style={{ color: deltaPos ? "#3c7a57" : "#b14b4b", fontWeight: 600 }}>
+              {deltaPos ? "+" : ""}
+              {delta.toFixed(1)}%
+            </span>
+          </div>
         )}
       </div>
-
-      {subtitle && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={startAnimation ? { opacity: 1 } : { opacity: 0 }}
-          transition={{ duration: 0.35, delay: delay + 0.34 }}
-          className="text-[11px] text-gray-300"
-        >
-          {subtitle}
-        </motion.p>
+      <p className="text-[36px] leading-none tracking-[-2px]" style={{ fontWeight: 700, color: NAVY }}>
+        {format(animated)}
+      </p>
+      <p className="mt-2 text-[12.5px] text-black/45" style={{ fontWeight: 500 }}>{label}</p>
+      {prevValue !== null && prevValue > 0 && (
+        <p className="mt-0.5 text-[11.5px] text-black/28">{format(prevValue)} muaji i kaluar</p>
       )}
     </motion.div>
   );
 }
 
-function MarketingSection({
-  children,
+function SpendTooltip({ active, payload, label }: SpendTooltipProps) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-[10px] border border-[#e8e8ec] bg-white px-3 py-2" style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.10)" }}>
+      <p className="mb-1 text-[11px] text-black/40">{label}</p>
+      <p className="text-[13px]" style={{ color: NAVY, fontWeight: 700 }}>
+        {fmtEur(Number(payload[0].value ?? 0))}
+      </p>
+    </div>
+  );
+}
+
+function LineTooltip({ active, payload, label }: LineTooltipProps) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-[10px] border border-[#e8e8ec] bg-white px-3 py-2.5" style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.10)" }}>
+      <p className="mb-1.5 text-[11px] text-black/40">{label}</p>
+      {payload.map((p, i) => (
+        <div key={i} className="flex items-center gap-2 py-0.5">
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: p.stroke ?? NAVY }} />
+          <span className="text-[12px] text-black/50">{p.name ?? "—"}:</span>
+          <span className="text-[12px]" style={{ color: p.stroke ?? NAVY, fontWeight: 600 }}>
+            {fmtNum(Number(p.value ?? 0))}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChartYearSelect({ value, onChange }: { value: number; onChange: (year: number) => void }) {
+  return (
+    <label className="flex items-center gap-2">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Viti</span>
+      <CustomSelect
+        size="sm"
+        className="min-w-[92px]"
+        options={[...YEAR_OPTIONS]}
+        value={String(value)}
+        onChange={(next) => onChange(Number(next))}
+      />
+    </label>
+  );
+}
+
+// ─── Modal field helpers ───────────────────────────────────────────────────────
+
+function ModalNumberField({
+  label, value, onChange, required = false,
 }: {
-  children: (state: { inView: boolean; hasEntered: boolean }) => React.ReactNode;
+  label: string; value: string; onChange: (v: string) => void; required?: boolean;
 }) {
-  const { ref, inView, hasEntered } = useHasEnteredView(0.22);
-
   return (
-    <section ref={ref} className="relative mb-10">
-      {children({ inView, hasEntered })}
-    </section>
+    <div>
+      <label className="mb-1 block text-[12px] font-semibold text-black/55">
+        {label}{required && <span className="ml-0.5 text-[#b14b4b]">*</span>}
+      </label>
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[38px] w-full rounded-[10px] border border-[#e8e8ec] bg-white px-3 text-[13px] outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+        style={{ color: "rgba(0,0,0,0.85)", fontWeight: 500 }}
+      />
+    </div>
   );
 }
 
-function AnimatedSpendTrendChart({ show }: { show: boolean }) {
+function ModalTextField({
+  label, value, onChange, placeholder, required = false,
+}: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean;
+}) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={cumulativeData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-        <defs>
-          <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#003883" stopOpacity={0.12} />
-            <stop offset="100%" stopColor="#003883" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-
-        <CartesianGrid stroke="#f3f4f6" vertical={false} />
-        <XAxis
-          dataKey="month"
-          tick={{ fontSize: 11, fill: "#9ca3af" }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
-          tick={{ fontSize: 11, fill: "#9ca3af" }}
-          axisLine={false}
-          tickLine={false}
-          width={55}
-        />
-        <Tooltip content={<CustomTooltip isCurrency />} />
-        <Area
-          key={show ? "spend-active" : "spend-idle"}
-          type="monotone"
-          dataKey="spend"
-          name="Cumulative"
-          stroke="#003883"
-          strokeWidth={2}
-          fill="url(#spendGrad)"
-          isAnimationActive={show}
-          animationBegin={180}
-          animationDuration={1400}
-          animationEasing="ease-out"
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+    <div>
+      <label className="mb-1 block text-[12px] font-semibold text-black/55">
+        {label}{required && <span className="ml-0.5 text-[#b14b4b]">*</span>}
+      </label>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[38px] w-full rounded-[10px] border border-[#e8e8ec] bg-white px-3 text-[13px] outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+        style={{ color: "rgba(0,0,0,0.85)", fontWeight: 500 }}
+      />
+    </div>
   );
 }
 
-function AnimatedViewsBarChart({ show }: { show: boolean }) {
+function ModalDateField({
+  label, value, onChange, required = false,
+}: {
+  label: string; value: string; onChange: (v: string) => void; required?: boolean;
+}) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        data={viewsTrend}
-        margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
-        barGap={4}
+    <div>
+      <label className="mb-1 block text-[12px] font-semibold text-black/55">
+        {label}{required && <span className="ml-0.5 text-[#b14b4b]">*</span>}
+      </label>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[38px] w-full rounded-[10px] border border-[#e8e8ec] bg-white px-3 text-[13px] outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+        style={{ color: "rgba(0,0,0,0.85)", fontWeight: 500 }}
+      />
+    </div>
+  );
+}
+
+// ─── DigitalModal ──────────────────────────────────────────────────────────────
+
+function DigitalModal({
+  defaultYear, defaultMonth, onClose, onSave,
+}: {
+  defaultYear: number;
+  defaultMonth: number;
+  onClose: () => void;
+  onSave: (input: MarketingInput) => Promise<{ error: Error | null }>;
+}) {
+  const [year, setYear]           = useState(String(defaultYear));
+  // Store the month name directly — avoids SQ_MONTHS.indexOf round-trip on every change.
+  const [monthName, setMonthName] = useState(SQ_MONTHS[defaultMonth - 1] ?? SQ_MONTHS[0]);
+  const [spendFB, setSpendFB]     = useState("");
+  const [viewsFB, setViewsFB]     = useState("");
+  const [viewsTT, setViewsTT]     = useState("");
+  const [leadsFB, setLeadsFB]     = useState("");
+  const [leadsIG, setLeadsIG]     = useState("");
+  const [leadsTT, setLeadsTT]     = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [errMsg, setErrMsg]       = useState<string | null>(null);
+
+  const canSubmit = year && monthName && !saving;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSaving(true);
+    setErrMsg(null);
+    try {
+      const monthNumber = SQ_MONTHS.indexOf(monthName) + 1; // 1–12
+      const payload = {
+        year:            Number(year),
+        month:           monthNumber,
+        spend_facebook:  Number(spendFB)  || 0,
+        views_facebook:  Number(viewsFB)  || 0,
+        views_tiktok:    Number(viewsTT)  || 0,
+        leads_facebook:  Number(leadsFB)  || 0,
+        leads_instagram: Number(leadsIG)  || 0,
+        leads_tiktok:    Number(leadsTT)  || 0,
+      };
+      const { error } = await onSave(payload);
+      if (error) { setErrMsg(error.message); return; }
+      onClose();
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : "Ruajtja dështoi. Provo përsëri.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-[480px] rounded-[20px] border border-[#e8e8ec] bg-white p-6"
+        style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}
       >
-        <CartesianGrid stroke="#f3f4f6" vertical={false} />
-        <XAxis
-          dataKey="month"
-          tick={{ fontSize: 11, fill: "#9ca3af" }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
-          tick={{ fontSize: 11, fill: "#9ca3af" }}
-          axisLine={false}
-          tickLine={false}
-          width={50}
-        />
-        <Tooltip content={<CustomTooltip />} />
-        <Bar
-          key={show ? "previous-active" : "previous-idle"}
-          dataKey="previous"
-          name="Previous"
-          fill="#003883"
-          fillOpacity={0.15}
-          radius={[4, 4, 0, 0]}
-          barSize={20}
-          isAnimationActive={show}
-          animationBegin={120}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-        <Bar
-          key={show ? "current-active" : "current-idle"}
-          dataKey="current"
-          name="Current"
-          fill="#003883"
-          radius={[4, 4, 0, 0]}
-          barSize={20}
-          isAnimationActive={show}
-          animationBegin={520}
-          animationDuration={900}
-          animationEasing="ease-out"
-        />
-      </BarChart>
-    </ResponsiveContainer>
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
+            Shto të dhëna dixhitale
+          </h2>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-black/35 transition hover:bg-[#f5f7fb] hover:text-black/60"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-black/55">
+              Viti<span className="ml-0.5 text-[#b14b4b]">*</span>
+            </label>
+            <CustomSelect size="sm" className="w-full" options={[...YEAR_OPTIONS]} value={year} onChange={setYear} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-black/55">
+              Muaji<span className="ml-0.5 text-[#b14b4b]">*</span>
+            </label>
+            <CustomSelect
+              size="sm"
+              className="w-full"
+              options={SQ_MONTHS}
+              value={monthName}
+              onChange={setMonthName}
+            />
+          </div>
+          <ModalNumberField label="Shpenzime Facebook (€)" value={spendFB} onChange={setSpendFB} />
+          <ModalNumberField label="Shikime Facebook"       value={viewsFB} onChange={setViewsFB} />
+          <ModalNumberField label="Shikime TikTok"         value={viewsTT} onChange={setViewsTT} />
+          <ModalNumberField label="Leads Facebook"         value={leadsFB} onChange={setLeadsFB} />
+          <ModalNumberField label="Leads Instagram"        value={leadsIG} onChange={setLeadsIG} />
+          <ModalNumberField label="Leads TikTok"           value={leadsTT} onChange={setLeadsTT} />
+        </div>
+
+        {errMsg && (
+          <div className="mt-3 flex items-center gap-2 rounded-[10px] bg-[#fdf3f3] px-3 py-2.5">
+            <AlertTriangle size={13} style={{ color: "#b14b4b" }} strokeWidth={2} />
+            <p className="text-[12px]" style={{ color: "#b14b4b" }}>{errMsg}</p>
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="h-[38px] rounded-[10px] border border-[#e8e8ec] px-4 text-[13px] text-black/55 transition hover:bg-[#f5f7fb]"
+          >
+            Anulo
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="h-[38px] rounded-[10px] px-5 text-[13px] text-white transition hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: NAVY, fontWeight: 600 }}
+          >
+            {saving ? "Duke ruajtur..." : "Shto të dhënat"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
-export default function MarketingDashboard() {
-  const { data } = useDashboard();
+// ─── OfflineModal ──────────────────────────────────────────────────────────────
 
-  const budgetRef = useRef<HTMLDivElement | null>(null);
-  const budgetInView = useInView(budgetRef, { once: true, amount: 0.45 });
+function OfflineModal({
+  defaultYear, defaultMonth, onClose, onSave,
+}: {
+  defaultYear: number;
+  defaultMonth: number;
+  onClose: () => void;
+  onSave: (input: OfflineInput) => Promise<{ error: Error | null }>;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [channel, setPeriodChannel]   = useState("");
+  const [description, setDescription] = useState("");
+  const [amount, setAmount]           = useState("");
+  const [periodType, setPeriodType]   = useState<"Mujore" | "Vjetore">("Mujore");
+  const [year, setYear]               = useState(String(defaultYear));
+  const [month, setMonth]             = useState(String(defaultMonth));
+  const [date, setDate]               = useState(today);
+  const [saving, setSaving]           = useState(false);
+  const [errMsg, setErrMsg]           = useState<string | null>(null);
 
-  const monthlySpend = data.marketing.spend;
-  const yearlySpend = cumulativeData[cumulativeData.length - 1]?.spend ?? monthlySpend;
-  const weeklySpend = Math.round(monthlySpend / 4);
+  const canSubmit =
+    channel && amount && year && date &&
+    (periodType === "Vjetore" || month) && !saving;
 
-  const monthlyViews = data.marketing.reach;
-  const yearlyViews = viewsTrend.reduce((sum, item) => sum + item.current, 0);
-  const weeklyViews = Math.round(monthlyViews / 4);
-
-  const periodTotal = useCountUp(monthlySpend, budgetInView, 1250);
-  const dailyAverage = useCountUp(Math.round(monthlySpend / 30), budgetInView, 1250);
-  const remainingBudgetBase = Math.max(data.targets.monthlyRevenueTarget - monthlySpend, 0);
-  const remainingBudget = useCountUp(remainingBudgetBase, budgetInView, 1250);
-
-  const budgetPercentValue =
-    data.targets.monthlyRevenueTarget > 0
-      ? Math.min(
-          Math.round((monthlySpend / data.targets.monthlyRevenueTarget) * 100),
-          100
-        )
-      : 0;
-
-  const budgetPercent = useCountUp(budgetPercentValue, budgetInView, 1100);
-
-  const spendVsTarget = pctChange(monthlySpend, data.targets.monthlyRevenueTarget || 1);
-  const viewsVsLeads = pctChange(monthlyViews, data.marketing.leadsGenerated || 1);
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSaving(true);
+    setErrMsg(null);
+    try {
+      const { error } = await onSave({
+        channel,
+        description: description || null,
+        amount:      Number(amount),
+        period_type: periodType,
+        year:        Number(year),
+        month:       periodType === "Mujore" ? Number(month) : null,
+        date,
+      });
+      if (error) { setErrMsg(error.message); return; }
+      onClose();
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : "Ruajtja dështoi. Provo përsëri.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="flex-1 overflow-auto bg-[#FAFBFC]">
-      <div className="mx-auto max-w-[1200px] px-8 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-8"
-        >
-          <div className="mb-1 flex items-center gap-2.5">
-            <h1 className="text-[22px] tracking-tight text-gray-900">Marketing</h1>
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-[480px] rounded-[20px] border border-[#e8e8ec] bg-white p-6"
+        style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}
+      >
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
+            Shto hyrje offline
+          </h2>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-black/35 transition hover:bg-[#f5f7fb] hover:text-black/60"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-black/55">
+              Kanali<span className="ml-0.5 text-[#b14b4b]">*</span>
+            </label>
+            <CustomSelect
+              size="md"
+              className="w-full"
+              options={[...CHANNELS]}
+              value={channel}
+              placeholder="Zgjidh kanalin"
+              onChange={setPeriodChannel}
+            />
           </div>
-          <p className="text-[13px] text-gray-400">
-            Live campaign performance, spend and reach overview
-          </p>
+          <ModalTextField
+            label="Përshkrimi"
+            value={description}
+            onChange={setDescription}
+            placeholder="Opsionale"
+          />
+          <ModalNumberField label="Shuma (€)" value={amount} onChange={setAmount} required />
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-black/55">
+              Periudha<span className="ml-0.5 text-[#b14b4b]">*</span>
+            </label>
+            <CustomSelect
+              size="md"
+              className="w-full"
+              options={["Mujore", "Vjetore"]}
+              value={periodType}
+              onChange={(v) => setPeriodType(v as "Mujore" | "Vjetore")}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[12px] font-semibold text-black/55">
+                Viti<span className="ml-0.5 text-[#b14b4b]">*</span>
+              </label>
+              <CustomSelect size="md" className="w-full" options={[...YEAR_OPTIONS]} value={year} onChange={setYear} />
+            </div>
+            {periodType === "Mujore" && (
+              <div>
+                <label className="mb-1 block text-[12px] font-semibold text-black/55">
+                  Muaji<span className="ml-0.5 text-[#b14b4b]">*</span>
+                </label>
+                <CustomSelect
+                  size="md"
+                  className="w-full"
+                  options={SQ_MONTHS}
+                  value={SQ_MONTHS[Number(month) - 1] ?? ""}
+                  onChange={(v) => setMonth(String(SQ_MONTHS.indexOf(v) + 1))}
+                />
+              </div>
+            )}
+          </div>
+          <ModalDateField label="Data" value={date} onChange={setDate} required />
+        </div>
+
+        {errMsg && (
+          <div className="mt-3 flex items-center gap-2 rounded-[10px] bg-[#fdf3f3] px-3 py-2.5">
+            <AlertTriangle size={13} style={{ color: "#b14b4b" }} strokeWidth={2} />
+            <p className="text-[12px]" style={{ color: "#b14b4b" }}>{errMsg}</p>
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="h-[38px] rounded-[10px] border border-[#e8e8ec] px-4 text-[13px] text-black/55 transition hover:bg-[#f5f7fb]"
+          >
+            Anulo
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="h-[38px] rounded-[10px] px-5 text-[13px] text-white transition hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: NAVY, fontWeight: 600 }}
+          >
+            {saving ? "Duke ruajtur..." : "Shto hyrjen"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── DeleteConfirmModal ────────────────────────────────────────────────────────
+
+function DeleteConfirmModal({
+  onCancel, onConfirm, loading,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-[360px] rounded-[20px] border border-[#e8e8ec] bg-white p-6"
+        style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}
+      >
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#fdf3f3]">
+          <AlertTriangle size={18} style={{ color: "#b14b4b" }} strokeWidth={2} />
+        </div>
+        <h2 className="text-[15px]" style={{ fontWeight: 700, color: "rgba(0,0,0,0.82)" }}>
+          Fshi hyrjen offline
+        </h2>
+        <p className="mt-1.5 text-[13px] text-black/45">
+          Jeni i sigurt? Kjo veprim nuk mund të zhbëhet.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="h-[38px] rounded-[10px] border border-[#e8e8ec] px-4 text-[13px] text-black/55 transition hover:bg-[#f5f7fb] disabled:opacity-50"
+          >
+            Anulo
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="h-[38px] rounded-[10px] px-5 text-[13px] text-white transition hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: "#b14b4b", fontWeight: 600 }}
+          >
+            {loading ? "Duke fshirë..." : "Fshi"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
+type MarketingDashboardProps = {
+  onOpenDataInput?: () => void;
+};
+
+export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboardProps) {
+  const {
+    marketingData, offlineEntries, loading,
+    saveMonthlyData, createOfflineEntry, deleteOfflineEntry,
+  } = useMarketing();
+
+  const [started, setStarted] = useState(false);
+  const now = new Date();
+  const [filterYear, setFilterYear] = useState(
+    YEARS.includes(now.getFullYear()) ? now.getFullYear() : YEARS[0]
+  );
+  const [filterMonth, setFilterMonth] = useState<number | "all">(now.getMonth() + 1);
+
+  const [showDigitalModal, setShowDigitalModal] = useState(false);
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId]     = useState<string | null>(null);
+  const [deleting, setDeleting]                 = useState(false);
+  const [logFilter, setLogFilter]               = useState<"E gjitha" | "Mujore" | "Vjetore">("E gjitha");
+
+  useEffect(() => {
+    if (!loading) {
+      const t = setTimeout(() => setStarted(true), 80);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
+
+  const existingData = useMemo(() => {
+    const map: Record<number, Record<number, (typeof marketingData)[0]>> = {};
+    for (const row of marketingData) {
+      if (!map[row.year]) map[row.year] = {};
+      map[row.year][row.month] = row;
+    }
+    return map;
+  }, [marketingData]);
+
+  const aggregateDigital = useCallback(
+    (rows: typeof marketingData) => ({
+      spend: rows.reduce((s, r) => s + r.spend_facebook, 0),
+      views: rows.reduce((s, r) => s + r.views_facebook + r.views_tiktok, 0),
+      leads: rows.reduce((s, r) => s + r.leads_facebook + r.leads_instagram + r.leads_tiktok, 0),
+    }),
+    [],
+  );
+
+  const currentDigitalRows = useMemo(
+    () =>
+      marketingData.filter((r) => {
+        if (r.year !== filterYear) return false;
+        if (filterMonth !== "all" && r.month !== filterMonth) return false;
+        return true;
+      }),
+    [marketingData, filterYear, filterMonth]
+  );
+
+  const prevDigitalRows = useMemo(() => {
+    if (filterMonth === "all") return marketingData.filter((r) => r.year === filterYear - 1);
+    const prevYear  = filterMonth === 1 ? filterYear - 1 : filterYear;
+    const prevMonth = filterMonth === 1 ? 12 : (filterMonth as number) - 1;
+    return marketingData.filter((r) => r.year === prevYear && r.month === prevMonth);
+  }, [marketingData, filterYear, filterMonth]);
+
+  const currentDigital = useMemo(() => aggregateDigital(currentDigitalRows), [aggregateDigital, currentDigitalRows]);
+  const prevDigital    = useMemo(() => aggregateDigital(prevDigitalRows),    [aggregateDigital, prevDigitalRows]);
+
+  const offlineSpendCurrent = useMemo(
+    () =>
+      offlineEntries
+        .filter((e) => {
+          if (e.year !== filterYear) return false;
+          if (filterMonth === "all") return true;
+          return e.period_type === "Vjetore" || e.month === (filterMonth as number);
+        })
+        .reduce((s, e) => s + e.amount, 0),
+    [offlineEntries, filterYear, filterMonth]
+  );
+
+  const offlineSpendPrev = useMemo(() => {
+    if (filterMonth === "all") {
+      return offlineEntries
+        .filter((e) => e.year === filterYear - 1)
+        .reduce((s, e) => s + e.amount, 0);
+    }
+    const prevYear  = filterMonth === 1 ? filterYear - 1 : filterYear;
+    const prevMonth = filterMonth === 1 ? 12 : (filterMonth as number) - 1;
+    return offlineEntries
+      .filter((e) => {
+        if (e.year !== prevYear) return false;
+        return e.period_type === "Vjetore" || e.month === prevMonth;
+      })
+      .reduce((s, e) => s + e.amount, 0);
+  }, [offlineEntries, filterYear, filterMonth]);
+
+  const totalSpend    = currentDigital.spend + offlineSpendCurrent;
+  const prevTotalSpend = prevDigital.spend + offlineSpendPrev;
+  const hasPrevPeriod  = prevDigitalRows.length > 0 || offlineSpendPrev > 0;
+
+  const chartData = useMemo(
+    () =>
+      SQ_MONTHS_SHORT.map((label, idx) => {
+        const row = existingData[filterYear]?.[idx + 1];
+        return {
+          label,
+          spend: row?.spend_facebook ?? 0,
+          views: (row?.views_facebook ?? 0) + (row?.views_tiktok ?? 0),
+          leads: (row?.leads_facebook ?? 0) + (row?.leads_instagram ?? 0) + (row?.leads_tiktok ?? 0),
+        };
+      }),
+    [existingData, filterYear]
+  );
+
+  const filteredOfflineLog = useMemo(() => {
+    if (logFilter === "E gjitha") return offlineEntries;
+    return offlineEntries.filter((e) => e.period_type === logFilter);
+  }, [offlineEntries, logFilter]);
+
+  const defaultModalMonth = filterMonth === "all" ? now.getMonth() + 1 : (filterMonth as number);
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTargetId) return;
+    setDeleting(true);
+    await deleteOfflineEntry(deleteTargetId);
+    setDeleting(false);
+    setDeleteTargetId(null);
+  };
+
+  return (
+    <div style={{ backgroundColor: "#f8f8fa" }}>
+      <div className="mx-auto max-w-[1100px] px-10 py-10">
+
+        {/* Header */}
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <motion.h1 {...fadeUp(0)} className="text-[26px] tracking-wide" style={{ fontWeight: 700, color: NAVY }}>
+              Marketingu
+            </motion.h1>
+            <motion.p {...fadeUp(0.06)} className="mt-0.5 text-[13px]" style={{ color: NAVY, opacity: 0.65 }}>
+              Përformanca e marketingut digjital dhe offline
+            </motion.p>
+          </div>
+          {onOpenDataInput && (
+            <motion.div {...fadeUp(0.08)}>
+              <button
+                onClick={onOpenDataInput}
+                className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] text-white transition hover:opacity-90"
+                style={{ backgroundColor: NAVY }}
+              >
+                <Database size={14} strokeWidth={2.1} />
+                Hap Data Input
+              </button>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Period selectors + action buttons */}
+        <motion.div {...fadeUp(0.08)} className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CustomSelect
+              size="sm"
+              className="min-w-[100px]"
+              options={[...YEAR_OPTIONS]}
+              value={String(filterYear)}
+              onChange={(v) => setFilterYear(Number(v))}
+            />
+            <CustomSelect
+              size="sm"
+              className="min-w-[160px]"
+              options={SQ_MONTHS}
+              value={filterMonth === "all" ? "" : SQ_MONTHS[(filterMonth as number) - 1]}
+              placeholder="Të gjitha muajt"
+              onChange={(v) => setFilterMonth(v === "" ? "all" : SQ_MONTHS.indexOf(v) + 1)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDigitalModal(true)}
+              className="flex h-[34px] items-center gap-1.5 rounded-[10px] px-3.5 text-[12.5px] text-white transition hover:opacity-90"
+              style={{ backgroundColor: NAVY, fontWeight: 600 }}
+            >
+              <Plus size={13} strokeWidth={2.5} />
+              Shto të dhëna dixhitale
+            </button>
+            <button
+              onClick={() => setShowOfflineModal(true)}
+              className="flex h-[34px] items-center gap-1.5 rounded-[10px] border px-3.5 text-[12.5px] transition hover:bg-[#f5f7fb]"
+              style={{ borderColor: `${NAVY}40`, color: NAVY, fontWeight: 600 }}
+            >
+              <Plus size={13} strokeWidth={2.5} />
+              Shto hyrje offline
+            </button>
+          </div>
         </motion.div>
 
-        <MarketingSection>
-          {({ inView, hasEntered }) => (
-            <>
-              <AnimatedSectionTitle
-                title="Total Marketing Spend"
-                subtitle="Investment overview across all channels"
-                startAnimation={inView}
-              />
+        {/* Hero cards */}
+        <div className="mb-8 flex gap-4">
+          <HeroCard
+            label="Shpenzimet totale"
+            value={totalSpend}
+            prevValue={hasPrevPeriod ? prevTotalSpend : null}
+            format={fmtEur}
+            icon={TrendingUp}
+            delay={0.1}
+            active={started}
+          />
+          <HeroCard
+            label="Shikimet totale"
+            value={currentDigital.views}
+            prevValue={prevDigitalRows.length > 0 ? prevDigital.views : null}
+            format={fmtNum}
+            icon={Eye}
+            delay={0.17}
+            active={started}
+          />
+          <HeroCard
+            label="Kontaktet totale"
+            value={currentDigital.leads}
+            prevValue={prevDigitalRows.length > 0 ? prevDigital.leads : null}
+            format={fmtNum}
+            icon={Users}
+            delay={0.24}
+            active={started}
+          />
+        </div>
 
-              <div className="mb-5 grid grid-cols-3 gap-4">
-                <AnimatedKpiCard
-                  label="Weekly Spend"
-                  value={formatFullEuro(weeklySpend)}
-                  change={spendVsTarget >= 0 ? `+${spendVsTarget.toFixed(1)}%` : `${spendVsTarget.toFixed(1)}%`}
-                  positive={spendVsTarget >= 0}
-                  subtitle="vs. revenue target reference"
-                  startAnimation={inView}
-                  delay={0.06}
-                  valueType="currency"
-                />
-                <AnimatedKpiCard
-                  label="Monthly Spend"
-                  value={formatFullEuro(monthlySpend)}
-                  change={spendVsTarget >= 0 ? `+${spendVsTarget.toFixed(1)}%` : `${spendVsTarget.toFixed(1)}%`}
-                  positive={spendVsTarget >= 0}
-                  subtitle="live from OS"
-                  startAnimation={inView}
-                  delay={0.14}
-                  valueType="currency"
-                />
-                <AnimatedKpiCard
-                  label="Yearly Spend"
-                  value={formatFullEuro(yearlySpend)}
-                  change="+22.1%"
-                  positive
-                  subtitle="6-month cumulative total"
-                  startAnimation={inView}
-                  delay={0.22}
-                  valueType="currency"
-                />
-              </div>
+        {/* Spend bar chart */}
+        <motion.div
+          {...fadeUp(0.3)}
+          className="mb-5 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
+          style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
+        >
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>Shpenzimet sipas muajve</p>
+              <p className="mt-0.5 text-[12px] text-black/30">Shpenzimet e Facebook sipas muajve — {filterYear}</p>
+            </div>
+            <ChartYearSelect value={filterYear} onChange={setFilterYear} />
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={chartData} barSize={22} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <XAxis dataKey="label" axisLine={false} tickLine={false}
+                tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)", fontWeight: 500 }} />
+              <YAxis hide />
+              <Tooltip content={<SpendTooltip />} cursor={{ fill: "rgba(0,56,131,0.04)", radius: 6 }} />
+              <Bar dataKey="spend" name="Facebook" fill={FB_COLOR} radius={[5, 5, 0, 0]} fillOpacity={0.9} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-3 flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: FB_COLOR }} />
+            <span className="text-[11.5px] text-black/40">Facebook</span>
+          </div>
+        </motion.div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-                transition={{ duration: 0.55, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                className="rounded-xl border border-gray-100 bg-white p-6"
-              >
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-[13px] text-gray-800">Cumulative Spend Trend</p>
-                    <p className="mt-0.5 text-[11px] text-gray-400">Oct 2025 – Mar 2026</p>
-                  </div>
+        {/* Views / leads line chart */}
+        <motion.div
+          {...fadeUp(0.36)}
+          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
+          style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
+        >
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>Shikimet dhe kontaktet sipas muajve</p>
+              <p className="mt-0.5 text-[12px] text-black/30">Shikimet dhe kontaktet sipas muajve — {filterYear}</p>
+            </div>
+            <ChartYearSelect value={filterYear} onChange={setFilterYear} />
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false}
+                interval={0}
+                minTickGap={0}
+                padding={{ left: 8, right: 8 }}
+                tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)", fontWeight: 500 }} />
+              <YAxis hide />
+              <Tooltip content={<LineTooltip />} />
+              <Line type="monotone" dataKey="views" name="Shikime"    stroke={VIEWS_COLOR} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="leads" name="Kontaktet"  stroke={LEADS_COLOR} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="mt-3 flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: VIEWS_COLOR }} />
+              <span className="text-[11.5px] text-black/40">Shikime</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: LEADS_COLOR }} />
+              <span className="text-[11.5px] text-black/40">Kontaktet</span>
+            </div>
+          </div>
+        </motion.div>
 
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={inView ? { opacity: 1, x: 0 } : { opacity: 0, x: 10 }}
-                    transition={{ duration: 0.4, delay: 0.48 }}
-                    className="flex items-center gap-1.5 text-emerald-500"
-                  >
-                    <TrendingUp size={14} />
-                    <span className="text-[12px]">On track</span>
-                  </motion.div>
-                </div>
+        {/* Offline marketing log */}
+        <motion.div
+          {...fadeUp(0.42)}
+          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
+          style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
+        >
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>
+              Regjistri i marketingut offline
+            </p>
+            <div className="flex items-center rounded-[10px] border border-[#e8e8ec] p-0.5">
+              {OFFLINE_FILTERS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setLogFilter(f)}
+                  className="rounded-[8px] px-3 py-1.5 text-[11.5px] transition"
+                  style={{
+                    background: logFilter === f ? NAVY : "transparent",
+                    color:      logFilter === f ? "white" : "rgba(0,0,0,0.45)",
+                    fontWeight: logFilter === f ? 600 : 400,
+                  }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                <div className="h-[220px]">
-                  {hasEntered ? (
-                    <AnimatedSpendTrendChart show={hasEntered} />
-                  ) : (
-                    <div className="h-full" />
-                  )}
-                </div>
-              </motion.div>
-            </>
+          {filteredOfflineLog.length === 0 ? (
+            <div className="flex flex-col items-center py-10">
+              <p className="text-[13px] text-black/40" style={{ fontWeight: 500 }}>
+                Nuk ka hyrje offline
+              </p>
+              <p className="mt-1 text-[12px] text-black/28">
+                Shto hyrjen e parë duke klikuar butonin më sipër
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#f0f0f4]">
+                    {["Kanali", "Përshkrimi", "Shuma (€)", "Periudha", "Data", ""].map((h) => (
+                      <th
+                        key={h}
+                        className="pb-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-black/35"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOfflineLog.map((entry) => (
+                    <tr key={entry.id} className="border-b border-[#f8f8fa] transition hover:bg-[#fafbfd]">
+                      <td className="py-3 pr-4">
+                        <span
+                          className="inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11.5px]"
+                          style={{
+                            background: `${CHANNEL_COLOR[entry.channel] ?? "#6b7280"}18`,
+                            color:       CHANNEL_COLOR[entry.channel] ?? "#6b7280",
+                            fontWeight:  600,
+                          }}
+                        >
+                          {entry.channel}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-[12.5px] text-black/50">
+                        {entry.description || <span className="text-black/25">—</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-[13px]" style={{ color: NAVY, fontWeight: 700 }}>
+                        {fmtEur(entry.amount)}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span
+                          className="inline-flex items-center rounded-[6px] px-2 py-0.5 text-[11px]"
+                          style={{
+                            background: entry.period_type === "Vjetore" ? "#eaf0fa" : "#f0f7f3",
+                            color:      entry.period_type === "Vjetore" ? NAVY : "#3c7a57",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {entry.period_type}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-[12.5px] text-black/45">
+                        {fmtDate(entry.date)}
+                      </td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => setDeleteTargetId(entry.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-[7px] text-black/25 transition hover:bg-[#fdf3f3] hover:text-[#b14b4b]"
+                        >
+                          <Trash2 size={13} strokeWidth={2} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </MarketingSection>
+        </motion.div>
 
-        <MarketingSection>
-          {({ inView }) => (
-            <>
-              <AnimatedSectionTitle
-                title="Spend This Period"
-                subtitle="Current live monthly operating view"
-                startAnimation={inView}
-              />
-
-              <motion.div
-                ref={budgetRef}
-                initial={{ opacity: 0, y: 22 }}
-                animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
-                transition={{ duration: 0.55, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
-                className="rounded-xl border border-gray-100 bg-white p-6"
-              >
-                <div className="grid grid-cols-2 gap-8">
-                  <div>
-                    <p className="mb-3 text-[11px] uppercase tracking-[0.06em] text-gray-400">
-                      Period Total
-                    </p>
-
-                    <p className="mb-2 text-[34px] leading-none tracking-tight text-gray-900">
-                      {formatFullEuro(periodTotal)}
-                    </p>
-
-                    <motion.div
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={budgetInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 10 }}
-                      transition={{ duration: 0.4, delay: 0.24 }}
-                      className={`flex items-center gap-1.5 ${
-                        spendVsTarget >= 0 ? "text-emerald-500" : "text-red-400"
-                      }`}
-                    >
-                      {spendVsTarget >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                      <span className="text-[12px]">
-                        {spendVsTarget >= 0 ? "+" : ""}
-                        {spendVsTarget.toFixed(1)}% vs revenue target
-                      </span>
-                    </motion.div>
-                  </div>
-
-                  <div className="flex flex-col gap-4">
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={budgetInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-                      transition={{ duration: 0.38, delay: 0.14 }}
-                      className="flex items-center justify-between border-b border-gray-50 py-3"
-                    >
-                      <span className="text-[12px] text-gray-400">Daily Average</span>
-                      <span className="text-[13px] text-gray-800">{formatFullEuro(dailyAverage)}</span>
-                    </motion.div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={budgetInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-                      transition={{ duration: 0.38, delay: 0.22 }}
-                      className="flex items-center justify-between border-b border-gray-50 py-3"
-                    >
-                      <span className="text-[12px] text-gray-400">Budget Utilisation</span>
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-gray-100">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={budgetInView ? { width: `${budgetPercentValue}%` } : { width: 0 }}
-                            transition={{ duration: 1, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
-                            className="h-full rounded-full bg-[#003883]"
-                          />
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.6, x: 0 }}
-                            animate={
-                              budgetInView
-                                ? { opacity: 1, scale: 1, x: `${budgetPercentValue}%` }
-                                : { opacity: 0, scale: 0.6, x: 0 }
-                            }
-                            transition={{ duration: 0.45, delay: 1.02 }}
-                            className="absolute top-1/2 -ml-1.5 flex h-3 w-3 -translate-y-1/2 items-center justify-center rounded-full bg-[#003883]/12"
-                          >
-                            <div className="h-1.5 w-1.5 rounded-full bg-[#003883]" />
-                          </motion.div>
-                        </div>
-                        <span className="text-[13px] text-gray-800">{budgetPercent}%</span>
-                      </div>
-                    </motion.div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={budgetInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-                      transition={{ duration: 0.38, delay: 0.3 }}
-                      className="flex items-center justify-between py-3"
-                    >
-                      <span className="text-[12px] text-gray-400">Remaining Budget</span>
-                      <span className="text-[13px] text-gray-800">{formatFullEuro(remainingBudget)}</span>
-                    </motion.div>
-                  </div>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </MarketingSection>
-
-        <MarketingSection>
-          {({ inView, hasEntered }) => (
-            <>
-              <AnimatedSectionTitle
-                title="Total Views / Reach"
-                subtitle="Audience exposure across all channels"
-                startAnimation={inView}
-              />
-
-              <div className="mb-5 grid grid-cols-3 gap-4">
-                <AnimatedKpiCard
-                  label="Weekly Reach"
-                  value={formatPlainNumber(weeklyViews)}
-                  change={viewsVsLeads >= 0 ? `+${viewsVsLeads.toFixed(1)}%` : `${viewsVsLeads.toFixed(1)}%`}
-                  positive={viewsVsLeads >= 0}
-                  subtitle="vs leads generated"
-                  startAnimation={inView}
-                  delay={0.06}
-                  valueType="number"
-                />
-                <AnimatedKpiCard
-                  label="Monthly Reach"
-                  value={formatPlainNumber(monthlyViews)}
-                  change={viewsVsLeads >= 0 ? `+${viewsVsLeads.toFixed(1)}%` : `${viewsVsLeads.toFixed(1)}%`}
-                  positive={viewsVsLeads >= 0}
-                  subtitle="live from OS"
-                  startAnimation={inView}
-                  delay={0.14}
-                  valueType="number"
-                />
-                <AnimatedKpiCard
-                  label="Yearly Reach"
-                  value={formatPlainNumber(yearlyViews)}
-                  change="+31.8%"
-                  positive
-                  subtitle="6-month reach total"
-                  startAnimation={inView}
-                  delay={0.22}
-                  valueType="number"
-                />
-              </div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-                transition={{ duration: 0.55, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                className="rounded-xl border border-gray-100 bg-white p-6"
-              >
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-[13px] text-gray-800">Reach: Current vs Previous Period</p>
-                    <p className="mt-0.5 text-[11px] text-gray-400">6-month comparison</p>
-                  </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={inView ? { opacity: 1, x: 0 } : { opacity: 0, x: 10 }}
-                    transition={{ duration: 0.4, delay: 0.3 }}
-                    className="flex items-center gap-5"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-sm bg-[#003883]" />
-                      <span className="text-[11px] text-gray-400">Current</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-sm bg-[#003883]/20" />
-                      <span className="text-[11px] text-gray-400">Previous</span>
-                    </div>
-                  </motion.div>
-                </div>
-
-                <div className="h-[220px]">
-                  {hasEntered ? (
-                    <AnimatedViewsBarChart show={hasEntered} />
-                  ) : (
-                    <div className="h-full" />
-                  )}
-                </div>
-              </motion.div>
-            </>
-          )}
-        </MarketingSection>
       </div>
+
+      {/* Modals */}
+      <AnimatePresence>
+        {showDigitalModal && (
+          <DigitalModal
+            defaultYear={filterYear}
+            defaultMonth={defaultModalMonth}
+            onClose={() => setShowDigitalModal(false)}
+            onSave={saveMonthlyData}
+          />
+        )}
+        {showOfflineModal && (
+          <OfflineModal
+            defaultYear={filterYear}
+            defaultMonth={defaultModalMonth}
+            onClose={() => setShowOfflineModal(false)}
+            onSave={createOfflineEntry}
+          />
+        )}
+        {deleteTargetId && (
+          <DeleteConfirmModal
+            loading={deleting}
+            onCancel={() => setDeleteTargetId(null)}
+            onConfirm={handleDeleteConfirm}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

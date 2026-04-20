@@ -1,0 +1,181 @@
+import { useEffect, useMemo, useState, type ComponentType, type CSSProperties } from "react";
+import { Eye, Phone, TrendingUp, Users } from "lucide-react";
+import type { CreateDailyLogInput, DailyLogEntry } from "../hooks/useCRM";
+import { MONTH_LABELS, MONTH_SHORT_LABELS, YEAR_OPTIONS, fmtDate } from "./shared";
+import { DailyLogSummary } from "./daily-log/DailyLogSummary";
+import { DailyLogTable } from "./daily-log/DailyLogTable";
+
+type SummaryTotals = {
+  calls: number;
+  contacts: number;
+  showings: number;
+  sales: number;
+};
+
+type SummaryMetricKey = keyof SummaryTotals;
+
+function emptyTotals(): SummaryTotals {
+  return { calls: 0, contacts: 0, showings: 0, sales: 0 };
+}
+
+function sumRows(rows: DailyLogEntry[]): SummaryTotals {
+  return rows.reduce<SummaryTotals>(
+    (acc, row) => ({
+      calls: acc.calls + (row.calls ?? 0),
+      contacts: acc.contacts + (row.contacts ?? 0),
+      showings: acc.showings + (row.showings ?? 0),
+      sales: acc.sales + (row.sales ?? 0),
+    }),
+    emptyTotals(),
+  );
+}
+
+export function DailyLogSection({
+  entries,
+  loading,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  entries: DailyLogEntry[];
+  loading: boolean;
+  onCreate: (data: CreateDailyLogInput) => Promise<{ error?: string; data?: DailyLogEntry }>;
+  onUpdate: (
+    id: string,
+    data: Partial<CreateDailyLogInput>,
+  ) => Promise<{ error?: string; data?: DailyLogEntry }>;
+  onDelete: (id: string) => Promise<{ error?: string }>;
+}) {
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [selectedMonth] = useState(() => new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [summaryStarted, setSummaryStarted] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    const timeout = window.setTimeout(() => setSummaryStarted(true), 80);
+    return () => window.clearTimeout(timeout);
+  }, [loading]);
+
+  const now = new Date();
+  const thisYear = now.getFullYear();
+
+  const yearOptions = useMemo(() => {
+    const years = new Set<number>(YEAR_OPTIONS.map(Number));
+    years.add(thisYear);
+    entries.forEach((entry) => {
+      years.add(new Date(entry.date).getFullYear());
+    });
+
+    return Array.from(years)
+      .sort((a, b) => a - b)
+      .map((year) => String(year));
+  }, [entries, thisYear]);
+
+  const activeSelectedYear =
+    yearOptions.length > 0 && !yearOptions.includes(String(selectedYear))
+      ? Number(yearOptions[0])
+      : selectedYear;
+
+  const allEntriesByDate = useMemo(
+    () => [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [entries],
+  );
+
+  const filteredEntries = useMemo(
+    () =>
+      allEntriesByDate.filter((entry) => {
+        const date = new Date(entry.date);
+        return date.getFullYear() === activeSelectedYear && date.getMonth() === selectedMonth;
+      }),
+    [activeSelectedYear, allEntriesByDate, selectedMonth],
+  );
+
+  const activeSelectedEntryId = useMemo(() => {
+    if (filteredEntries.length === 0) return null;
+    return selectedEntryId && filteredEntries.some((entry) => entry.id === selectedEntryId)
+      ? selectedEntryId
+      : filteredEntries[0].id;
+  }, [filteredEntries, selectedEntryId]);
+
+  const selectedEntry = useMemo(() => {
+    if (filteredEntries.length === 0) return null;
+    return filteredEntries.find((entry) => entry.id === activeSelectedEntryId) ?? filteredEntries[0];
+  }, [activeSelectedEntryId, filteredEntries]);
+
+  const previousEntry = useMemo(() => {
+    if (!selectedEntry) return null;
+    const selectedIndex = allEntriesByDate.findIndex((entry) => entry.id === selectedEntry.id);
+    return selectedIndex >= 0 ? allEntriesByDate[selectedIndex + 1] ?? null : null;
+  }, [allEntriesByDate, selectedEntry]);
+
+  const selectedDayComparisonText = previousEntry ? fmtDate(previousEntry.date) : "ditës së mëparshme";
+
+  const selectedEntryLabel = useMemo(() => {
+    if (!selectedEntry) return null;
+    const date = new Date(selectedEntry.date + "T00:00:00");
+    return `${String(date.getDate()).padStart(2, "0")} ${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`;
+  }, [selectedEntry]);
+
+  const annualChartData = useMemo(
+    () =>
+      MONTH_SHORT_LABELS.map((label, monthIndex) => ({
+        month: label,
+        ...sumRows(
+          entries.filter((entry) => {
+            const date = new Date(entry.date);
+            return date.getFullYear() === activeSelectedYear && date.getMonth() === monthIndex;
+          }),
+        ),
+      })),
+    [activeSelectedYear, entries],
+  );
+
+  const metricConfigs: Array<{
+    key: SummaryMetricKey;
+    label: string;
+    icon: ComponentType<{ size?: number; style?: CSSProperties; strokeWidth?: number }>;
+    delay: number;
+  }> = [
+    { key: "calls", label: "Thirrje", icon: Phone, delay: 0 },
+    { key: "contacts", label: "Kontakte", icon: Users, delay: 0.06 },
+    { key: "showings", label: "Shfaqje", icon: Eye, delay: 0.12 },
+    { key: "sales", label: "Shitje", icon: TrendingUp, delay: 0.18 },
+  ];
+
+  const summaryMetrics = metricConfigs.map((metric) => ({
+    key: metric.key,
+    label: metric.label,
+    icon: metric.icon,
+    delay: metric.delay,
+    curr: selectedEntry?.[metric.key] ?? 0,
+    prev: previousEntry?.[metric.key] ?? null,
+  }));
+
+  return (
+    <div>
+      <DailyLogSummary
+        selectedEntryLabel={selectedEntryLabel}
+        summaryMetrics={summaryMetrics}
+        summaryStarted={summaryStarted}
+        selectedDayComparisonText={selectedDayComparisonText}
+        selectedYear={activeSelectedYear}
+        yearOptions={yearOptions}
+        onYearChange={setSelectedYear}
+        annualChartData={annualChartData}
+      />
+
+      <DailyLogTable
+        loading={loading}
+        selectedMonth={selectedMonth}
+        selectedYear={activeSelectedYear}
+        filteredEntries={filteredEntries}
+        selectedEntryId={activeSelectedEntryId}
+        onSelectEntry={setSelectedEntryId}
+        onCreate={onCreate}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    </div>
+  );
+}

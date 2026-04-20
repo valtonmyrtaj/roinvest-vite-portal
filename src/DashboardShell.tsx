@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutGrid,
@@ -14,11 +14,12 @@ import {
   Clock3,
   AlertCircle,
   Pencil,
-  Check,
   X,
+  type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "./context/AuthContext";
-import { supabase } from "./lib/supabase";
+import { useAuth } from "./context/useAuth";
+import { history } from "./lib/api";
+import type { NotificationHistoryRow } from "./lib/api/history";
 
 const ACCENT = "#003883";
 
@@ -41,14 +42,14 @@ type DashboardShellProps = {
   userRole: UserRole;
 };
 
-const navItems: { key: PageKey; label: string; icon: any }[] = [
-  { key: "overview",  label: "Overview",          icon: LayoutGrid },
-  { key: "sales",     label: "Sales",              icon: BarChart3  },
-  { key: "units",     label: "Units",              icon: Building2  },
-  { key: "marketing", label: "Marketing",          icon: Megaphone  },
-  { key: "crm",       label: "CRM Activity",       icon: Activity   },
-  { key: "reports",   label: "Executive Reports",  icon: FileText   },
-  { key: "input",     label: "Data Input",         icon: Database   },
+const navItems: { key: PageKey; label: string; icon: LucideIcon }[] = [
+  { key: "overview",  label: "Pasqyra",           icon: LayoutGrid },
+  { key: "sales",     label: "Shitjet",            icon: BarChart3  },
+  { key: "units",     label: "Njësitë",            icon: Building2  },
+  { key: "marketing", label: "Marketingu",         icon: Megaphone  },
+  { key: "crm",       label: "Aktiviteti CRM",     icon: Activity   },
+  { key: "reports",   label: "Raportet",           icon: FileText   },
+  { key: "input",     label: "Të dhënat",          icon: Database   },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,8 +66,8 @@ interface Notification {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+function timeAgo(iso: string, nowTs: number): string {
+  const diff = nowTs - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60_000);
   const hours   = Math.floor(diff / 3_600_000);
   const days    = Math.floor(diff / 86_400_000);
@@ -86,7 +87,7 @@ function notifType(rec: { new_data: Record<string, unknown>; previous_data: Reco
   return "other";
 }
 
-const NOTIF_META: Record<NotifType, { icon: React.ComponentType<any>; color: string; bg: string; title: string }> = {
+const NOTIF_META: Record<NotifType, { icon: LucideIcon; color: string; bg: string; title: string }> = {
   sold:     { icon: BadgeCheck,  color: "#3c7a57", bg: "#edf7f1", title: "Njësi e shitur"       },
   reserved: { icon: Clock3,      color: "#b0892f", bg: "#fff8e8", title: "Njësi e rezervuar"    },
   expired:  { icon: AlertCircle, color: "#b14b4b", bg: "#fbeeee", title: "Rezervimi skadoi"     },
@@ -95,14 +96,21 @@ const NOTIF_META: Record<NotifType, { icon: React.ComponentType<any>; color: str
 
 const LS_READ_KEY = "roinvest_notif_read_at";
 
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 // ─── NotificationPanel ────────────────────────────────────────────────────────
 
 function NotificationPanel({
   notifications,
+  nowTs,
   onMarkRead,
   onClose,
 }: {
   notifications: Notification[];
+  nowTs: number;
   onMarkRead: () => void;
   onClose: () => void;
 }) {
@@ -159,7 +167,7 @@ function NotificationPanel({
                     Njësia <span className="font-medium text-black/65">{n.unitDisplay}</span>
                     {n.change_reason ? ` · ${n.change_reason}` : ""}
                   </p>
-                  <p className="mt-1 text-[11px] text-black/28">{timeAgo(n.changed_at)}</p>
+                  <p className="mt-1 text-[11px] text-black/28">{timeAgo(n.changed_at, nowTs)}</p>
                 </div>
               </div>
             );
@@ -242,7 +250,11 @@ export default function DashboardShell({
   const [lastReadAt, setLastReadAt]       = useState<number>(
     () => Number(localStorage.getItem(LS_READ_KEY) ?? 0)
   );
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const bellRef = useRef<HTMLDivElement>(null);
+  const hasRequestedNotificationsRef = useRef(false);
+  const notificationsPrefetchHandleRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
 
   // Avatar state
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -260,40 +272,88 @@ export default function DashboardShell({
     .split(" ").filter(Boolean).slice(0, 2)
     .map((p) => p[0]?.toUpperCase()).join("");
 
+  const loadNotifications = useCallback(() => {
+    if (hasRequestedNotificationsRef.current) return;
+    hasRequestedNotificationsRef.current = true;
+
+    void history.listRecentNotificationHistory({ limit: 20 }).then(({ data, error }) => {
+      if (!isMountedRef.current || error || !data) return;
+
+      const rows: NotificationHistoryRow[] = data;
+      const mapped: Notification[] = rows.map((rec) => {
+        const previousData =
+          rec.previous_data && typeof rec.previous_data === "object" && !Array.isArray(rec.previous_data)
+            ? (rec.previous_data as Record<string, unknown>)
+            : {};
+        const newData =
+          rec.new_data && typeof rec.new_data === "object" && !Array.isArray(rec.new_data)
+            ? (rec.new_data as Record<string, unknown>)
+            : {};
+        return {
+          id: rec.id,
+          type: notifType({ previous_data: previousData, new_data: newData }),
+          unitDisplay: rec.units?.unit_id ?? rec.id.slice(0, 8),
+          changed_at: rec.changed_at ?? "",
+          change_reason: rec.change_reason ?? "",
+        };
+      });
+
+      setNotifications(mapped);
+    });
+  }, []);
+
   // Redirect if page not allowed
   useEffect(() => {
     const allowed = visibleNavItems.map((i) => i.key);
     if (!allowed.includes(currentPage)) onNavigate("overview");
   }, [currentPage, onNavigate, userRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch notifications
-  const fetchNotifications = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("unit_history")
-      .select("id, changed_at, change_reason, previous_data, new_data, units(unit_id)")
-      .order("changed_at", { ascending: false })
-      .limit(20);
-    if (error || !data) return;
-    const mapped: Notification[] = (data as any[]).map((rec) => ({
-      id:          rec.id,
-      type:        notifType(rec),
-      unitDisplay: rec.units?.unit_id ?? rec.id.slice(0, 8),
-      changed_at:  rec.changed_at,
-      change_reason: rec.change_reason ?? "",
-    }));
-    setNotifications(mapped);
-  }, []);
+  // Notifications are secondary shell work, so prefetch them after first paint.
+  useEffect(() => {
+    const idleWindow = window as IdleWindow;
+    let usedIdleCallback = false;
 
-  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+    if (idleWindow.requestIdleCallback) {
+      usedIdleCallback = true;
+      notificationsPrefetchHandleRef.current = idleWindow.requestIdleCallback(() => {
+        notificationsPrefetchHandleRef.current = null;
+        loadNotifications();
+      }, { timeout: 1200 });
+    } else {
+      notificationsPrefetchHandleRef.current = window.setTimeout(() => {
+        notificationsPrefetchHandleRef.current = null;
+        loadNotifications();
+      }, 250);
+    }
+
+    return () => {
+      isMountedRef.current = false;
+      if (notificationsPrefetchHandleRef.current === null) return;
+
+      if (usedIdleCallback && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(notificationsPrefetchHandleRef.current);
+        return;
+      }
+
+      window.clearTimeout(notificationsPrefetchHandleRef.current);
+    };
+  }, [loadNotifications]);
 
   // Close dropdowns on outside click
   useEffect(() => {
+    const tickId = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 60_000);
+
     const handler = (e: MouseEvent) => {
       if (bellRef.current   && !bellRef.current.contains(e.target as Node))   setBellOpen(false);
       if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setAvatarOpen(false);
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    return () => {
+      window.clearInterval(tickId);
+      document.removeEventListener("mousedown", handler);
+    };
   }, []);
 
   const handleMarkRead = () => {
@@ -304,7 +364,7 @@ export default function DashboardShell({
 
   const unreadCount = notifications.filter(
     (n) => new Date(n.changed_at).getTime() > lastReadAt &&
-           Date.now() - new Date(n.changed_at).getTime() < 86_400_000
+           nowTs - new Date(n.changed_at).getTime() < 86_400_000
   ).length;
 
   return (
@@ -340,7 +400,7 @@ export default function DashboardShell({
 
         <div className="mt-auto border-t border-black/[0.05] px-4 py-4">
           <div className="text-[10px] uppercase tracking-[0.18em] text-black/22">UF Partners Portal</div>
-          <div className="mt-1 text-[11px] text-black/32">v1.0 · Mar 2026</div>
+          <div className="mt-1 text-[11px] text-black/32">v1.0</div>
         </div>
       </aside>
 
@@ -364,7 +424,11 @@ export default function DashboardShell({
             {/* Bell */}
             <div className="relative" ref={bellRef}>
               <button
-                onClick={() => { setBellOpen((o) => !o); setAvatarOpen(false); }}
+                onClick={() => {
+                  loadNotifications();
+                  setBellOpen((o) => !o);
+                  setAvatarOpen(false);
+                }}
                 className="relative rounded-lg p-2 text-black/35 transition hover:bg-black/[0.04] hover:text-black/60"
               >
                 <Bell className="h-4 w-4" />
@@ -382,6 +446,7 @@ export default function DashboardShell({
                 {bellOpen && (
                   <NotificationPanel
                     notifications={notifications}
+                    nowTs={nowTs}
                     onMarkRead={handleMarkRead}
                     onClose={() => setBellOpen(false)}
                   />

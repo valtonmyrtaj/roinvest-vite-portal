@@ -84,9 +84,9 @@ export function CustomSelect({
               <button
                 type="button"
                 onClick={() => { onChange(""); setOpen(false); }}
-                className={`flex w-full items-center ${s.pl} ${s.pr} py-2 ${s.text} text-black/35 transition-colors hover:bg-[#f5f7fb]`}
+                className={`flex w-full items-start ${s.pl} ${s.pr} py-2 text-left ${s.text} text-black/35 transition-colors hover:bg-[#f5f7fb]`}
               >
-                {placeholder}
+                <span className="flex-1 whitespace-normal text-left leading-[1.35]">{placeholder}</span>
               </button>
             )}
 
@@ -98,15 +98,15 @@ export function CustomSelect({
                   key={opt}
                   type="button"
                   onClick={() => { onChange(opt); setOpen(false); }}
-                  className={`flex w-full items-center justify-between ${s.pl} ${s.pr} py-2 ${s.text} transition-colors hover:bg-[#f5f7fb]`}
+                  className={`flex w-full items-start justify-between gap-2 ${s.pl} ${s.pr} py-2 text-left ${s.text} transition-colors hover:bg-[#f5f7fb]`}
                   style={{
                     color: selected ? "#003883" : "rgba(0,0,0,0.75)",
                     fontWeight: selected ? 600 : 400,
                   }}
                 >
-                  <span>{opt}</span>
+                  <span className="flex-1 whitespace-normal text-left leading-[1.35]">{opt}</span>
                   {selected && (
-                    <Check size={12} strokeWidth={2.5} className="shrink-0" style={{ color: "#003883" }} />
+                    <Check size={12} strokeWidth={2.5} className="mt-[1px] shrink-0" style={{ color: "#003883" }} />
                   )}
                 </button>
               );

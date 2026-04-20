@@ -1,31 +1,14 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
-  type Dispatch,
   type ReactNode,
-  type SetStateAction,
 } from "react";
 import { seedData } from "../assets/data/seedData";
 import type { DashboardData } from "../types";
-import { supabase } from "../lib/supabase";
-
-type DashboardContextType = {
-  selectedPeriod: string;
-  setSelectedPeriod: Dispatch<SetStateAction<string>>;
-  data: DashboardData;
-  setData: Dispatch<SetStateAction<DashboardData>>;
-  saveData: (newData: DashboardData) => Promise<{ error: string | null }>;
-  resetData: () => void;
-  dataLoading: boolean;
-};
-
-const DashboardContext = createContext<DashboardContextType | undefined>(
-  undefined
-);
+import { dashboard } from "../lib/api";
+import { DashboardContext } from "./dashboard-context";
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [selectedPeriod, setSelectedPeriod] = useState("Mar 2026");
@@ -44,17 +27,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           setTimeout(() => resolve(null), 5000)
         );
 
-        const query = supabase
-          .from("dashboard_snapshots")
-          .select("data")
-          .eq("period", selectedPeriod)
-          .maybeSingle();
+        const query = dashboard.getDashboardSnapshot(selectedPeriod);
 
         const result = await Promise.race([query, timeout]);
 
         if (cancelled) return;
 
-        if (result && "data" in result && result.data?.data) {
+        if (result && !result.error && result.data?.data) {
           setData(result.data.data as DashboardData);
         } else {
           setData(seedData);
@@ -79,27 +58,19 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setData(newData);
 
       try {
-        const upsertPromise = supabase
-          .from("dashboard_snapshots")
-          .upsert(
-            {
-              period: selectedPeriod,
-              data: newData,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "period" }
-          );
+        const upsertPromise = dashboard.saveDashboardSnapshot({
+          period: selectedPeriod,
+          data: newData,
+          updated_at: new Date().toISOString(),
+        });
 
-        const timeoutPromise = new Promise<{ error: { message: string } }>(
+        const timeoutPromise = new Promise<{ data: null; error: string }>(
           (resolve) =>
-            setTimeout(
-              () => resolve({ error: { message: "Request timed out" } }),
-              8000
-            )
+            setTimeout(() => resolve({ data: null, error: "Request timed out" }), 8000)
         );
 
         const result = await Promise.race([upsertPromise, timeoutPromise]);
-        return { error: result.error?.message ?? null };
+        return { error: result.error ?? null };
       } catch (err) {
         return { error: err instanceof Error ? err.message : "Unknown error" };
       }
@@ -129,14 +100,4 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       {children}
     </DashboardContext.Provider>
   );
-}
-
-export function useDashboard() {
-  const context = useContext(DashboardContext);
-
-  if (!context) {
-    throw new Error("useDashboard must be used within a DashboardProvider");
-  }
-
-  return context;
 }

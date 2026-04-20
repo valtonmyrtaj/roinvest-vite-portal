@@ -1,58 +1,67 @@
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Clock3, BadgeCheck, Building2 } from "lucide-react";
+import { CheckCircle2, BadgeCheck, Building2 } from "lucide-react";
 import { CustomSelect } from "./components/CustomSelect";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
 import { useUnits } from "./hooks/useUnits";
-import type { OwnerCategory } from "./hooks/useUnits";
-
-const NAVY = "#003883";
+import { usePortfolioMetrics } from "./hooks/usePortfolioMetrics";
+import { useSaleReporting } from "./hooks/useSaleReporting";
+import type { OwnerCategory, Unit } from "./hooks/useUnits";
+import { PillBadge } from "./components/ui/PillBadge";
+import { getOwnerCategoryStyle } from "./lib/ownerColors";
+import { formatEuro as fmtEur } from "./lib/formatCurrency";
+import { NAVY, RED, SOFT_EASE } from "./ui/tokens";
 
 const SQ_MONTHS = [
   "Janar","Shkurt","Mars","Prill","Maj","Qershor",
   "Korrik","Gusht","Shtator","Tetor","Nëntor","Dhjetor",
 ];
-const SQ_MONTHS_SHORT = ["Jan","Shk","Mar","Pri","Maj","Qer","Kor","Gus","Sht","Tet","Nën","Dhj"];
-const FILTER_YEARS = [2025, 2026, 2027, 2028, 2029, 2030];
-const CHART_YEARS  = [2025, 2026, 2027, 2028, 2029, 2030];
+const FILTER_YEARS = [2026, 2027, 2028, 2029, 2030];
+const CHART_YEARS  = [2026, 2027, 2028, 2029, 2030];
+const OverviewMonthlySalesChart = lazy(() => import("./OverviewMonthlySalesChart"));
 
 function todayAlbanian() {
   const d = new Date();
   return `${d.getDate()} ${SQ_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function formatEur(n: number) {
-  return `€${n.toLocaleString("de-DE")}`;
-}
-
 function useCountUp(end: number, active: boolean, duration = 1200) {
   const [val, setVal] = useState(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
+
     let frame = 0;
     let t0: number | null = null;
+    const initialValue = end > 0 ? Math.max(1, Math.min(end, Math.round(end * 0.03))) : 0;
+
     const tick = (ts: number) => {
       if (!t0) t0 = ts;
       const p = Math.min((ts - t0) / duration, 1);
-      setVal(Math.round(end * (1 - Math.pow(1 - p, 3))));
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(initialValue + (end - initialValue) * eased));
       if (p < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [end, active, duration]);
-  return val;
+  return active ? val : 0;
 }
 
 function useCountUpRevenue(end: number, active: boolean) {
   return useCountUp(end, active, 1600);
 }
 
+// The sale-reporting hooks now retain the last resolved payload during
+// refetches, so this wrapper can stay as a compatibility no-op at the
+// page layer while keeping the surrounding call sites unchanged.
+function useHoldLast<T>(value: T, _loading: boolean): T {
+  void _loading;
+  return value;
+}
+
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.38, delay, ease: [0.22, 1, 0.36, 1] as const },
+  transition: { duration: 0.38, delay, ease: SOFT_EASE },
 });
 
 // Period badge pill
@@ -72,37 +81,19 @@ function PeriodBadge({ label }: { label: string }) {
   );
 }
 
-interface ChartEntry {
-  month: string;
-  units: number;
-  revenue: number;
-  label: string;
-}
-
-interface TooltipPayloadItem {
-  value: number;
-  payload: ChartEntry;
-}
-
-function SalesTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadItem[] }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
+function ContextChip({ label }: { label: string }) {
   return (
-    <div
-      className="rounded-[12px] border border-[#e8e8ec] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-      style={{ minWidth: 160 }}
+    <span
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px]"
+      style={{
+        background: "rgba(0,56,131,0.06)",
+        color: NAVY,
+        fontWeight: 500,
+        letterSpacing: "0.01em",
+      }}
     >
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {d.label}
-      </p>
-      <p className="text-[20px] font-bold leading-none tracking-[-1px]" style={{ color: NAVY }}>
-        {d.units}
-        <span className="ml-1.5 text-[12px] font-normal text-black/40">njësi</span>
-      </p>
-      <p className="mt-1.5 text-[13px] font-semibold text-black/60">
-        {formatEur(d.revenue)}
-      </p>
-    </div>
+      {label}
+    </span>
   );
 }
 
@@ -111,6 +102,7 @@ interface KpiDef {
   label: string;
   value: number;
   total: number;
+  color: string;
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties; strokeWidth?: number }>;
   badge?: string | null;
 }
@@ -155,7 +147,7 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
           initial={{ width: 0 }}
           animate={{ width: active ? `${pct}%` : "0%" }}
           transition={{ duration: 1, delay: delay + 0.2, ease: [0.22, 1, 0.36, 1] }}
-          style={{ backgroundColor: NAVY, opacity: 0.15 }}
+          style={{ backgroundColor: kpi.color }}
         />
       </div>
     </motion.div>
@@ -164,20 +156,42 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
 
 function SecondaryPartyCard({
   category,
+  units,
+  year,
+  month,
+  periodContextLabel,
   delay,
   active,
 }: {
   category: OwnerCategory;
+  units: Unit[];
+  year: number | "all";
+  month: number | "all";
+  periodContextLabel: string;
   delay: number;
   active: boolean;
 }) {
-  const { units } = useUnits();
-  const catUnits = units.filter((u) => u.owner_category === category);
-  const sold = catUnits.filter((u) => u.status === "E shitur").length;
-  const available = catUnits.filter((u) => u.status === "Në dispozicion").length;
-  const total = catUnits.length;
-  const soldPct = total > 0 ? Math.round((sold / total) * 100) : 0;
+  const snapshotMetrics = usePortfolioMetrics({
+    units,
+    ownerScope: category,
+    year: "all",
+    month: "all",
+  });
+  const { metrics: categoryMetrics, loading: categoryMetricsLoading } = useSaleReporting({
+    ownerScope: category,
+    year: year === "all" ? null : year,
+    month: month === "all" ? null : (month as number) + 1,
+    enabled: active,
+  });
+  // Hold last-confirmed metrics so period changes don't flash zero on the
+  // sold counter while the new RPC payload is in flight.
+  const displayCategoryMetrics = useHoldLast(categoryMetrics, categoryMetricsLoading);
+  const total = snapshotMetrics.totalUnits;
+  const available = snapshotMetrics.availableUnits;
+  const sold = displayCategoryMetrics?.soldUnits ?? 0;
   const animatedSold = useCountUp(sold, active, 1000);
+  const animatedAvailable = useCountUp(available, active, 1000);
+  const animatedTotal = useCountUp(total, active, 1000);
 
   return (
     <motion.div
@@ -187,15 +201,28 @@ function SecondaryPartyCard({
       className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
       style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
     >
-      <div className="mb-5 flex items-start justify-between">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#f4f4f5]">
-          <Building2 size={16} style={{ color: NAVY }} strokeWidth={1.8} />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <PillBadge
+            style={{
+              background: getOwnerCategoryStyle(category).bg,
+              color: getOwnerCategoryStyle(category).color,
+              border: `1px solid ${getOwnerCategoryStyle(category).border}`,
+            }}
+          >
+            {category}
+          </PillBadge>
+          <p
+            className="mt-2 text-[20px] leading-none tracking-[-0.02em]"
+            style={{ fontWeight: 650, color: getOwnerCategoryStyle(category).color }}
+          >
+            Stoku i pronësisë
+          </p>
+          <p className="mt-1 text-[11px] text-black/34">
+            Pamje aktuale e stokut
+          </p>
         </div>
-        {soldPct > 0 && (
-          <span className="text-[12px] text-black/28" style={{ fontWeight: 500 }}>
-            {soldPct}%
-          </span>
-        )}
+        <ContextChip label={periodContextLabel} />
       </div>
 
       {total === 0 ? (
@@ -204,39 +231,63 @@ function SecondaryPartyCard({
         </p>
       ) : (
         <>
-          <p
-            className="text-[38px] leading-none tracking-[-2px]"
-            style={{ fontWeight: 700, color: NAVY }}
-          >
-            {animatedSold}
-          </p>
-          <p className="mt-1.5 text-[12.5px] text-black/45" style={{ fontWeight: 500 }}>
-            Njësi të shitura
-          </p>
-          <p className="mt-0.5 text-[12px] text-black/28">
-            {total} gjithsej njësi
-          </p>
-
-          <div className="mt-4 h-[3px] overflow-hidden rounded-full bg-black/[0.05]">
-            <motion.div
-              className="h-full rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: active ? `${soldPct}%` : "0%" }}
-              transition={{ duration: 1, delay: delay + 0.2, ease: [0.22, 1, 0.36, 1] }}
-              style={{ backgroundColor: NAVY, opacity: 0.15 }}
-            />
-          </div>
-
-          <div className="mt-4 flex items-center gap-5">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-[6px] w-[6px] rounded-full bg-[#b14b4b]" />
-              <span className="text-[12px] text-black/40">E shitur</span>
-              <span className="text-[12px] text-black/70" style={{ fontWeight: 600 }}>{sold}</span>
+          <div className="grid gap-3.5 sm:grid-cols-3">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-[5px] w-[5px] rounded-full"
+                  style={{ backgroundColor: NAVY, opacity: 0.55 }}
+                />
+                <p className="text-[11px] uppercase tracking-[0.12em] text-black/30" style={{ fontWeight: 600 }}>
+                  Gjithsej
+                </p>
+              </div>
+              <p
+                className="mt-1.5 text-[24px] leading-none tracking-[-0.03em]"
+                style={{ fontWeight: 700, color: NAVY }}
+              >
+                {animatedTotal}
+              </p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-[6px] w-[6px] rounded-full bg-[#3c7a57]" />
-              <span className="text-[12px] text-black/40">Në dispozicion</span>
-              <span className="text-[12px] text-black/70" style={{ fontWeight: 600 }}>{available}</span>
+
+            <div className="sm:border-l sm:border-[#eff1f4] sm:pl-4">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-[5px] w-[5px] rounded-full"
+                  style={{ backgroundColor: "#3c7a57", opacity: 0.55 }}
+                />
+                <p className="text-[11px] uppercase tracking-[0.12em] text-black/30" style={{ fontWeight: 600 }}>
+                  Në dispozicion
+                </p>
+              </div>
+              <p
+                className="mt-1.5 text-[24px] leading-none tracking-[-0.03em]"
+                style={{ fontWeight: 700, color: NAVY }}
+              >
+                {animatedAvailable}
+              </p>
+            </div>
+
+            <div className="sm:border-l sm:border-[#eff1f4] sm:pl-4">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-[5px] w-[5px] rounded-full"
+                  style={{ backgroundColor: RED, opacity: 0.6 }}
+                />
+                <p className="text-[11px] uppercase tracking-[0.12em] text-black/30" style={{ fontWeight: 600 }}>
+                  Të shitura
+                </p>
+              </div>
+              <p
+                className="mt-1.5 text-[24px] leading-none tracking-[-0.03em]"
+                style={{ fontWeight: 700, color: RED }}
+              >
+                {animatedSold}
+              </p>
+              <div
+                className="mt-2 h-[2px] w-5 rounded-full"
+                style={{ backgroundColor: "rgba(177,75,75,0.18)" }}
+              />
             </div>
           </div>
         </>
@@ -245,9 +296,66 @@ function SecondaryPartyCard({
   );
 }
 
+function OverviewMonthlySalesChartFallback() {
+  return (
+    <div className="flex h-[180px] items-center justify-center rounded-[14px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
+      <p className="text-[12.5px] text-black/36">Duke ngarkuar grafikun...</p>
+    </div>
+  );
+}
+
+function DeferredOverviewMonthlySalesChart({
+  chartYear,
+  started,
+}: {
+  chartYear: number;
+  started: boolean;
+}) {
+  const [shouldLoadChart, setShouldLoadChart] = useState(false);
+
+  useEffect(() => {
+    if (!started || shouldLoadChart) {
+      return;
+    }
+
+    const loadChart = () => {
+      setShouldLoadChart(true);
+    };
+    const windowWithIdleCallback = window as Window & typeof globalThis & {
+      requestIdleCallback?: (
+        callback: IdleRequestCallback,
+        options?: IdleRequestOptions,
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof windowWithIdleCallback.requestIdleCallback === "function") {
+      const idleId = windowWithIdleCallback.requestIdleCallback(loadChart, { timeout: 1600 });
+      return () => {
+        windowWithIdleCallback.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timeoutId = globalThis.setTimeout(loadChart, 900);
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+    };
+  }, [shouldLoadChart, started]);
+
+  if (!shouldLoadChart) {
+    return <OverviewMonthlySalesChartFallback />;
+  }
+
+  return (
+    <Suspense fallback={<OverviewMonthlySalesChartFallback />}>
+      <OverviewMonthlySalesChart chartYear={chartYear} started={started} />
+    </Suspense>
+  );
+}
+
 export default function OverviewPage() {
-  const { units, loading } = useUnits();
-  const [started, setStarted] = useState(false);
+  // Overview only needs inventory state here; sale KPIs/chart come from reporting RPCs.
+  const { units, loading } = useUnits({ includeSaleTruth: false });
 
   // Period filter state
   const [filterYear, setFilterYear] = useState<number | "all">("all");
@@ -255,93 +363,89 @@ export default function OverviewPage() {
 
   // Chart year — syncs with filterYear when a specific year is selected
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
-  useEffect(() => {
-    if (filterYear !== "all") setChartYear(filterYear);
-  }, [filterYear]);
 
-  useEffect(() => {
-    if (!loading) {
-      const t = setTimeout(() => setStarted(true), 80);
-      return () => clearTimeout(t);
-    }
-  }, [loading]);
+  const started = !loading;
 
-  // All Investitor units
-  const inv = useMemo(
-    () => units.filter((u) => u.owner_category === "Investitor"),
-    [units]
-  );
+  // Inventory-only snapshot — period-independent stock counts.
+  const snapshotMetrics = usePortfolioMetrics({
+    units,
+    ownerScope: "Investitor",
+    year: "all",
+    month: "all",
+  });
 
-  // Always-unfiltered counts (for progress bar, available, reserved, total KPIs)
-  const soldAll     = inv.filter((u) => u.status === "E shitur").length;
-  const available   = inv.filter((u) => u.status === "Në dispozicion").length;
-  const reserved    = inv.filter((u) => u.status === "E rezervuar").length;
-  const total       = inv.length;
-  const soldPct     = total > 0 ? (soldAll / total) * 100 : 0;
-  const reservedPct = total > 0 ? (reserved / total) * 100 : 0;
-  const availablePct = total > 0 ? (available / total) * 100 : 0;
+  // Backend sale-reporting — period-aware financial KPIs (A2).
+  const reportingYear = filterYear === "all" ? null : filterYear;
+  const reportingMonth = filterMonth === "all" ? null : (filterMonth as number) + 1;
 
-  // Period-filtered sold units (for hero revenue + sold KPI)
-  const filteredSoldUnits = useMemo(() => {
-    return inv.filter((u) => {
-      if (u.status !== "E shitur") return false;
-      if (filterYear === "all") return true;
-      if (!u.sale_date) return false;
-      const sd = new Date(u.sale_date);
-      if (sd.getFullYear() !== filterYear) return false;
-      if (filterMonth !== "all" && sd.getMonth() !== filterMonth) return false;
-      return true;
-    });
-  }, [inv, filterYear, filterMonth]);
+  const {
+    metrics: reportingMetrics,
+    loading: reportingLoading,
+    error: reportingError,
+  } = useSaleReporting({
+    ownerScope: "Investitor",
+    year: reportingYear,
+    month: reportingMonth,
+  });
 
-  const soldFiltered   = filteredSoldUnits.length;
-  const totalRevenue   = filteredSoldUnits.reduce((s, u) => s + u.price, 0);
-  const completionPct  = total > 0 ? Math.round((soldFiltered / total) * 100) : 0;
-  const animatedRevenue = useCountUpRevenue(totalRevenue, started);
+  const total = snapshotMetrics.totalUnits;
+  const available = snapshotMetrics.availableUnits;
 
-  // Period label for badges
+  const filterActive = filterYear !== "all";
+  const rawActiveFinancial = reportingMetrics;
+  const activeFinancialLoading = reportingLoading;
+  const activeFinancialError = reportingError;
+  // Hold last-confirmed metrics so swapping the period filter doesn't flash
+  // zeros through the hero + KPI cards while the RPC is re-fetching.
+  const activeFinancial = useHoldLast(rawActiveFinancial, activeFinancialLoading);
+
+  const soldFiltered = activeFinancial?.soldUnits ?? 0;
+  const totalRevenue = activeFinancial?.contractedValue ?? 0;
+
+  const completionPct = total > 0 ? Math.round((soldFiltered / total) * 100) : 0;
+  const animatedRevenue = useCountUpRevenue(totalRevenue, started && !activeFinancialLoading);
+
+  // A2 — hero sublabel + completion context reflect the applied period honestly.
+  const soldSummaryLabel = filterActive
+    ? `${soldFiltered} njësi të shitura në periudhën e zgjedhur`
+    : `${soldFiltered} njësi të shitura gjithsej`;
+
+  // Period label for badges / chip
   const periodLabel: string | null =
-    filterYear === "all"
+    !filterActive
       ? null
       : filterMonth === "all"
       ? `${filterYear}`
       : `${SQ_MONTHS[filterMonth as number]} ${filterYear}`;
 
+  const activePeriodChipLabel =
+    !filterActive
+      ? "Të gjitha vitet"
+      : filterMonth === "all"
+      ? `${filterYear}`
+      : `${SQ_MONTHS[filterMonth as number]} ${filterYear}`;
+
+  // Hero "Vlera e kontraktuar" badge — A2 makes the badge mirror the filter state.
+  const heroRevenueBadgeLabel = filterActive ? (periodLabel ?? "Periudha e zgjedhur") : "Aktuale";
+
+  const completionContextLabel = filterActive
+    ? filterMonth === "all"
+      ? "e stokut në vitin e zgjedhur"
+      : "e stokut në periudhën e zgjedhur"
+    : "e projektit e shitur";
+
   const kpis: KpiDef[] = [
-    { key: "sold",      label: "Njësi të shitura",    value: soldFiltered, total, icon: BadgeCheck,   badge: periodLabel },
-    { key: "available", label: "Njësi në dispozicion", value: available,    total, icon: CheckCircle2, badge: null },
-    { key: "reserved",  label: "Njësi të rezervuara",  value: reserved,     total, icon: Clock3,       badge: null },
-    { key: "total",     label: "Gjithsej njësi",        value: total,        total, icon: Building2,    badge: null },
+    { key: "total",     label: "Gjithsej njësi",        value: total,        total, color: "#003883", icon: Building2,    badge: null },
+    { key: "available", label: "Njësi në dispozicion", value: available,    total, color: "#3c7a57", icon: CheckCircle2, badge: null },
+    { key: "sold",      label: "Njësi të shitura",    value: soldFiltered, total, color: "#b14b4b", icon: BadgeCheck,   badge: periodLabel },
   ];
 
-  // Monthly chart data
-  const chartData = useMemo<ChartEntry[]>(() => {
-    const months: ChartEntry[] = SQ_MONTHS.map((name, i) => ({
-      month: SQ_MONTHS_SHORT[i],
-      label: `${name} ${chartYear}`,
-      units: 0,
-      revenue: 0,
-    }));
-    inv
-      .filter((u) => u.status === "E shitur" && u.sale_date)
-      .forEach((u) => {
-        const sd = new Date(u.sale_date!);
-        if (sd.getFullYear() === chartYear) {
-          months[sd.getMonth()].units += 1;
-          months[sd.getMonth()].revenue += u.price;
-        }
-      });
-    return months;
-  }, [inv, chartYear]);
-
-  const hasChartData = inv.some((u) => u.status === "E shitur" && u.sale_date);
-
   return (
-    <div className="flex-1 overflow-auto" style={{ backgroundColor: "#f8f8fa" }}>
+    <div style={{ backgroundColor: "#f8f8fa" }}>
       <div className="mx-auto max-w-[1100px] px-10 py-10">
 
         {/* Header */}
-        <div className="mb-5 flex items-start justify-between">
+        <div className="mb-3 flex items-start justify-between">
           <div>
             <motion.h1
               {...fadeUp(0)}
@@ -350,8 +454,11 @@ export default function OverviewPage() {
             >
               UF Partners Residence
             </motion.h1>
-            <motion.p {...fadeUp(0.06)} className="mt-0.5 text-[13px]" style={{ color: "#003883", opacity: 0.20 }}>
+            <motion.p {...fadeUp(0.06)} className="mt-0.5 text-[13px]" style={{ color: "#003883", opacity: 0.65 }}>
               Rr. Agron Selenica, Gjilan
+            </motion.p>
+            <motion.p {...fadeUp(0.07)} className="mt-0.5 text-[12px]" style={{ color: "#003883", opacity: 0.5 }}>
+              Pronësia Investitor · pamje financiare sipas periudhës së zgjedhur
             </motion.p>
           </div>
 
@@ -361,14 +468,18 @@ export default function OverviewPage() {
         </div>
 
         {/* Period filter — right-aligned above hero card */}
-        <motion.div {...fadeUp(0.08)} className="mb-3 flex justify-end gap-2">
+        <motion.div {...fadeUp(0.08)} className="mb-1.5 flex justify-end gap-2">
           <CustomSelect
             size="sm"
             className="min-w-[148px]"
             options={["Të gjitha vitet", ...FILTER_YEARS.map(String)]}
             value={filterYear === "all" ? "Të gjitha vitet" : String(filterYear)}
             onChange={(v) => {
-              setFilterYear(v === "Të gjitha vitet" ? "all" : Number(v));
+              const nextYear = v === "Të gjitha vitet" ? "all" : Number(v);
+              setFilterYear(nextYear);
+              if (nextYear !== "all") {
+                setChartYear(nextYear);
+              }
               setFilterMonth("all");
             }}
           />
@@ -399,22 +510,27 @@ export default function OverviewPage() {
                 className="text-[11px] uppercase tracking-[0.14em] text-black/35"
                 style={{ fontWeight: 600 }}
               >
-                Të ardhura totale
+                Vlera e kontraktuar
               </p>
-              {periodLabel && <PeriodBadge label={periodLabel} />}
+              <PeriodBadge label={heroRevenueBadgeLabel} />
             </div>
             <p
               className="text-[52px] leading-none tracking-[-2px]"
               style={{ color: NAVY, fontWeight: 700 }}
             >
-              {formatEur(animatedRevenue)}
+              {fmtEur(animatedRevenue)}
             </p>
+            {activeFinancialError && (
+              <p className="mt-1.5 text-[11.5px] text-[#b14b4b]/80">
+                Treguesit financiarë nuk u ngarkuan për këtë periudhë.
+              </p>
+            )}
           </div>
 
           {/* Right: completion stats */}
           <div className="flex flex-col items-end gap-1 text-right">
             <p className="text-[13px] text-black/50" style={{ fontWeight: 400 }}>
-              Bazuar në {soldFiltered} njësi të shitura
+              {soldSummaryLabel}
             </p>
             <p
               className="text-[38px] leading-none tracking-[-1.5px]"
@@ -423,7 +539,7 @@ export default function OverviewPage() {
               {completionPct}%
             </p>
             <p className="text-[12px] text-black/40">
-              e projektit e shitur
+              {completionContextLabel}
             </p>
           </div>
         </motion.div>
@@ -435,121 +551,34 @@ export default function OverviewPage() {
           ))}
         </div>
 
-        {/* Progress bar — always unfiltered */}
+        {/* Monthly sales chart */}
         <motion.div
-          {...fadeUp(0.38)}
+          {...fadeUp(0.44)}
           className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
-          <p className="mb-4 text-[13px] text-black/55" style={{ fontWeight: 600 }}>
-            Ndarja e stokut
-          </p>
-
-          <div className="flex h-3 overflow-hidden rounded-full bg-[#f0f0f2]">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: started ? `${soldPct}%` : "0%" }}
-              transition={{ duration: 0.95, delay: 0.42, ease: [0.22, 1, 0.36, 1] }}
-              style={{ backgroundColor: "#b14b4b" }}
-            />
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: started ? `${reservedPct}%` : "0%" }}
-              transition={{ duration: 0.95, delay: 0.52, ease: [0.22, 1, 0.36, 1] }}
-              style={{ backgroundColor: "#b0892f" }}
-            />
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: started ? `${availablePct}%` : "0%" }}
-              transition={{ duration: 0.95, delay: 0.62, ease: [0.22, 1, 0.36, 1] }}
-              style={{ backgroundColor: "#3c7a57" }}
+          <div className="mb-5 flex items-start justify-between">
+            <div>
+              <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>
+                Shitjet mujore
+              </p>
+              <p className="mt-0.5 text-[12px] text-black/35">
+                Njësi të shitura sipas muajit
+              </p>
+            </div>
+            <CustomSelect
+              size="sm"
+              className="min-w-[90px]"
+              options={CHART_YEARS.map(String)}
+              value={String(chartYear)}
+              onChange={(v) => setChartYear(Number(v))}
             />
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-6">
-            {[
-              { label: "E shitur",       count: soldAll,   pct: soldPct,      color: "#b14b4b" },
-              { label: "E rezervuar",    count: reserved,  pct: reservedPct,  color: "#b0892f" },
-              { label: "Në dispozicion", count: available, pct: availablePct, color: "#3c7a57" },
-            ].map((seg) => (
-              <div key={seg.label} className="flex items-center gap-2">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: seg.color }}
-                />
-                <span className="text-[13px] text-black/45">{seg.label}</span>
-                <span className="text-[13px]" style={{ fontWeight: 700, color: seg.color }}>
-                  {seg.count}
-                </span>
-                <span className="text-[12px] text-black/25">
-                  {Math.round(seg.pct)}%
-                </span>
-              </div>
-            ))}
-            <span className="ml-auto text-[12px] text-black/25">
-              {total} njësi gjithsej
-            </span>
-          </div>
+          <DeferredOverviewMonthlySalesChart chartYear={chartYear} started={started} />
         </motion.div>
 
-        {/* Monthly sales chart */}
-        {hasChartData && (
-          <motion.div
-            {...fadeUp(0.44)}
-            className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
-            style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
-          >
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>
-                  Shitjet mujore
-                </p>
-                <p className="mt-0.5 text-[12px] text-black/35">
-                  Njësi të shitura sipas muajit
-                </p>
-              </div>
-              <CustomSelect
-                size="sm"
-                className="min-w-[90px]"
-                options={CHART_YEARS.map(String)}
-                value={String(chartYear)}
-                onChange={(v) => setChartYear(Number(v))}
-              />
-            </div>
-
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={chartData} barSize={22} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)", fontWeight: 500 }}
-                />
-                <YAxis
-                  allowDecimals={false}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: "rgba(0,0,0,0.28)" }}
-                  width={36}
-                />
-                <Tooltip
-                  content={<SalesTooltip />}
-                  cursor={{ fill: "rgba(0,56,131,0.04)", radius: 6 }}
-                />
-                <Bar dataKey="units" radius={[5, 5, 0, 0]}>
-                  {chartData.map((entry, index) => (
-                    <Cell
-                      key={index}
-                      fill={entry.units > 0 ? NAVY : "rgba(0,56,131,0.08)"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </motion.div>
-        )}
-
-        {/* Secondary parties — always unfiltered */}
+        {/* Ownership structure — snapshot stock + filtered sold */}
         <motion.p
           {...fadeUp(0.5)}
           className="mb-3 text-[11px] uppercase tracking-[0.1em] text-black/28"
@@ -557,9 +586,25 @@ export default function OverviewPage() {
         >
           Struktura e pronësisë
         </motion.p>
-        <div className="flex gap-4">
-          <SecondaryPartyCard category="Pronarët e tokës"   delay={0.54} active={started} />
-          <SecondaryPartyCard category="Kompani ndërtimore" delay={0.60} active={started} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <SecondaryPartyCard
+            category="Pronarët e tokës"
+            units={units}
+            year={filterYear}
+            month={filterMonth}
+            periodContextLabel={activePeriodChipLabel}
+            delay={0.54}
+            active={started}
+          />
+          <SecondaryPartyCard
+            category="Kompani ndërtimore"
+            units={units}
+            year={filterYear}
+            month={filterMonth}
+            periodContextLabel={activePeriodChipLabel}
+            delay={0.60}
+            active={started}
+          />
         </div>
 
       </div>
