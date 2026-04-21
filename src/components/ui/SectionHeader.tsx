@@ -3,6 +3,7 @@ import {
   SECONDARY_HEADER_TONE_STYLES,
   type SecondaryHeaderTone,
 } from "./secondaryHeaderTone";
+import { EyebrowLabel } from "./Eyebrow";
 
 export function SectionHeader({
   eyebrow,
@@ -37,12 +38,13 @@ export function SectionHeader({
     <div className={`mb-5 flex flex-wrap items-start justify-between gap-4 ${className}`.trim()}>
       <div>
         {eyebrow ? (
-          <p
-            className={`mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${eyebrowClassName}`.trim()}
+          <EyebrowLabel
+            as="p"
+            className={`mb-1 ${eyebrowClassName}`.trim()}
             style={{ ...toneStyles.eyebrow, ...eyebrowStyle }}
           >
             {eyebrow}
-          </p>
+          </EyebrowLabel>
         ) : null}
         <p
           className={`text-[18px] font-semibold leading-tight tracking-[-0.03em] ${titleClassName}`.trim()}

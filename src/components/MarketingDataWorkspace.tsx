@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { CustomSelect } from "./CustomSelect";
+import { CenteredEyebrowDivider, EyebrowLabel } from "./ui/Eyebrow";
 import { useMarketing } from "../hooks/useMarketing";
 import { SkeletonRows } from "./SkeletonRows";
 import type { MarketingInput, MarketingRow, OfflineInput, OfflineEntry } from "../hooks/useMarketing";
@@ -56,7 +57,9 @@ function ModalNumberField({ label, value, onChange, prefix, placeholder }: {
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">{label}</span>
+      <EyebrowLabel as="span" className="text-black/35">
+        {label}
+      </EyebrowLabel>
       <div className="relative">
         {prefix && (
           <span className="absolute left-3 top-1/2 -translate-y-1/2 select-none text-[13px] text-black/40">
@@ -85,7 +88,9 @@ function ModalTextField({ label, value, onChange, placeholder }: {
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">{label}</span>
+      <EyebrowLabel as="span" className="text-black/35">
+        {label}
+      </EyebrowLabel>
       <input
         type="text"
         value={value}
@@ -104,7 +109,9 @@ function ModalDateField({ label, value, onChange }: {
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">{label}</span>
+      <EyebrowLabel as="span" className="text-black/35">
+        {label}
+      </EyebrowLabel>
       <input
         type="date"
         value={value}
@@ -112,16 +119,6 @@ function ModalDateField({ label, value, onChange }: {
         className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
       />
     </label>
-  );
-}
-
-function SectionDivider({ label }: { label: string }) {
-  return (
-    <div className="mb-4 flex items-center gap-3">
-      <div className="h-px flex-1 bg-black/[0.06]" />
-      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-black/30">{label}</span>
-      <div className="h-px flex-1 bg-black/[0.06]" />
-    </div>
   );
 }
 
@@ -291,7 +288,9 @@ function DigitalModal({
 
             <div className="mb-5 grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Viti</span>
+                <EyebrowLabel as="span" className="text-black/35">
+                  Viti
+                </EyebrowLabel>
                 <CustomSelect
                   size="md"
                   options={[...YEAR_OPTIONS]}
@@ -300,7 +299,9 @@ function DigitalModal({
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Muaji</span>
+                <EyebrowLabel as="span" className="text-black/35">
+                  Muaji
+                </EyebrowLabel>
                 <CustomSelect
                   size="md"
                   options={SQ_MONTHS}
@@ -311,20 +312,20 @@ function DigitalModal({
               </label>
             </div>
 
-            <SectionDivider label="Facebook" />
+            <CenteredEyebrowDivider className="mb-4" label="Facebook" />
             <div className="mb-5 grid grid-cols-3 gap-3">
               <ModalNumberField label="Shpenzimi" value={form.spend_facebook} onChange={set("spend_facebook")} prefix="€" />
               <ModalNumberField label="Shikime" value={form.views_facebook} onChange={set("views_facebook")} />
               <ModalNumberField label="Kontakte" value={form.leads_facebook} onChange={set("leads_facebook")} />
             </div>
 
-            <SectionDivider label="TikTok" />
+            <CenteredEyebrowDivider className="mb-4" label="TikTok" />
             <div className="mb-5 grid grid-cols-2 gap-3">
               <ModalNumberField label="Shikime" value={form.views_tiktok} onChange={set("views_tiktok")} />
               <ModalNumberField label="Kontakte" value={form.leads_tiktok} onChange={set("leads_tiktok")} />
             </div>
 
-            <SectionDivider label="Instagram" />
+            <CenteredEyebrowDivider className="mb-4" label="Instagram" />
             <div className="mb-6">
               <ModalNumberField label="Kontakte" value={form.leads_instagram} onChange={set("leads_instagram")} />
             </div>
@@ -501,7 +502,9 @@ function OfflineModal({
 
             <div className="flex flex-col gap-4">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Kanali</span>
+                <EyebrowLabel as="span" className="text-black/35">
+                  Kanali
+                </EyebrowLabel>
                 <CustomSelect size="md" options={[...CHANNELS]} value={form.channel} onChange={set("channel")} placeholder="Zgjidh kanalin" />
               </label>
 
@@ -510,18 +513,24 @@ function OfflineModal({
               <ModalNumberField label="Shuma (€)" value={form.amount} onChange={set("amount")} prefix="€" placeholder="0" />
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Periudha</span>
+                <EyebrowLabel as="span" className="text-black/35">
+                  Periudha
+                </EyebrowLabel>
                 <CustomSelect size="md" options={["Mujore", "Vjetore"]} value={form.period_type} onChange={set("period_type")} />
               </label>
 
               <div className={`grid gap-3 ${form.period_type === "Mujore" ? "grid-cols-2" : "grid-cols-1"}`}>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Viti</span>
+                  <EyebrowLabel as="span" className="text-black/35">
+                    Viti
+                  </EyebrowLabel>
                   <CustomSelect size="md" options={[...YEAR_OPTIONS]} value={form.year} onChange={set("year")} />
                 </label>
                 {form.period_type === "Mujore" && (
                   <label className="flex flex-col gap-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Muaji</span>
+                    <EyebrowLabel as="span" className="text-black/35">
+                      Muaji
+                    </EyebrowLabel>
                     <CustomSelect size="md" options={SQ_MONTHS} value={form.month} onChange={set("month")} placeholder="Zgjidh muajin" />
                   </label>
                 )}
@@ -744,11 +753,15 @@ export function MarketingDataWorkspace() {
 
       <div className="flex flex-wrap items-end gap-3 rounded-[18px] border border-[#e8e8ec] bg-white p-4">
         <label className="flex min-w-[110px] flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Viti</span>
+          <EyebrowLabel as="span" className="text-black/35">
+            Viti
+          </EyebrowLabel>
           <CustomSelect size="sm" options={[...YEAR_OPTIONS]} value={String(filterYear)} onChange={(v) => setFilterYear(Number(v))} />
         </label>
         <label className="flex min-w-[170px] flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Muaji</span>
+          <EyebrowLabel as="span" className="text-black/35">
+            Muaji
+          </EyebrowLabel>
           <CustomSelect
             size="sm"
             options={SQ_MONTHS}
@@ -788,7 +801,7 @@ export function MarketingDataWorkspace() {
                   {["Periudha", "Shpenzimi", "Shikime", "Kontaktet", "Veprime"].map((h, i) => (
                     <th
                       key={h}
-                      className={`py-3 text-[11px] font-semibold uppercase tracking-wide text-black/35 ${
+                      className={`py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35 ${
                         i === 1 || i === 2 || i === 3 ? "px-3 text-right" :
                         i === 4 ? "pl-3 pr-5 text-center" :
                         "pl-6 pr-3 text-left"
@@ -884,7 +897,7 @@ export function MarketingDataWorkspace() {
                   {["Kanali", "Përshkrimi", "Shuma", "Periudha", "Data", "Veprime"].map((h, i) => (
                     <th
                       key={h}
-                      className={`py-3 text-[11px] font-semibold uppercase tracking-wide text-black/35 ${
+                      className={`py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35 ${
                         i === 0 ? "pl-6 pr-3 text-left" :
                         i === 2 ? "px-3 text-right" :
                         i === 5 ? "pl-3 pr-5 text-center" :

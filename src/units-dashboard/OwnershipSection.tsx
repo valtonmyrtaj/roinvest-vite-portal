@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Building2 } from "lucide-react";
+import { SectionEyebrow } from "../components/ui/Eyebrow";
 import type { Unit } from "../hooks/useUnits";
 import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import {
@@ -35,16 +36,11 @@ export function OwnershipSection({ units }: { units: Unit[] }) {
 
   return (
     <div className="mb-8">
-      <div className="mb-1 flex items-center gap-2">
-        <span
-          className="text-[11px] uppercase tracking-[0.1em] text-black/35"
-          style={{ fontWeight: 600 }}
-        >
-          Shpërndarja e pronësisë
-        </span>
-        <span className="text-[11px] text-black/25">— {units.length} njësi të caktuara</span>
-      </div>
-      <div className="mb-4 h-px bg-black/[0.05]" />
+      <SectionEyebrow
+        className="mb-4"
+        label="Shpërndarja e pronësisë"
+        detail={`${units.length} njësi të caktuara`}
+      />
 
       <div className="grid grid-cols-12 gap-4">
         {ownershipKpis.map((o, index) => (

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { BadgeCheck, Building2, CheckCircle2, Clock3 } from "lucide-react";
+import { SectionEyebrow } from "../components/ui/Eyebrow";
 import type { OwnerCategory, Unit } from "../hooks/useUnits";
 import { AnimatedNumber, Card, FilterSelect } from "./primitives";
 import { OWNER_CATEGORIES } from "./shared";
@@ -56,16 +57,11 @@ export function StockStatusSection({
 
   return (
     <div className="mb-8">
-      <div className="mb-1 flex items-center gap-2">
-        <span
-          className="text-[11px] uppercase tracking-[0.1em] text-black/35"
-          style={{ fontWeight: 600 }}
-        >
-          Statusi i stokut
-        </span>
-        <span className="text-[11px] text-black/25">— sipas pronarit</span>
-      </div>
-      <div className="mb-4 h-px bg-black/[0.05]" />
+      <SectionEyebrow
+        className="mb-4"
+        label="Statusi i stokut"
+        detail="sipas pronarit"
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-[14px] border border-[#e8e8ec] bg-white p-[4px] shadow-[0_1px_2px_rgba(16,24,40,0.02)]">

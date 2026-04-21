@@ -1,4 +1,5 @@
 import { Filter, Search } from "lucide-react";
+import { SectionEyebrow } from "../components/ui/Eyebrow";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { PillBadge } from "../components/ui/PillBadge";
 import type { Block, Level, Unit, UnitStatus } from "../hooks/useUnits";
@@ -68,16 +69,11 @@ export function UnitsRegistrySection({
 }) {
   return (
     <div>
-      <div className="mb-1 flex items-center gap-2">
-        <span
-          className="text-[11px] uppercase tracking-[0.1em] text-black/35"
-          style={{ fontWeight: 600 }}
-        >
-          Regjistri i njësive
-        </span>
-        <span className="text-[11px] text-black/25">— lista e plotë e stokut</span>
-      </div>
-      <div className="mb-4 h-px bg-black/[0.05]" />
+      <SectionEyebrow
+        className="mb-4"
+        label="Regjistri i njësive"
+        detail="lista e plotë e stokut"
+      />
 
       <Card className="overflow-hidden p-0">
         <CardSectionHeader

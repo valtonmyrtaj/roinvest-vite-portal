@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, X } from "lucide-react";
+import { EyebrowLabel } from "../components/ui/Eyebrow";
 import type { Unit, UnitHistory } from "../hooks/useUnits";
 import { SQ_MONTHS_LONG } from "./shared";
 import { SkeletonRows } from "../components/SkeletonRows";
@@ -113,9 +114,9 @@ export function HistoryDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-black/35">
+          <EyebrowLabel as="p" className="mb-4 text-black/35">
             Historia e ndryshimeve
-          </p>
+          </EyebrowLabel>
 
           {loadingHistory ? (
             <SkeletonRows rows={4} />

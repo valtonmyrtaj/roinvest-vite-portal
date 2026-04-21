@@ -1,5 +1,6 @@
 import type { CSSProperties, ElementType, ReactNode } from "react";
 import { NAVY } from "../../ui/tokens";
+import { EyebrowLabel } from "./Eyebrow";
 
 type PageHeaderTone = "brand" | "neutral";
 
@@ -69,12 +70,13 @@ export function PageHeader({
       <div className={bodyClassName}>
         <div className={contentClassName}>
           {eyebrow ? (
-            <p
-              className={`mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${eyebrowClassName}`.trim()}
+            <EyebrowLabel
+              as="p"
+              className={`mb-1 ${eyebrowClassName}`.trim()}
               style={resolvedEyebrowStyle}
             >
               {eyebrow}
-            </p>
+            </EyebrowLabel>
           ) : null}
           <TitleTag
             className={`text-[24px] font-semibold tracking-[-0.03em] ${titleClassName}`.trim()}
