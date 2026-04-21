@@ -93,7 +93,6 @@ const fadeUp = (delay = 0) => ({
 });
 
 const OVERVIEW_CARD_SHADOW = "0 1px 2px rgba(0,0,0,0.04), 0 10px 26px rgba(0,0,0,0.035)";
-const OVERVIEW_CARD_HOVER_SHADOW = "0 1px 2px rgba(0,0,0,0.04), 0 14px 32px rgba(0,0,0,0.05)";
 const OVERVIEW_HERO_SHADOW = "0 1px 2px rgba(0,0,0,0.045), 0 16px 36px rgba(0,0,0,0.04)";
 const OVERVIEW_OWNERSHIP_BORDER = "#e5e7eb";
 
@@ -174,7 +173,6 @@ interface KpiDef {
 }
 
 function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: boolean }) {
-  const shouldReduceMotion = useReducedMotion();
   const animated = useAnimatedNumber(kpi.value, active, 0.95);
   const pct = kpi.total > 0 ? Math.round((kpi.value / kpi.total) * 100) : 0;
   const showPct = kpi.key !== "total";
@@ -182,16 +180,6 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
   return (
     <motion.div
       {...fadeUp(delay)}
-      whileHover={
-        shouldReduceMotion
-          ? undefined
-          : {
-              y: -2,
-              borderColor: "rgba(0,56,131,0.12)",
-              boxShadow: OVERVIEW_CARD_HOVER_SHADOW,
-              transition: { duration: 0.24, ease: SOFT_EASE },
-            }
-      }
       className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-5"
       style={{ boxShadow: OVERVIEW_CARD_SHADOW }}
     >
@@ -271,7 +259,6 @@ function SecondaryPartyCard({
   const total = snapshotMetrics.totalUnits;
   const available = snapshotMetrics.availableUnits;
   const sold = displayCategoryMetrics?.soldUnits ?? 0;
-  const shouldReduceMotion = useReducedMotion();
   const animatedSold = useAnimatedNumber(sold, active, 0.8);
   const animatedAvailable = useAnimatedNumber(available, active, 0.8);
   const animatedTotal = useAnimatedNumber(total, active, 0.8);
@@ -279,16 +266,6 @@ function SecondaryPartyCard({
   return (
     <motion.div
       {...ownershipSectionReveal(delay)}
-      whileHover={
-        shouldReduceMotion
-          ? undefined
-          : {
-              y: -2,
-              borderColor: OVERVIEW_OWNERSHIP_BORDER,
-              boxShadow: OVERVIEW_CARD_HOVER_SHADOW,
-              transition: { duration: 0.24, ease: SOFT_EASE },
-            }
-      }
       className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
       style={{ borderColor: OVERVIEW_OWNERSHIP_BORDER, boxShadow: OVERVIEW_CARD_SHADOW }}
     >
