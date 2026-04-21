@@ -214,7 +214,7 @@ export default function OverviewMonthlySalesChart({
           data={chartData}
           barSize={22}
           barCategoryGap="26%"
-          margin={{ top: 6, right: 4, left: -18, bottom: 0 }}
+          margin={{ top: 6, right: 4, left: 0, bottom: 0 }}
         >
           <CartesianGrid
             vertical={false}
@@ -240,7 +240,7 @@ export default function OverviewMonthlySalesChart({
             tickLine={false}
             domain={[0, yAxisMax]}
             tick={{ fontSize: 10.5, fill: "rgba(15,23,42,0.28)" }}
-            width={30}
+            width={34}
           />
           <Tooltip
             content={<SalesTooltip />}
@@ -248,7 +248,7 @@ export default function OverviewMonthlySalesChart({
           />
           <Bar
             dataKey="units"
-            radius={[8, 8, 0, 0]}
+            radius={[0, 0, 0, 0]}
             maxBarSize={32}
             activeBar={{
               fillOpacity: 0.96,
