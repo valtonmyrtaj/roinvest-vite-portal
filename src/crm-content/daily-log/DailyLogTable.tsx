@@ -190,7 +190,7 @@ export function DailyLogTable({
                 style={{ backgroundColor: NAVY }}
               >
                 <Plus size={14} strokeWidth={2.2} />
-                Shto ditën
+                Regjistro ditën
               </button>
             ) : null
           }
@@ -247,7 +247,7 @@ export function DailyLogTable({
                           <input
                             value={draft.comments}
                             onChange={(event) => setDraft((prev) => ({ ...prev, comments: event.target.value }))}
-                            placeholder="Shënime..."
+                            placeholder="Shënime operative, nëse duhen"
                             className="h-9 w-full rounded-[9px] border border-black/10 bg-white px-2 text-[12px] text-black/70 outline-none focus:border-[#003883]/30"
                           />
                         </td>
@@ -283,8 +283,14 @@ export function DailyLogTable({
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.18, ease: SOFT_EASE }}
                       >
-                        <td colSpan={7} className="py-10 text-center text-[12.5px] text-black/30">
-                          Asnjë aktivitet i regjistruar
+                        <td colSpan={7} className="py-10 text-center">
+                          <p className="text-[12.5px] font-medium text-black/40">
+                            Nuk ka aktivitet të regjistruar për {MONTH_LABELS[selectedMonth]}{" "}
+                            {selectedYear}
+                          </p>
+                          <p className="mt-1 text-[11.5px] text-black/28">
+                            Regjistro ditën e parë për të nisur pasqyrën mujore.
+                          </p>
                         </td>
                       </motion.tr>
                     ) : (
@@ -347,7 +353,7 @@ export function DailyLogTable({
                                   <input
                                     value={editDraft.comments}
                                     onChange={(event) => setEditDraft((prev) => ({ ...prev, comments: event.target.value }))}
-                                    placeholder="Shënime..."
+                                    placeholder="Shënime operative, nëse duhen"
                                     className="h-9 w-full rounded-[9px] border border-black/10 bg-white px-2 text-[12px] text-black/70 outline-none focus:border-[#003883]/30"
                                   />
                                 </td>

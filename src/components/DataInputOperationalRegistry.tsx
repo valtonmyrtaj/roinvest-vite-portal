@@ -255,7 +255,7 @@ const getPaymentFollowUp = (row: RegistryRow) => {
 
     return {
       primary: "Pagesë e plotë",
-      secondary: row.paymentCount > 0 ? "E arkëtuar" : "Pa pagesë të regjistruar",
+      secondary: row.paymentCount > 0 ? "E arkëtuar plotësisht" : "Pagesa nuk është regjistruar ende",
       secondaryClassName: "text-black/38",
     };
   }
@@ -272,7 +272,7 @@ const getPaymentFollowUp = (row: RegistryRow) => {
 
     return {
       primary: "Me këste",
-      secondary: row.paymentCount > 0 ? "Të gjitha të paguara" : "Pa këste",
+      secondary: row.paymentCount > 0 ? "Të gjitha të paguara" : "Këstet nuk janë regjistruar ende",
       secondaryClassName: "text-black/38",
     };
   }
@@ -295,9 +295,9 @@ const getPaymentFollowUp = (row: RegistryRow) => {
   }
 
   return {
-    primary: "Pa plan",
-    secondary: null,
-    secondaryClassName: "text-black/32",
+    primary: "Plan pagese",
+    secondary: "Nuk është regjistruar ende",
+    secondaryClassName: "text-black/38",
   };
 };
 
@@ -771,8 +771,17 @@ export function DataInputOperationalRegistry({
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr className="border-t border-[#f0f0f2]">
-                    <td colSpan={11} className="py-16 text-center text-[13px] text-black/30">
-                      Asnjë njësi nuk përputhet me filtrat aktualë.
+                    <td colSpan={11} className="py-16 text-center">
+                      <p className="text-[13px] font-medium text-black/40">
+                        {units.length === 0
+                          ? "Nuk ka njësi të regjistruara ende për këtë kategori."
+                          : "Asnjë njësi nuk përputhet me filtrat aktualë."}
+                      </p>
+                      <p className="mt-1 text-[11.5px] text-black/28">
+                        {units.length === 0
+                          ? "Shto hyrjen e parë më sipër për ta nisur regjistrin."
+                          : "Rishikoni filtrat për ta rikthyer listën e plotë."}
+                      </p>
                     </td>
                   </tr>
                 ) : (

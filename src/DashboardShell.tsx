@@ -146,9 +146,9 @@ function NotificationPanel({
             <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/[0.03]">
               <Bell size={15} className="text-black/30" strokeWidth={2} />
             </div>
-            <p className="text-[12.5px] font-medium text-black/55">Asnjë njoftim i ri</p>
+            <p className="text-[12.5px] font-medium text-black/55">Nuk ka njoftime të reja</p>
             <p className="mt-1 text-[11.5px] text-black/32">
-              Njoftimet e reja do të shfaqen këtu
+              Ndryshimet e fundit do të shfaqen këtu sapo të regjistrohen.
             </p>
           </div>
         ) : (

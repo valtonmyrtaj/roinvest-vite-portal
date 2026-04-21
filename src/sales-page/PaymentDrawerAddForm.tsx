@@ -52,7 +52,11 @@ export function PaymentDrawerAddForm({
       setNotes("");
       setShowAddForm(false);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Kësti nuk u ruajt dot.");
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Kësti nuk u ruajt. Kontrolloni të dhënat dhe provoni përsëri.",
+      );
     } finally {
       setSaving(false);
     }
@@ -66,7 +70,7 @@ export function PaymentDrawerAddForm({
             Shto këst
           </p>
           <p className="mt-1 text-[12px] text-black/42">
-            Regjistro këstin e ardhshëm për planin e kësaj njësie.
+            Shto këstin e ardhshëm ose plotëso planin ekzistues të pagesave.
           </p>
         </div>
 
@@ -135,6 +139,7 @@ export function PaymentDrawerAddForm({
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 rows={3}
+                placeholder="Detaje operative, nëse duhen"
                 className="rounded-[11px] border border-[#e8e8ec] bg-white px-3 py-2.5 text-[13px] text-black/80 outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
               />
             </label>

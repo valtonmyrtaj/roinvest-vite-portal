@@ -122,7 +122,11 @@ export function ShowingModal({
 
       onClose();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Shfaqja nuk u ruajt dot.");
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Shfaqja nuk u ruajt. Kontrolloni të dhënat dhe provoni përsëri.",
+      );
     } finally {
       setSaving(false);
     }
@@ -158,10 +162,10 @@ export function ShowingModal({
         <div className="mb-5 flex items-start justify-between">
           <div>
             <p className="text-[16px] font-semibold tracking-[-0.02em] text-black/90">
-              {initial ? "Ndrysho shfaqjen" : "Shto shfaqje të re"}
+              {initial ? "Ndrysho shfaqjen" : "Regjistro shfaqje të re"}
             </p>
             <p className="mt-0.5 text-[12px] text-black/40">
-              Kontakti, njësia dhe rezultati komercial i shfaqjes
+              Regjistro kontaktin, njësinë dhe rezultatin komercial në një hyrje të vetme.
             </p>
           </div>
           <button
@@ -301,7 +305,7 @@ export function ShowingModal({
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              placeholder="Shënime opsionale..."
+              placeholder="Detaje operative, përshtypje ose hapa pasues"
               rows={2}
               className="resize-none rounded-[11px] border border-black/10 bg-white px-3 py-2.5 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
             />

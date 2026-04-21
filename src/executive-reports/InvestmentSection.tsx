@@ -286,8 +286,8 @@ Pamje për pronësinë Investitor · stoku, shitjet, arkëtimet dhe vlera e mbet
                     </div>
                     <p className="mt-2 text-[11.5px] text-[#3c7a57]/45">
                       {summaryMetricsValue.hasPaymentData
-                        ? "Nga pagesat e regjistruara"
-                        : "Asnjë pagesë e regjistruar"}
+                        ? "Bazuar në pagesat e regjistruara"
+                        : "Ende pa pagesa të regjistruara"}
                     </p>
                   </>
                 ) : (
@@ -310,7 +310,7 @@ Pamje për pronësinë Investitor · stoku, shitjet, arkëtimet dhe vlera e mbet
                     <p className="mt-2 text-[11.5px] text-[#b0892f]/45">
                       {summaryMetricsValue.hasPaymentData
                         ? "Këste të papaguara"
-                        : "Pa plan pagesash"}
+                        : "Ende pa plan pagese"}
                     </p>
                   </>
                 ) : (

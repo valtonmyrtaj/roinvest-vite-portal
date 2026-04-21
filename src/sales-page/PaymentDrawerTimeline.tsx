@@ -35,7 +35,7 @@ export function PaymentDrawerTimeline({
             Plani i pagesave
           </p>
           <p className="mt-1 text-[12.5px] text-black/42">
-            Ritmi i arkëtimeve dhe këstët e mbetura për këtë njësi.
+            Pamja e arkëtimeve dhe kësteve të mbetura për këtë njësi.
           </p>
         </div>
 
@@ -58,9 +58,14 @@ export function PaymentDrawerTimeline({
       {loading ? (
         <SkeletonRows rows={3} className="mt-5" />
       ) : payments.length === 0 ? (
-        <p className="mt-5 text-[13px] text-black/35">
-          Nuk ka këste të regjistruara ende për këtë njësi.
-        </p>
+        <div className="mt-5 text-center">
+          <p className="text-[13px] font-medium text-black/40">
+            Plani i pagesave nuk ka këste të regjistruara ende
+          </p>
+          <p className="mt-1 text-[11.5px] text-black/28">
+            Shto këstin e parë për të nisur gjurmimin e arkëtimeve.
+          </p>
+        </div>
       ) : (
         <>
           <div className="relative mt-6 overflow-x-auto pb-2">

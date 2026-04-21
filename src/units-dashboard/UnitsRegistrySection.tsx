@@ -240,10 +240,17 @@ export function UnitsRegistrySection({
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="py-16 text-center text-[13px] text-black/30">
-                      {units.length === 0
-                        ? "Asnjë njësi e shtuar ende. Shko te Data Input për të shtuar njësi."
-                        : "Asnjë njësi nuk përputhet me filtrat aktualë."}
+                    <td colSpan={11} className="py-16 text-center">
+                      <p className="text-[13px] font-medium text-black/40">
+                        {units.length === 0 || registryScopeUnits.length === 0
+                          ? "Nuk ka njësi të regjistruara ende për këtë përzgjedhje."
+                          : "Asnjë njësi nuk përputhet me filtrat aktualë."}
+                      </p>
+                      <p className="mt-1 text-[11.5px] text-black/28">
+                        {units.length === 0 || registryScopeUnits.length === 0
+                          ? "Ndrysho përzgjedhjen ose shto njësi të reja nga Data Input."
+                          : "Rishikoni filtrat për ta rikthyer listën e plotë."}
+                      </p>
                     </td>
                   </tr>
                 )}

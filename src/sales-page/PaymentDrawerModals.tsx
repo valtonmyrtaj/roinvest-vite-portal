@@ -33,7 +33,9 @@ export function ConfirmDeleteModal({
       await onConfirm();
       onClose();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Kësti nuk u fshi dot.");
+      setError(
+        caughtError instanceof Error ? caughtError.message : "Kësti nuk u fshi. Provoni përsëri.",
+      );
     } finally {
       setSaving(false);
     }
@@ -116,7 +118,9 @@ export function MarkPaidModal({
       onClose();
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Pagesa nuk u ruajt dot.",
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Pagesa nuk u regjistrua. Provoni përsëri.",
       );
     } finally {
       setSaving(false);
@@ -143,7 +147,7 @@ export function MarkPaidModal({
           Shëno si të paguar
         </p>
         <p className="mt-2 text-[13px] text-black/48">
-          Kësti #{payment.installment_number} do të regjistrohet si i paguar.
+          Kësti #{payment.installment_number} do të shënohet si i paguar dhe progresi i arkëtimit do të përditësohet.
         </p>
 
         <label className="mt-5 flex flex-col gap-1.5">

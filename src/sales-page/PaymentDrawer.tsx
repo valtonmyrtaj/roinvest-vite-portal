@@ -145,7 +145,7 @@ export function PaymentDrawer({
         {deleteTarget && (
           <ConfirmDeleteModal
             title="Fshi këstin"
-            description={`Kësti #${deleteTarget.installment_number} do të hiqet përgjithmonë nga plani i pagesave.`}
+            description={`Kësti #${deleteTarget.installment_number} do të hiqet nga plani i pagesave. Ky veprim nuk mund të kthehet.`}
             onClose={() => setDeleteTarget(null)}
             onConfirm={() => onDeletePayment(deleteTarget.id)}
           />

@@ -126,7 +126,14 @@ export function ShowingsSection({
             className="px-4 py-3"
           />
           {upcoming.length === 0 ? (
-            <div className="py-9 text-center text-[12.5px] text-black/30">Asnjë shfaqje e planifikuar</div>
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+              <p className="text-[12.5px] font-medium text-black/42">
+                Nuk ka shfaqje të planifikuara për momentin
+              </p>
+              <p className="mt-1 text-[11.5px] text-black/30">
+                Shfaqjet e reja do të renditen këtu sapo të planifikohen.
+              </p>
+            </div>
           ) : (
             <div className="flex h-[320px] min-h-[320px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
               {upcoming.map((showing) => (
@@ -143,7 +150,14 @@ export function ShowingsSection({
             className="px-4 py-3"
           />
           {past.length === 0 ? (
-            <div className="py-9 text-center text-[12.5px] text-black/30">Asnjë shfaqje e regjistruar</div>
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+              <p className="text-[12.5px] font-medium text-black/42">
+                Ende nuk ka shfaqje të mbyllura
+              </p>
+              <p className="mt-1 text-[11.5px] text-black/30">
+                Shfaqjet e kryera dhe të anuluara ruhen këtu.
+              </p>
+            </div>
           ) : (
             <div className="flex h-[320px] min-h-[320px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
               {past.map((showing) => (

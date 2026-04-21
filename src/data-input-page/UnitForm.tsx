@@ -201,7 +201,7 @@ export function UnitForm({
             type="text"
             value={draft.notes ?? ""}
             onChange={(e) => set("notes", e.target.value)}
-            placeholder="Shënime opsionale..."
+            placeholder="Shënime operative, nëse duhen"
             className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
           />
         </label>

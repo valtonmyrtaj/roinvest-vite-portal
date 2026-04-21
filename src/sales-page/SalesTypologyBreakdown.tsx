@@ -57,7 +57,7 @@ function TypologyAccordionRow({
 
         <div className="flex flex-1 flex-wrap items-center gap-[4px]">
           {soldCount === 0 ? (
-            <span className="text-[11.5px] text-black/25">Nuk ka shitje në periudhën e zgjedhur</span>
+            <span className="text-[11.5px] text-black/28">Ende pa shitje në këtë periudhë</span>
           ) : (
             <>
               {Array.from({ length: dotsToShowCount }, (_, index) => (
@@ -101,7 +101,7 @@ function TypologyAccordionRow({
             <div className="grid gap-3 px-5 py-4">
               {soldCount === 0 ? (
                 <p className="text-[12px] text-black/35">
-                  Asnjë njësi e shitur për këtë tipologji.
+                  Kjo tipologji nuk ka njësi të shitura në periudhën e zgjedhur.
                 </p>
               ) : (
                 <>

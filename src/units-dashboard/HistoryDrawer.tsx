@@ -121,7 +121,14 @@ export function HistoryDrawer({
           {loadingHistory ? (
             <SkeletonRows rows={4} />
           ) : history.length === 0 ? (
-            <p className="text-[13px] text-black/30">Asnjë ndryshim i regjistruar.</p>
+            <div className="text-center">
+              <p className="text-[13px] font-medium text-black/40">
+                Nuk ka ndryshime të regjistruara ende për këtë njësi
+              </p>
+              <p className="mt-1 text-[11.5px] text-black/28">
+                Sapo të ruhen përditësime, ato do të shfaqen këtu.
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col gap-4">
               {history.map((h) => {

@@ -123,13 +123,22 @@ export function ActivityTimeline({ refreshKey = 0 }: { refreshKey?: number }) {
         <p className="text-[14px] font-semibold tracking-[-0.2px]" style={{ color: NAVY }}>
           Aktiviteti i fundit
         </p>
-        <p className="mt-0.5 text-[12px] text-black/35">50 ndryshimet e fundit në njësi</p>
+        <p className="mt-0.5 text-[12px] text-black/35">
+          50 ndryshimet më të fundit në regjistrin e njësive
+        </p>
       </div>
       <div className="max-h-[480px] overflow-y-auto px-5 pb-1 pt-3.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {loading ? (
           <SkeletonRows rows={5} className="py-4" />
         ) : entries.length === 0 ? (
-          <div className="py-10 text-center text-[13px] text-black/30">Asnjë aktivitet i regjistruar</div>
+          <div className="flex flex-col items-center py-10 text-center">
+            <p className="text-[13px] font-medium text-black/40">
+              Nuk ka aktivitet të regjistruar ende
+            </p>
+            <p className="mt-1 text-[11.5px] text-black/28">
+              Ndryshimet operative do të shfaqen këtu sapo të ruhen.
+            </p>
+          </div>
         ) : (
           <>
             {todayEntries.length > 0 && (

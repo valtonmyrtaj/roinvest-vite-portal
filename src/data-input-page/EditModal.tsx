@@ -410,7 +410,7 @@ export function EditModal({
                     setReason(e.target.value);
                     setError("");
                   }}
-                  placeholder="p.sh. Klienti kërkoi ndryshim të sipërfaqes"
+                  placeholder="p.sh. Korrigjim sipërfaqeje sipas verifikimit"
                   className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
                 />
               </label>

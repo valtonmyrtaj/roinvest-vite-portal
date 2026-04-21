@@ -32,7 +32,14 @@ export function ActiveReservationsSection({ units }: { units: Unit[] }) {
 
         <div className="overflow-x-auto">
           {activeReservations.length === 0 ? (
-            <div className="px-5 py-8 text-[12px] text-black/25">Asnjë rezervim aktiv</div>
+            <div className="px-5 py-8 text-center">
+              <p className="text-[12.5px] font-medium text-black/38">
+                Nuk ka rezervime aktive për momentin
+              </p>
+              <p className="mt-1 text-[11.5px] text-black/26">
+                Njësitë e rezervuara do të shfaqen këtu sipas datës së skadimit.
+              </p>
+            </div>
           ) : (
             <table className="w-full min-w-[640px] text-left">
               <thead>

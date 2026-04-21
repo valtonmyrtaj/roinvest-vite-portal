@@ -316,7 +316,11 @@ function DigitalModal({
       if (error) { setErrMsg(error.message); return; }
       onClose();
     } catch (err) {
-      setErrMsg(err instanceof Error ? err.message : "Ruajtja dështoi. Provo përsëri.");
+      setErrMsg(
+        err instanceof Error
+          ? err.message
+          : "Të dhënat nuk u ruajtën. Kontrolloni fushat dhe provoni përsëri.",
+      );
     } finally {
       setSaving(false);
     }
@@ -446,7 +450,11 @@ function OfflineModal({
       if (error) { setErrMsg(error.message); return; }
       onClose();
     } catch (err) {
-      setErrMsg(err instanceof Error ? err.message : "Ruajtja dështoi. Provo përsëri.");
+      setErrMsg(
+        err instanceof Error
+          ? err.message
+          : "Hyrja nuk u ruajt. Kontrolloni fushat dhe provoni përsëri.",
+      );
     } finally {
       setSaving(false);
     }
@@ -469,7 +477,7 @@ function OfflineModal({
       >
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
-            Shto hyrje offline
+            Regjistro hyrje offline
           </h2>
           <button
             onClick={onClose}
@@ -497,7 +505,7 @@ function OfflineModal({
             label="Përshkrimi"
             value={description}
             onChange={setDescription}
-            placeholder="Opsionale"
+            placeholder="p.sh. Billboard pranë hyrjes kryesore"
           />
           <ModalNumberField label="Shuma (€)" value={amount} onChange={setAmount} required />
           <div>
@@ -951,10 +959,14 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           {filteredOfflineLog.length === 0 ? (
             <div className="flex flex-col items-center py-10">
               <p className="text-[13px] text-black/40" style={{ fontWeight: 500 }}>
-                Nuk ka hyrje offline
+                {offlineEntries.length === 0
+                  ? "Nuk ka hyrje offline të regjistruara ende"
+                  : "Nuk ka hyrje offline për filtrin aktual"}
               </p>
               <p className="mt-1 text-[12px] text-black/28">
-                Shto hyrjen e parë duke klikuar butonin më sipër
+                {offlineEntries.length === 0
+                  ? "Regjistro hyrjen e parë për ta nisur evidencën operative."
+                  : "Ndrysho filtrin për të parë hyrjet ekzistuese."}
               </p>
             </div>
           ) : (

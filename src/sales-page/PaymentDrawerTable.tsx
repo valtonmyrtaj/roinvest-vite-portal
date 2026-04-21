@@ -37,7 +37,14 @@ export function PaymentDrawerTable({
         {loading ? (
           <SkeletonRows rows={3} className="px-5 py-4" />
         ) : payments.length === 0 ? (
-          <p className="px-5 py-4 text-[13px] text-black/35">Asnjë këst i regjistruar.</p>
+          <div className="px-5 py-5 text-center">
+            <p className="text-[13px] font-medium text-black/40">
+              Plani i pagesave nuk ka këste të regjistruara ende
+            </p>
+            <p className="mt-1 text-[11.5px] text-black/28">
+              Përdor bllokun më poshtë për të shtuar këstin e parë.
+            </p>
+          </div>
         ) : (
           <div className="min-w-[700px]">
             <div className={`flex items-center px-5 py-2.5 ${TABULAR_HEADER_ROW_CLASS}`}>

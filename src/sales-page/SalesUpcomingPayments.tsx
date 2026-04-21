@@ -40,8 +40,13 @@ export function SalesUpcomingPayments({
 
       <div className="overflow-x-auto">
         {upcomingPayments.length === 0 ? (
-          <div className="px-6 py-10 text-[13px] text-black/35">
-            Asnjë pagesë e ardhshme e regjistruar
+          <div className="px-6 py-10 text-center">
+            <p className="text-[13px] font-medium text-black/40">
+              Nuk ka pagesa të ardhshme për momentin
+            </p>
+            <p className="mt-1 text-[11.5px] text-black/28">
+              Këstet e papaguara do të renditen këtu sapo të kenë afat skadimi.
+            </p>
           </div>
         ) : (
           <table className="w-full min-w-[820px] text-left">

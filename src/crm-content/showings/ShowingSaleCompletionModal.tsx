@@ -121,7 +121,11 @@ export function ShowingSaleCompletionModal({
       });
       onClose();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Shitja nuk u kompletua dot.");
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Shitja nuk u kompletua. Kontrolloni të dhënat dhe provoni përsëri.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -150,7 +154,7 @@ export function ShowingSaleCompletionModal({
               Përfundo shitjen
             </p>
             <p className="mt-0.5 text-[12px] text-black/40">
-              Shitja do të kalojë në rrugën reale të kompletimit financiar.
+              Ky veprim e kalon njësinë në shitje të konfirmuar dhe hap kompletimin financiar.
             </p>
           </div>
           <button
@@ -218,7 +222,7 @@ export function ShowingSaleCompletionModal({
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              placeholder="Shënime opsionale për shitjen..."
+              placeholder="Shënime operative për shitjen, nëse duhen"
               rows={2}
               className="resize-none rounded-[11px] border border-black/10 bg-white px-3 py-2.5 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
             />
@@ -231,7 +235,7 @@ export function ShowingSaleCompletionModal({
               <div>
                 <p className="text-[13px] font-semibold text-black/82">Plani i pagesave</p>
                 <p className="mt-0.5 text-[11px] text-black/42">
-                  Shtoni këstet që duhet të krijohen menjëherë nga shitja.
+                  Shtoni këstet që duhet të hapen menjëherë në planin e pagesave.
                 </p>
               </div>
               <button

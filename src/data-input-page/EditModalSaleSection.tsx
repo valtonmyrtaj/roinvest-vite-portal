@@ -85,7 +85,7 @@ export function EditModalSaleSection({
       <div className="mb-3">
         <p className="text-[13px] font-semibold text-black/82">Përfundo shitjen</p>
         <p className="mt-0.5 text-[11px] text-black/42">
-          Shitja do të kalojë në rrugën reale të kompletimit financiar.
+          Ky veprim e kalon njësinë në shitje të konfirmuar dhe hap kompletimin financiar.
         </p>
       </div>
 
@@ -197,8 +197,8 @@ export function EditModalSaleSection({
                 color: "#3c7a57",
                 borderColor: "rgba(60,122,87,0.2)",
               }}
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                 <path
                   d="M2.5 6.2L4.8 8.5L9.5 3.5"
                   stroke="#3c7a57"
@@ -206,8 +206,8 @@ export function EditModalSaleSection({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-              </svg>
-              Pagesë e plotë — {formatEuroCompact(parsedFinalPriceLive)} do të regjistrohet si e paguar plotësisht
+                </svg>
+              Pagesë e plotë — {formatEuroCompact(parsedFinalPriceLive)} do të regjistrohet si arkëtim i plotë
             </span>
           </motion.div>
         )}
@@ -297,7 +297,7 @@ export function EditModalSaleSection({
             <div>
               <p className="text-[13px] font-semibold text-black/82">Plani i pagesave</p>
               <p className="mt-0.5 text-[11px] text-black/42">
-                Shtoni këstet që duhet të krijohen menjëherë nga shitja.
+                Shtoni këstet që duhet të hapen menjëherë në planin e pagesave.
               </p>
             </div>
             <button

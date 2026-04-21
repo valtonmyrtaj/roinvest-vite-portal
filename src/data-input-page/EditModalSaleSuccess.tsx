@@ -70,7 +70,7 @@ export function EditModalSaleSuccess({
       </motion.div>
 
       <p className="mt-4 text-[16px] font-semibold tracking-[-0.02em] text-black/90">
-        Shitja u kompletua me sukses
+        Shitja u regjistrua me sukses
       </p>
 
       <div className="mt-5 w-full">

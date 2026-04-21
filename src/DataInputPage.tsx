@@ -152,7 +152,7 @@ export default function DataInputPage({
   const handleSave = async () => {
     const valid = resolvedDrafts.filter(isDraftValid);
     if (valid.length === 0) {
-      setSaveError("Plotëso të paktën një njësi të plotë.");
+      setSaveError("Plotësoni të paktën një njësi të plotë për ta ruajtur.");
       return;
     }
     setSaving(true);
@@ -185,11 +185,11 @@ export default function DataInputPage({
         setDrafts((prev) => prev.filter((draft) => !persistedDraftKeys.has(draft._key)));
         setSaveError(
           `U ruajtën ${persistedDraftKeys.size} nga ${valid.length} njësi. ${
-            failedDraftUnitId ? `Njësia ${failedDraftUnitId} nuk u ruajt. ` : ""
-          }Gabim: ${errorMessage}`,
+            failedDraftUnitId ? `Njësia ${failedDraftUnitId} mbeti pa u ruajtur. ` : ""
+          }Kontrolloni detajin dhe provoni sërish vetëm hyrjet e mbetura. Detaj: ${errorMessage}`,
         );
       } else {
-        setSaveError(`Gabim: ${errorMessage}`);
+        setSaveError(`Nuk u ruajt asnjë njësi. Detaj: ${errorMessage}`);
       }
       setSaving(false);
       return;
@@ -232,7 +232,7 @@ export default function DataInputPage({
       const updateResult = await updateUnit(editUnit.id, payload.genericChanges, payload.reason);
       if (updateResult.error) {
         genericUpdateError =
-          "Shitja u kompletua, por disa ndryshime të njësisë nuk u ruajtën. Mbylleni dritaren dhe rihapeni njësinë nëse duhet t'i provoni përsëri.";
+          "Shitja u kompletua, por disa përditësime të njësisë nuk u ruajtën. Rihapeni njësinë dhe provoni sërish vetëm korrigjimet e mbetura.";
       }
     }
 
@@ -375,7 +375,7 @@ export default function DataInputPage({
                 animate={{ opacity: 1 }}
                 className="text-[12px] text-[#3c7a57]"
               >
-                ✓ Njësitë u ruajtën me sukses
+                ✓ Njësitë u regjistruan me sukses
               </motion.span>
             )}
             {saveError && (
