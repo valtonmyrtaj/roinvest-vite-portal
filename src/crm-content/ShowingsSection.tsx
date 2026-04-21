@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
 import type { CRMShowing, ShowingStatus } from "../hooks/useCRM";
+import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { Card } from "./primitives";
 import { fmtDateTime, NAVY, SOFT_EASE } from "./shared";
 import { SHOWING_STYLE } from "./showings/shared";
@@ -101,31 +102,29 @@ export function ShowingsSection({
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[14px] font-semibold tracking-[-0.2px]" style={{ color: NAVY }}>
-            Shfaqjet
-          </p>
-          <p className="mt-0.5 text-[12px] text-black/35">{showings.length} gjithsej</p>
-        </div>
-        <button
-          onClick={onAdd}
-          className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] text-white transition hover:opacity-90"
-          style={{ backgroundColor: NAVY }}
-        >
-          <Plus size={14} strokeWidth={2.2} />
-          Shto shfaqje
-        </button>
-      </div>
+      <CardSectionHeader
+        title="Shfaqjet"
+        subtitle={`${showings.length} gjithsej`}
+        className="mb-5 border-b-0 px-0 py-0"
+        right={
+          <button
+            onClick={onAdd}
+            className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] text-white transition hover:opacity-90"
+            style={{ backgroundColor: NAVY }}
+          >
+            <Plus size={14} strokeWidth={2.2} />
+            Shto shfaqje
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-4">
         <Card className="overflow-hidden p-0">
-          <div className="border-b border-[#f0f0f2] px-4 py-3">
-            <p className="text-[13px] font-semibold" style={{ color: NAVY }}>
-              Të planifikuara
-            </p>
-            <p className="mt-0.5 text-[12px] text-black/35">{upcoming.length} shfaqje</p>
-          </div>
+          <CardSectionHeader
+            title="Të planifikuara"
+            subtitle={`${upcoming.length} shfaqje`}
+            className="px-4 py-3"
+          />
           {upcoming.length === 0 ? (
             <div className="py-9 text-center text-[12.5px] text-black/30">Asnjë shfaqje e planifikuar</div>
           ) : (
@@ -138,12 +137,11 @@ export function ShowingsSection({
         </Card>
 
         <Card className="overflow-hidden p-0">
-          <div className="border-b border-[#f0f0f2] px-4 py-3">
-            <p className="text-[13px] font-semibold" style={{ color: NAVY }}>
-              Të kryera dhe të anuluara
-            </p>
-            <p className="mt-0.5 text-[12px] text-black/35">{past.length} shfaqje</p>
-          </div>
+          <CardSectionHeader
+            title="Të kryera dhe të anuluara"
+            subtitle={`${past.length} shfaqje`}
+            className="px-4 py-3"
+          />
           {past.length === 0 ? (
             <div className="py-9 text-center text-[12.5px] text-black/30">Asnjë shfaqje e regjistruar</div>
           ) : (

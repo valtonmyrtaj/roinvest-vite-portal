@@ -2,6 +2,7 @@ import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { PillBadge } from "./ui/PillBadge";
+import { SectionHeader } from "./ui/SectionHeader";
 import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import type { Payment } from "../hooks/usePayments";
 import { getUnitContractValue, getUnitFinalSalePrice } from "../lib/unitFinancials";
@@ -646,9 +647,11 @@ export function DataInputOperationalRegistry({
     >
       <div className="rounded-[22px] border border-[#ededf0] bg-white px-10 py-9 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
         <div className="mb-6">
-          <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[#003883]">
-            Njësitë ekzistuese
-          </h2>
+          <SectionHeader
+            title="Njësitë ekzistuese"
+            className="mb-0"
+            titleClassName="text-[18px]"
+          />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {statItems.map((item) => (
               <span

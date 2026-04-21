@@ -100,7 +100,6 @@ export function OperationalSection({
         <CardSectionHeader
           title="Përmbledhja mujore"
           className="border-b border-[#f0f0f2] px-5 py-3.5"
-          titleClassName="text-[13px] tracking-[-0.02em]"
         />
         <div className="executive-reports-scroll overflow-x-auto">
           <table className="w-full text-[12px]">

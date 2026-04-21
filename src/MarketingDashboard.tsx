@@ -16,6 +16,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { CustomSelect } from "./components/CustomSelect";
+import { CardSectionHeader } from "./components/ui/CardSectionHeader";
 import { PageHeader } from "./components/ui/PageHeader";
 import { useMarketing, type MarketingInput, type OfflineInput } from "./hooks/useMarketing";
 
@@ -859,13 +860,12 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           className="mb-5 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
-          <div className="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>Shpenzimet sipas muajve</p>
-              <p className="mt-0.5 text-[12px] text-black/30">Shpenzimet e Facebook sipas muajve — {filterYear}</p>
-            </div>
-            <ChartYearSelect value={filterYear} onChange={setFilterYear} />
-          </div>
+          <CardSectionHeader
+            title="Shpenzimet sipas muajve"
+            subtitle={`Shpenzimet e Facebook sipas muajve — ${filterYear}`}
+            className="mb-5 border-b-0 px-0 py-0"
+            right={<ChartYearSelect value={filterYear} onChange={setFilterYear} />}
+          />
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={chartData} barSize={22} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <XAxis dataKey="label" axisLine={false} tickLine={false}
@@ -887,13 +887,12 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
-          <div className="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>Shikimet dhe kontaktet sipas muajve</p>
-              <p className="mt-0.5 text-[12px] text-black/30">Shikimet dhe kontaktet sipas muajve — {filterYear}</p>
-            </div>
-            <ChartYearSelect value={filterYear} onChange={setFilterYear} />
-          </div>
+          <CardSectionHeader
+            title="Shikimet dhe kontaktet sipas muajve"
+            subtitle={`Shikimet dhe kontaktet sipas muajve — ${filterYear}`}
+            className="mb-5 border-b-0 px-0 py-0"
+            right={<ChartYearSelect value={filterYear} onChange={setFilterYear} />}
+          />
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />
@@ -926,27 +925,28 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>
-              Regjistri i marketingut offline
-            </p>
-            <div className="flex items-center rounded-[10px] border border-[#e8e8ec] p-0.5">
-              {OFFLINE_FILTERS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setLogFilter(f)}
-                  className="rounded-[8px] px-3 py-1.5 text-[11.5px] transition"
-                  style={{
-                    background: logFilter === f ? NAVY : "transparent",
-                    color:      logFilter === f ? "white" : "rgba(0,0,0,0.45)",
-                    fontWeight: logFilter === f ? 600 : 400,
-                  }}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
+          <CardSectionHeader
+            title="Regjistri i marketingut offline"
+            className="mb-4 border-b-0 px-0 py-0"
+            right={
+              <div className="flex items-center rounded-[10px] border border-[#e8e8ec] p-0.5">
+                {OFFLINE_FILTERS.map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setLogFilter(f)}
+                    className="rounded-[8px] px-3 py-1.5 text-[11.5px] transition"
+                    style={{
+                      background: logFilter === f ? NAVY : "transparent",
+                      color: logFilter === f ? "white" : "rgba(0,0,0,0.45)",
+                      fontWeight: logFilter === f ? 600 : 400,
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            }
+          />
 
           {filteredOfflineLog.length === 0 ? (
             <div className="flex flex-col items-center py-10">

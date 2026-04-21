@@ -4,6 +4,7 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import type { CreateDailyLogInput, DailyLogEntry } from "../../hooks/useCRM";
 import { ConfirmDeleteModal } from "../ConfirmDeleteModal";
 import { Card } from "../primitives";
+import { CardSectionHeader } from "../../components/ui/CardSectionHeader";
 import { MONTH_LABELS, NAVY, SOFT_EASE, TODAY_ISO, fmtDate, toDateOnly } from "../shared";
 import { SkeletonRows } from "../../components/SkeletonRows";
 
@@ -170,29 +171,26 @@ export function DailyLogTable({
           </div>
         )}
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[13px] font-semibold tracking-[-0.02em]" style={{ color: NAVY }}>
-              Regjistri ditor
-            </p>
-            <p className="mt-0.5 text-[12px] text-black/35">
-              {MONTH_LABELS[selectedMonth]} {selectedYear} · {filteredEntries.length} ditë të regjistruara
-            </p>
-          </div>
-          {!addingRow && (
-            <button
-              onClick={() => {
-                setDraft(emptyDraft(TODAY_ISO));
-                setAddingRow(true);
-              }}
-              className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] font-medium text-white transition hover:opacity-90"
-              style={{ backgroundColor: NAVY }}
-            >
-              <Plus size={14} strokeWidth={2.2} />
-              Shto ditën
-            </button>
-          )}
-        </div>
+        <CardSectionHeader
+          title="Regjistri ditor"
+          subtitle={`${MONTH_LABELS[selectedMonth]} ${selectedYear} · ${filteredEntries.length} ditë të regjistruara`}
+          className="mb-4 border-b-0 px-0 py-0"
+          right={
+            !addingRow ? (
+              <button
+                onClick={() => {
+                  setDraft(emptyDraft(TODAY_ISO));
+                  setAddingRow(true);
+                }}
+                className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] font-medium text-white transition hover:opacity-90"
+                style={{ backgroundColor: NAVY }}
+              >
+                <Plus size={14} strokeWidth={2.2} />
+                Shto ditën
+              </button>
+            ) : null
+          }
+        />
 
         <Card className="overflow-hidden p-0">
           {loading ? (

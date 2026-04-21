@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useLayoutEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, BadgeCheck, Building2 } from "lucide-react";
 import { CustomSelect } from "./components/CustomSelect";
+import { CardSectionHeader } from "./components/ui/CardSectionHeader";
 import { PageHeader } from "./components/ui/PageHeader";
 import { useUnits } from "./hooks/useUnits";
 import { usePortfolioMetrics } from "./hooks/usePortfolioMetrics";
@@ -565,23 +566,20 @@ export default function OverviewPage() {
           className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
-          <div className="mb-5 flex items-start justify-between">
-            <div>
-              <p className="text-[13px] text-black/55" style={{ fontWeight: 600 }}>
-                Shitjet mujore
-              </p>
-              <p className="mt-0.5 text-[12px] text-black/35">
-                Njësi të shitura sipas muajit
-              </p>
-            </div>
-            <CustomSelect
-              size="sm"
-              className="min-w-[90px]"
-              options={CHART_YEARS.map(String)}
-              value={String(chartYear)}
-              onChange={(v) => setChartYear(Number(v))}
-            />
-          </div>
+          <CardSectionHeader
+            title="Shitjet mujore"
+            subtitle="Njësi të shitura sipas muajit"
+            className="mb-5 border-b-0 px-0 py-0"
+            right={
+              <CustomSelect
+                size="sm"
+                className="min-w-[90px]"
+                options={CHART_YEARS.map(String)}
+                value={String(chartYear)}
+                onChange={(v) => setChartYear(Number(v))}
+              />
+            }
+          />
 
           <DeferredOverviewMonthlySalesChart chartYear={chartYear} started={started} />
         </motion.div>

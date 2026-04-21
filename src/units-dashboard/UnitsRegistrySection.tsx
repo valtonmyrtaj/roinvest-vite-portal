@@ -84,8 +84,6 @@ export function UnitsRegistrySection({
           title="Të gjitha njësitë"
           subtitle={`${filtered.length} nga ${registryScopeUnits.length} njësi të shfaqura`}
           className="px-6 py-5"
-          titleClassName="text-[14px] tracking-[-0.2px] text-[#003883]"
-          subtitleClassName="text-[12px] text-[#003883]"
           right={
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="relative">

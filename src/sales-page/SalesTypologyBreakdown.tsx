@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, CreditCard } from "lucide-react";
 import type { Unit } from "../hooks/useUnits";
+import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { getUnitContractValue } from "../lib/unitFinancials";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { Card } from "./primitives";
@@ -192,14 +193,12 @@ export function SalesTypologyBreakdown({
   return (
     <div className="mt-6">
       <Card>
-        <div className="mb-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/30">
-            Njësitë e shitura
-          </p>
-          <p className="mt-1 text-[13px] text-black/45">
-            Hap tipologjinë për të parë njësitë e shitura dhe planin e pagesave
-          </p>
-        </div>
+        <CardSectionHeader
+          title="Njësitë e shitura"
+          subtitle="Hap tipologjinë për të parë njësitë e shitura dhe planin e pagesave"
+          className="mb-5 border-b-0 px-0 py-0"
+          bodyClassName="max-w-[460px]"
+        />
 
         <div className="flex flex-col gap-3">
           {error ? (

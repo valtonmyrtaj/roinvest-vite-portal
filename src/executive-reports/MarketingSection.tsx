@@ -112,7 +112,6 @@ export function MarketingSection({
           <CardSectionHeader
             title="Shpenzime totale"
             className="border-b border-[#edf0f4] px-5 py-3.5"
-            titleClassName="text-[15px]"
             right={
               <MarketingPeriodControls
                 selectedMonth={selectedMarketingMonth}

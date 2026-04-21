@@ -31,8 +31,7 @@ export function SalesUpcomingPayments({
         title="Pagesat e ardhshme"
         subtitle="Këstët e papaguara të renditura sipas datës së skadimit"
         className="px-6 py-5"
-        titleClassName="text-[24px] leading-none tracking-[-0.02em] text-[#003883]"
-        subtitleClassName="mt-[4px] max-w-[500px] text-[13px] leading-[1.38] text-[#003883]/70"
+        bodyClassName="max-w-[500px]"
       />
 
       <div className="overflow-x-auto">

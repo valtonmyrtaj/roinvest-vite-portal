@@ -1,5 +1,6 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, RevenueTooltip } from "./primitives";
+import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { fmtRevenueAxisTick, NAVY, type ChartPoint } from "./shared";
 
 export function SalesRevenueChart({
@@ -23,14 +24,12 @@ export function SalesRevenueChart({
   return (
     <div className="mt-6">
       <Card className="overflow-hidden">
-        <div className="mb-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/30">
-            Vlera e kontraktuar mujore
-          </p>
-          <p className="mt-1 text-[13px] text-black/45">
-            Ritmi i shitjeve për vitin {selectedYear}
-          </p>
-        </div>
+        <CardSectionHeader
+          title="Vlera e kontraktuar mujore"
+          subtitle={`Ritmi i shitjeve për vitin ${selectedYear}`}
+          className="mb-5 border-b-0 px-0 py-0"
+          bodyClassName="max-w-[420px]"
+        />
 
         <div className="h-[280px]">
           {error ? (
