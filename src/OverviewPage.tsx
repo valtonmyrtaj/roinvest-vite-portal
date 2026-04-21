@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useLayoutEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { AnimatePresence, animate, motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, BadgeCheck, Building2 } from "lucide-react";
 import { CustomSelect } from "./components/CustomSelect";
 import { CardSectionHeader } from "./components/ui/CardSectionHeader";
@@ -8,8 +8,6 @@ import { useUnits } from "./hooks/useUnits";
 import { usePortfolioMetrics } from "./hooks/usePortfolioMetrics";
 import { useSaleReporting } from "./hooks/useSaleReporting";
 import type { OwnerCategory, Unit } from "./hooks/useUnits";
-import { PillBadge } from "./components/ui/PillBadge";
-import { getOwnerCategoryStyle } from "./lib/ownerColors";
 import { formatEuro as fmtEur } from "./lib/formatCurrency";
 import { NAVY, RED, SOFT_EASE } from "./ui/tokens";
 
@@ -26,30 +24,58 @@ function todayAlbanian() {
   return `${d.getDate()} ${SQ_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function useCountUp(end: number, active: boolean, duration = 1200) {
-  const [val, setVal] = useState(0);
-  useLayoutEffect(() => {
-    if (!active) return;
+function useAnimatedNumber(end: number, active: boolean, duration = 1.1) {
+  const shouldReduceMotion = useReducedMotion();
+  const [value, setValue] = useState(0);
+  const currentValueRef = useRef(0);
+  const hasStartedRef = useRef(false);
 
-    let frame = 0;
-    let t0: number | null = null;
-    const initialValue = end > 0 ? Math.max(1, Math.min(end, Math.round(end * 0.03))) : 0;
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
 
-    const tick = (ts: number) => {
-      if (!t0) t0 = ts;
-      const p = Math.min((ts - t0) / duration, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(initialValue + (end - initialValue) * eased));
-      if (p < 1) frame = requestAnimationFrame(tick);
+    const nextValue = Number.isFinite(end) ? end : 0;
+
+    if (shouldReduceMotion) {
+      currentValueRef.current = nextValue;
+      hasStartedRef.current = true;
+      return;
+    }
+
+    const fromValue = hasStartedRef.current ? currentValueRef.current : 0;
+
+    if (Math.round(fromValue) === Math.round(nextValue)) {
+      currentValueRef.current = nextValue;
+      hasStartedRef.current = true;
+      return;
+    }
+
+    const controls = animate(fromValue, nextValue, {
+      duration,
+      ease: SOFT_EASE,
+      onUpdate(latest) {
+        const roundedValue = Math.round(latest);
+        currentValueRef.current = roundedValue;
+        setValue(roundedValue);
+      },
+      onComplete() {
+        currentValueRef.current = nextValue;
+        setValue(nextValue);
+      },
+    });
+
+    hasStartedRef.current = true;
+    return () => {
+      controls.stop();
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [end, active, duration]);
-  return active ? val : 0;
+  }, [active, duration, end, shouldReduceMotion]);
+
+  return active ? (shouldReduceMotion ? end : value) : 0;
 }
 
-function useCountUpRevenue(end: number, active: boolean) {
-  return useCountUp(end, active, 1600);
+function useAnimatedRevenue(end: number, active: boolean) {
+  return useAnimatedNumber(end, active, 1.35);
 }
 
 // The sale-reporting hooks now retain the last resolved payload during
@@ -61,9 +87,28 @@ function useHoldLast<T>(value: T, _loading: boolean): T {
 }
 
 const fadeUp = (delay = 0) => ({
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.38, delay, ease: SOFT_EASE },
+  transition: { duration: 0.42, delay, ease: SOFT_EASE },
+});
+
+const OVERVIEW_CARD_SHADOW = "0 1px 2px rgba(0,0,0,0.04), 0 10px 26px rgba(0,0,0,0.035)";
+const OVERVIEW_CARD_HOVER_SHADOW = "0 1px 2px rgba(0,0,0,0.04), 0 14px 32px rgba(0,0,0,0.05)";
+const OVERVIEW_HERO_SHADOW = "0 1px 2px rgba(0,0,0,0.045), 0 16px 36px rgba(0,0,0,0.04)";
+const OVERVIEW_OWNERSHIP_BORDER = "#e5e7eb";
+
+const sectionReveal = (delay = 0) => ({
+  initial: { opacity: 0, y: 14 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.22 },
+  transition: { duration: 0.44, delay, ease: SOFT_EASE },
+});
+
+const ownershipSectionReveal = (delay = 0) => ({
+  initial: { opacity: 0, y: 10 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.24 },
+  transition: { duration: 0.34, delay, ease: SOFT_EASE },
 });
 
 // Period badge pill
@@ -80,6 +125,25 @@ function PeriodBadge({ label }: { label: string }) {
     >
       {label}
     </span>
+  );
+}
+
+function AnimatedPeriodBadge({ label }: { label?: string | null }) {
+  return (
+    <AnimatePresence initial={false} mode="wait">
+      {label ? (
+        <motion.span
+          key={label}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2, ease: SOFT_EASE }}
+          className="inline-flex"
+        >
+          <PeriodBadge label={label} />
+        </motion.span>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -110,16 +174,25 @@ interface KpiDef {
 }
 
 function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: boolean }) {
-  const animated = useCountUp(kpi.value, active);
+  const shouldReduceMotion = useReducedMotion();
+  const animated = useAnimatedNumber(kpi.value, active, 0.95);
   const pct = kpi.total > 0 ? Math.round((kpi.value / kpi.total) * 100) : 0;
 
   return (
     <motion.div
       {...fadeUp(delay)}
-      whileHover={{ y: -4, boxShadow: "0 12px 28px rgba(0,0,0,0.09)" }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      whileHover={
+        shouldReduceMotion
+          ? undefined
+          : {
+              y: -2,
+              borderColor: "rgba(0,56,131,0.12)",
+              boxShadow: OVERVIEW_CARD_HOVER_SHADOW,
+              transition: { duration: 0.24, ease: SOFT_EASE },
+            }
+      }
       className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-5"
-      style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
+      style={{ boxShadow: OVERVIEW_CARD_SHADOW }}
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#f4f4f5]">
@@ -132,7 +205,7 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
 
       <p
         className="text-[38px] leading-none tracking-[-2px]"
-        style={{ fontWeight: 700, color: NAVY }}
+        style={{ fontWeight: 700, color: kpi.key === "sold" ? RED : NAVY }}
       >
         {animated}
       </p>
@@ -140,7 +213,7 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
         <p className="text-[12.5px] text-black/45" style={{ fontWeight: 500 }}>
           {kpi.label}
         </p>
-        {kpi.badge && <PeriodBadge label={kpi.badge} />}
+        <AnimatedPeriodBadge label={kpi.badge} />
       </div>
 
       <div className="mt-4 h-[3px] overflow-hidden rounded-full bg-black/[0.05]">
@@ -148,7 +221,11 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
           className="h-full rounded-full"
           initial={{ width: 0 }}
           animate={{ width: active ? `${pct}%` : "0%" }}
-          transition={{ duration: 1, delay: delay + 0.2, ease: [0.22, 1, 0.36, 1] }}
+          transition={{
+            duration: 0.88,
+            delay: Math.min(0.18 + delay * 0.35, 0.24),
+            ease: SOFT_EASE,
+          }}
           style={{ backgroundColor: kpi.color }}
         />
       </div>
@@ -191,37 +268,34 @@ function SecondaryPartyCard({
   const total = snapshotMetrics.totalUnits;
   const available = snapshotMetrics.availableUnits;
   const sold = displayCategoryMetrics?.soldUnits ?? 0;
-  const animatedSold = useCountUp(sold, active, 1000);
-  const animatedAvailable = useCountUp(available, active, 1000);
-  const animatedTotal = useCountUp(total, active, 1000);
+  const shouldReduceMotion = useReducedMotion();
+  const animatedSold = useAnimatedNumber(sold, active, 0.8);
+  const animatedAvailable = useAnimatedNumber(available, active, 0.8);
+  const animatedTotal = useAnimatedNumber(total, active, 0.8);
 
   return (
     <motion.div
-      {...fadeUp(delay)}
-      whileHover={{ y: -4, boxShadow: "0 12px 28px rgba(0,0,0,0.09)" }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      {...ownershipSectionReveal(delay)}
+      whileHover={
+        shouldReduceMotion
+          ? undefined
+          : {
+              y: -2,
+              borderColor: OVERVIEW_OWNERSHIP_BORDER,
+              boxShadow: OVERVIEW_CARD_HOVER_SHADOW,
+              transition: { duration: 0.24, ease: SOFT_EASE },
+            }
+      }
       className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
-      style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
+      style={{ borderColor: OVERVIEW_OWNERSHIP_BORDER, boxShadow: OVERVIEW_CARD_SHADOW }}
     >
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <PillBadge
-            style={{
-              background: getOwnerCategoryStyle(category).bg,
-              color: getOwnerCategoryStyle(category).color,
-              border: `1px solid ${getOwnerCategoryStyle(category).border}`,
-            }}
+          <p
+            className="text-[11px] uppercase tracking-[0.12em] text-black/36"
+            style={{ fontWeight: 600 }}
           >
             {category}
-          </PillBadge>
-          <p
-            className="mt-2 text-[20px] leading-none tracking-[-0.02em]"
-            style={{ fontWeight: 650, color: getOwnerCategoryStyle(category).color }}
-          >
-            Stoku i pronësisë
-          </p>
-          <p className="mt-1 text-[11px] text-black/34">
-            Pamje aktuale e stokut
           </p>
         </div>
         <ContextChip label={periodContextLabel} />
@@ -236,11 +310,10 @@ function SecondaryPartyCard({
           <div className="grid gap-3.5 sm:grid-cols-3">
             <div>
               <div className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-[5px] w-[5px] rounded-full"
-                  style={{ backgroundColor: NAVY, opacity: 0.55 }}
-                />
-                <p className="text-[11px] uppercase tracking-[0.12em] text-black/30" style={{ fontWeight: 600 }}>
+                <p
+                  className="text-[10.5px] uppercase tracking-[0.12em] text-black/30"
+                  style={{ fontWeight: 500 }}
+                >
                   Gjithsej
                 </p>
               </div>
@@ -254,11 +327,10 @@ function SecondaryPartyCard({
 
             <div className="sm:border-l sm:border-[#eff1f4] sm:pl-4">
               <div className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-[5px] w-[5px] rounded-full"
-                  style={{ backgroundColor: "#3c7a57", opacity: 0.55 }}
-                />
-                <p className="text-[11px] uppercase tracking-[0.12em] text-black/30" style={{ fontWeight: 600 }}>
+                <p
+                  className="text-[10.5px] uppercase tracking-[0.12em] text-black/30"
+                  style={{ fontWeight: 500 }}
+                >
                   Në dispozicion
                 </p>
               </div>
@@ -272,11 +344,10 @@ function SecondaryPartyCard({
 
             <div className="sm:border-l sm:border-[#eff1f4] sm:pl-4">
               <div className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-[5px] w-[5px] rounded-full"
-                  style={{ backgroundColor: RED, opacity: 0.6 }}
-                />
-                <p className="text-[11px] uppercase tracking-[0.12em] text-black/30" style={{ fontWeight: 600 }}>
+                <p
+                  className="text-[10.5px] uppercase tracking-[0.12em] text-black/30"
+                  style={{ fontWeight: 500 }}
+                >
                   Të shitura
                 </p>
               </div>
@@ -405,7 +476,8 @@ export default function OverviewPage() {
   const totalRevenue = activeFinancial?.contractedValue ?? 0;
 
   const completionPct = total > 0 ? Math.round((soldFiltered / total) * 100) : 0;
-  const animatedRevenue = useCountUpRevenue(totalRevenue, started && !activeFinancialLoading);
+  const animatedRevenue = useAnimatedRevenue(totalRevenue, started);
+  const animatedCompletionPct = useAnimatedNumber(completionPct, started, 0.9);
 
   // A2 — hero sublabel + completion context reflect the applied period honestly.
   const soldSummaryLabel = filterActive
@@ -438,7 +510,7 @@ export default function OverviewPage() {
 
   const kpis: KpiDef[] = [
     { key: "total",     label: "Gjithsej njësi",        value: total,        total, color: "#003883", icon: Building2,    badge: null },
-    { key: "available", label: "Njësi në dispozicion", value: available,    total, color: "#3c7a57", icon: CheckCircle2, badge: null },
+    { key: "available", label: "Njësi në dispozicion", value: available,    total, color: NAVY,      icon: CheckCircle2, badge: null },
     { key: "sold",      label: "Njësi të shitura",    value: soldFiltered, total, color: "#b14b4b", icon: BadgeCheck,   badge: periodLabel },
   ];
 
@@ -449,7 +521,8 @@ export default function OverviewPage() {
         {/* Header */}
         <PageHeader
           tone="brand"
-          className="mb-3 items-start"
+          className="!mb-1 items-start"
+          subtitleStyle={{ color: "rgba(15,23,42,0.5)" }}
           title={
             <motion.span {...fadeUp(0)} className="block">
               UF Partners Residence
@@ -462,8 +535,8 @@ export default function OverviewPage() {
               </motion.span>
               <motion.span
                 {...fadeUp(0.07)}
-                className="mt-0.5 block text-[12px]"
-                style={{ color: "rgba(0, 56, 131, 0.52)" }}
+                className="mt-0.5 block text-[12.5px]"
+                style={{ color: "rgba(15,23,42,0.4)" }}
               >
                 Pronësia Investitor · pamje financiare sipas periudhës së zgjedhur
               </motion.span>
@@ -477,7 +550,7 @@ export default function OverviewPage() {
         />
 
         {/* Period filter — right-aligned above hero card */}
-        <motion.div {...fadeUp(0.08)} className="mb-1.5 flex justify-end gap-2">
+        <motion.div {...fadeUp(0.08)} className="mb-1 flex justify-end gap-2">
           <CustomSelect
             size="sm"
             className="min-w-[148px]"
@@ -492,25 +565,35 @@ export default function OverviewPage() {
               setFilterMonth("all");
             }}
           />
-          {filterYear !== "all" && (
-            <CustomSelect
-              size="sm"
-              className="min-w-[148px]"
-              options={SQ_MONTHS}
-              value={filterMonth === "all" ? "" : SQ_MONTHS[filterMonth as number]}
-              placeholder="Të gjitha muajt"
-              onChange={(v) => setFilterMonth(v === "" ? "all" : SQ_MONTHS.indexOf(v))}
-            />
-          )}
+          <AnimatePresence initial={false}>
+            {filterYear !== "all" && (
+              <motion.div
+                key="overview-month-filter"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.22, ease: SOFT_EASE }}
+              >
+                <CustomSelect
+                  size="sm"
+                  className="min-w-[148px]"
+                  options={SQ_MONTHS}
+                  value={filterMonth === "all" ? "" : SQ_MONTHS[filterMonth as number]}
+                  placeholder="Të gjitha muajt"
+                  onChange={(v) => setFilterMonth(v === "" ? "all" : SQ_MONTHS.indexOf(v))}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Hero card */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.44, delay: 0.05, ease: SOFT_EASE }}
           className="mb-8 flex items-end justify-between rounded-[24px] border border-[#E8E8EC] bg-white px-8 py-7"
-          style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.06)" }}
+          style={{ boxShadow: OVERVIEW_HERO_SHADOW }}
         >
           {/* Left: label tightly above revenue */}
           <div className="flex flex-col gap-1.5">
@@ -521,7 +604,7 @@ export default function OverviewPage() {
               >
                 Vlera e kontraktuar
               </p>
-              <PeriodBadge label={heroRevenueBadgeLabel} />
+              <AnimatedPeriodBadge label={heroRevenueBadgeLabel} />
             </div>
             <p
               className="text-[52px] leading-none tracking-[-2px]"
@@ -545,7 +628,7 @@ export default function OverviewPage() {
               className="text-[38px] leading-none tracking-[-1.5px]"
               style={{ color: NAVY, fontWeight: 700 }}
             >
-              {completionPct}%
+              {animatedCompletionPct}%
             </p>
             <p className="text-[12px] text-black/40">
               {completionContextLabel}
@@ -562,14 +645,18 @@ export default function OverviewPage() {
 
         {/* Monthly sales chart */}
         <motion.div
-          {...fadeUp(0.44)}
-          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
-          style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
+          {...sectionReveal(0.12)}
+          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white px-6 pb-5 pt-4"
+          style={{ boxShadow: OVERVIEW_CARD_SHADOW }}
         >
           <CardSectionHeader
             title="Shitjet mujore"
             subtitle="Njësi të shitura sipas muajit"
-            className="mb-5 border-b-0 px-0 py-0"
+            className="mb-3 border-b-0 px-0 py-0"
+            bodyClassName="max-w-[420px]"
+            titleClassName="text-[14.5px] leading-[1.2] tracking-[-0.03em]"
+            subtitleClassName="mt-0.5 text-[11.5px] leading-[1.34]"
+            subtitleStyle={{ color: "rgba(15,23,42,0.42)" }}
             right={
               <CustomSelect
                 size="sm"
@@ -586,7 +673,7 @@ export default function OverviewPage() {
 
         {/* Ownership structure — snapshot stock + filtered sold */}
         <motion.p
-          {...fadeUp(0.5)}
+          {...ownershipSectionReveal(0.04)}
           className="mb-3 text-[11px] uppercase tracking-[0.1em] text-black/28"
           style={{ fontWeight: 600 }}
         >
@@ -599,7 +686,7 @@ export default function OverviewPage() {
             year={filterYear}
             month={filterMonth}
             periodContextLabel={activePeriodChipLabel}
-            delay={0.54}
+            delay={0.08}
             active={started}
           />
           <SecondaryPartyCard
@@ -608,7 +695,7 @@ export default function OverviewPage() {
             year={filterYear}
             month={filterMonth}
             periodContextLabel={activePeriodChipLabel}
-            delay={0.60}
+            delay={0.12}
             active={started}
           />
         </div>
