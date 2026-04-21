@@ -16,6 +16,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { CustomSelect } from "./components/CustomSelect";
+import { PageHeader } from "./components/ui/PageHeader";
 import { useMarketing, type MarketingInput, type OfflineInput } from "./hooks/useMarketing";
 
 const NAVY = "#003883";
@@ -753,28 +754,34 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
       <div className="mx-auto max-w-[1100px] px-10 py-10">
 
         {/* Header */}
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <motion.h1 {...fadeUp(0)} className="text-[24px] font-semibold tracking-[-0.03em]" style={{ color: NAVY }}>
+        <PageHeader
+          tone="brand"
+          className="mb-5 items-start"
+          title={
+            <motion.span {...fadeUp(0)} className="block">
               Marketingu
-            </motion.h1>
-            <motion.p {...fadeUp(0.06)} className="mt-0.5 text-[13px]" style={{ color: NAVY, opacity: 0.65 }}>
+            </motion.span>
+          }
+          subtitle={
+            <motion.span {...fadeUp(0.06)} className="block">
               Përformanca e marketingut digjital dhe offline
-            </motion.p>
-          </div>
-          {onOpenDataInput && (
-            <motion.div {...fadeUp(0.08)}>
-              <button
-                onClick={onOpenDataInput}
-                className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] text-white transition hover:opacity-90"
-                style={{ backgroundColor: NAVY }}
-              >
-                <Database size={14} strokeWidth={2.1} />
-                Hap Data Input
-              </button>
-            </motion.div>
-          )}
-        </div>
+            </motion.span>
+          }
+          right={
+            onOpenDataInput ? (
+              <motion.div {...fadeUp(0.08)}>
+                <button
+                  onClick={onOpenDataInput}
+                  className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] text-white transition hover:opacity-90"
+                  style={{ backgroundColor: NAVY }}
+                >
+                  <Database size={14} strokeWidth={2.1} />
+                  Hap Data Input
+                </button>
+              </motion.div>
+            ) : null
+          }
+        />
 
         {/* Period selectors + action buttons */}
         <motion.div {...fadeUp(0.08)} className="mb-4 flex items-center justify-between gap-2">

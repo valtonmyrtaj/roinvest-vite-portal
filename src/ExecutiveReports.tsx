@@ -99,12 +99,10 @@ export default function ExecutiveReports() {
           className="mb-10"
         >
           <PageHeader
+            tone="brand"
             title="Raportet"
             subtitle="Pasqyra e plotë e investimit — UF Partners Residence"
             className="mb-0"
-            titleStyle={{ color: NAVY }}
-            subtitleClassName="mt-[2px] text-[13px] font-normal"
-            subtitleStyle={{ color: "#9ca3af" }}
             right={
               <button
                 type="button"

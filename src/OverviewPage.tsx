@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useLayoutEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, BadgeCheck, Building2 } from "lucide-react";
 import { CustomSelect } from "./components/CustomSelect";
+import { PageHeader } from "./components/ui/PageHeader";
 import { useUnits } from "./hooks/useUnits";
 import { usePortfolioMetrics } from "./hooks/usePortfolioMetrics";
 import { useSaleReporting } from "./hooks/useSaleReporting";
@@ -445,27 +446,34 @@ export default function OverviewPage() {
       <div className="mx-auto max-w-[1100px] px-10 py-10">
 
         {/* Header */}
-        <div className="mb-3 flex items-start justify-between">
-          <div>
-            <motion.h1
-              {...fadeUp(0)}
-              className="text-[24px] font-semibold tracking-[-0.03em]"
-              style={{ color: "#003883" }}
-            >
+        <PageHeader
+          tone="brand"
+          className="mb-3 items-start"
+          title={
+            <motion.span {...fadeUp(0)} className="block">
               UF Partners Residence
-            </motion.h1>
-            <motion.p {...fadeUp(0.06)} className="mt-0.5 text-[13px]" style={{ color: "#003883", opacity: 0.65 }}>
-              Rr. Agron Selenica, Gjilan
-            </motion.p>
-            <motion.p {...fadeUp(0.07)} className="mt-0.5 text-[12px]" style={{ color: "#003883", opacity: 0.5 }}>
-              Pronësia Investitor · pamje financiare sipas periudhës së zgjedhur
-            </motion.p>
-          </div>
-
-          <motion.span {...fadeUp(0.08)} className="mt-1 text-[13px] text-black/28">
-            {todayAlbanian()}
-          </motion.span>
-        </div>
+            </motion.span>
+          }
+          subtitle={
+            <>
+              <motion.span {...fadeUp(0.06)} className="block">
+                Rr. Agron Selenica, Gjilan
+              </motion.span>
+              <motion.span
+                {...fadeUp(0.07)}
+                className="mt-0.5 block text-[12px]"
+                style={{ color: "rgba(0, 56, 131, 0.52)" }}
+              >
+                Pronësia Investitor · pamje financiare sipas periudhës së zgjedhur
+              </motion.span>
+            </>
+          }
+          right={
+            <motion.span {...fadeUp(0.08)} className="mt-1 text-[13px] text-black/28">
+              {todayAlbanian()}
+            </motion.span>
+          }
+        />
 
         {/* Period filter — right-aligned above hero card */}
         <motion.div {...fadeUp(0.08)} className="mb-1.5 flex justify-end gap-2">

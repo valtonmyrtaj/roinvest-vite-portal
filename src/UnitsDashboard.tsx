@@ -145,10 +145,9 @@ export function UnitsDashboard() {
 
       <div className="mx-auto max-w-[1280px] px-10 py-10">
         <PageHeader
+          tone="brand"
           title="Të gjitha njësitë"
           subtitle="Pamje e plotë e inventarit të njësive, me filtrim sipas llojit, nivelit, statusit dhe kategorisë së pronësisë."
-          titleClassName="text-black/92"
-          subtitleClassName="text-black/36"
         />
 
         <OwnershipSection units={units} />

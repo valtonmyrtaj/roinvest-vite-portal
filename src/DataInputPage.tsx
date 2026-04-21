@@ -279,6 +279,7 @@ export default function DataInputPage({
           className="mb-8"
         >
           <PageHeader
+            tone="brand"
             title="Data Input"
             subtitle="Shto dhe menaxho njësitë sipas kategorisë së pronësisë"
             className="mb-0"

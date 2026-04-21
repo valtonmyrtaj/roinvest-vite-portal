@@ -19,7 +19,7 @@ import {
   type ShowingSaleToast,
 } from "./crm-content/ShowingsSection";
 import { PageHeader } from "./components/ui/PageHeader";
-import { NAVY, SOFT_EASE, sectionMotion } from "./crm-content/shared";
+import { SOFT_EASE, sectionMotion } from "./crm-content/shared";
 import "./crm-content/dailyDateSync";
 import { PAGE_BG } from "./ui/tokens";
 import { SkeletonRows } from "./components/SkeletonRows";
@@ -234,12 +234,10 @@ export default function CRMContent() {
       <div className="mx-auto max-w-[1220px] px-10 py-9">
         <motion.div {...sectionMotion()} className="mb-7">
           <PageHeader
+            tone="brand"
             title="Aktiviteti CRM"
             subtitle="Monitorimi i aktivitetit ditor, shfaqjeve dhe ndryshimeve të fundit"
             className="mb-0"
-            titleStyle={{ color: NAVY }}
-            subtitleClassName="mt-1.5 text-[13px]"
-            subtitleStyle={{ color: NAVY, opacity: 0.65 }}
           />
         </motion.div>
 
