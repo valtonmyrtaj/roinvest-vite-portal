@@ -5,6 +5,10 @@ import type { CreateDailyLogInput, DailyLogEntry } from "../../hooks/useCRM";
 import { ConfirmDeleteModal } from "../ConfirmDeleteModal";
 import { Card } from "../primitives";
 import { CardSectionHeader } from "../../components/ui/CardSectionHeader";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../../components/ui/tabularHeader";
 import { MONTH_LABELS, NAVY, SOFT_EASE, TODAY_ISO, fmtDate, toDateOnly } from "../shared";
 import { SkeletonRows } from "../../components/SkeletonRows";
 
@@ -144,7 +148,7 @@ export function DailyLogTable({
     setDeletingId(null);
   };
 
-  const thCls = "py-2.5 px-3 text-left text-[11px] font-semibold uppercase tracking-wider text-black/35";
+  const thCls = `py-2.5 px-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`;
   const tdCls = "py-2.5 px-3 text-[13px] text-black/70 text-center";
 
   return (
@@ -198,8 +202,8 @@ export function DailyLogTable({
           ) : (
             <div className="max-h-[350px] overflow-x-auto overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <table className="w-full text-[12px]">
-                <thead className="sticky top-0 z-10 bg-[#f9f9fb]">
-                  <tr>
+                <thead className="sticky top-0 z-10">
+                  <tr className={TABULAR_HEADER_ROW_CLASS}>
                     <th className={`${thCls} pl-5 text-left`}>Data</th>
                     <th className={thCls}>Thirrje</th>
                     <th className={thCls}>Kontakte</th>

@@ -1,6 +1,10 @@
 import type { Payment } from "../hooks/usePayments";
 import type { Unit } from "../hooks/useUnits";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../components/ui/tabularHeader";
 import { Card, PaymentStatusBadge } from "./primitives";
 import { fmtDate, triggerOnActionKey } from "./shared";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
@@ -41,12 +45,12 @@ export function SalesUpcomingPayments({
           </div>
         ) : (
           <table className="w-full min-w-[820px] text-left">
-            <thead className="bg-[#fafbfc]">
-              <tr>
+            <thead>
+              <tr className={TABULAR_HEADER_ROW_CLASS}>
                 {["Njësia", "Blerësi", "Kësti #", "Shuma", "Data e skadimit", "Statusi"].map((label) => (
                   <th
                     key={label}
-                    className="px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/32"
+                    className={`px-6 py-3 ${TABULAR_HEADER_LABEL_CLASS}`}
                   >
                     {label}
                   </th>

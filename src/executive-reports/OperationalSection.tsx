@@ -1,6 +1,10 @@
 import { motion } from "framer-motion";
 import { Eye, Phone, TrendingUp, Users } from "lucide-react";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../components/ui/tabularHeader";
 import type { DailyLogEntry } from "../hooks/useCRM";
 import { Card, SectionHeader, StatCard } from "./primitives";
 import {
@@ -103,21 +107,21 @@ export function OperationalSection({
         />
         <div className="executive-reports-scroll overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="bg-[#f9f9fb]">
-              <tr>
-                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+            <thead>
+              <tr className={TABULAR_HEADER_ROW_CLASS}>
+                <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
                   Muaji
                 </th>
-                <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                   Thirrje
                 </th>
-                <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                   Kontakte
                 </th>
-                <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                   Shfaqje
                 </th>
-                <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                <th className={`px-5 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                   Shitje
                 </th>
               </tr>

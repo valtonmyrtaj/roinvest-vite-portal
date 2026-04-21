@@ -6,6 +6,10 @@ import type { SaleReportingMetrics, SaleReportingTypologyBreakdownItem } from ".
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { getUnitListingPrice } from "../lib/unitFinancials";
 import { normalizeCompatibleUnitFields } from "../lib/unitCompatibility";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../components/ui/tabularHeader";
 import { Card, HeroMetricCard, SectionHeader } from "./primitives";
 import {
   MONTH_LABELS,
@@ -359,15 +363,15 @@ Pamje për pronësinë Investitor · stoku, shitjet, arkëtimet dhe vlera e mbet
             <div className="overflow-hidden rounded-[18px] border border-[#edf0f4]">
               <div className="executive-reports-scroll overflow-x-auto">
                 <table className="w-full text-[12px]">
-                  <thead className="bg-[#f9f9fb]">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                  <thead>
+                    <tr className={TABULAR_HEADER_ROW_CLASS}>
+                      <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Kategoria e pronësisë
                       </th>
-                      <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Njësi të shitura
                       </th>
-                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      <th className={`px-5 py-3 text-right ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Vlera e kontraktuar
                       </th>
                     </tr>
@@ -411,21 +415,21 @@ Pamje për pronësinë Investitor · stoku, shitjet, arkëtimet dhe vlera e mbet
             <div className="overflow-hidden rounded-[18px] border border-[#edf0f4]">
               <div className="executive-reports-scroll overflow-x-auto">
                 <table className="w-full text-[12px]">
-                  <thead className="bg-[#f9f9fb]">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                  <thead>
+                    <tr className={TABULAR_HEADER_ROW_CLASS}>
+                      <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Tipologjia
                       </th>
-                      <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Gjithsej
                       </th>
-                      <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Të shitura
                       </th>
-                      <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Në dispozicion
                       </th>
-                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      <th className={`px-5 py-3 text-right ${TABULAR_HEADER_LABEL_CLASS}`}>
                         Vlera e kontraktuar
                       </th>
                     </tr>

@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { PillBadge } from "../components/ui/PillBadge";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../components/ui/tabularHeader";
 import type { Unit } from "../hooks/useUnits";
 import { Card } from "./primitives";
 import { fmtDateShort } from "./shared";
@@ -32,11 +36,11 @@ export function ActiveReservationsSection({ units }: { units: Unit[] }) {
           ) : (
             <table className="w-full min-w-[640px] text-left">
               <thead>
-                <tr className="border-b border-[#eef0f4] bg-[#fafbfc]">
+                <tr className={TABULAR_HEADER_ROW_CLASS}>
                   {["Njësia", "Pronari", "Skadon më", "Ditë mbetur", "Statusi"].map((col) => (
                     <th
                       key={col}
-                      className="px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/30"
+                      className={`px-5 py-2.5 ${TABULAR_HEADER_LABEL_CLASS}`}
                     >
                       {col}
                     </th>

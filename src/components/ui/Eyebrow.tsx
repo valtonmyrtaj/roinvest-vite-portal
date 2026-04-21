@@ -1,5 +1,7 @@
 import type { CSSProperties, ElementType, ReactNode } from "react";
 
+export const EYEBROW_LABEL_BASE_CLASS = "text-[11px] font-semibold uppercase tracking-[0.14em]";
+
 export function EyebrowLabel({
   children,
   as = "span",
@@ -15,7 +17,7 @@ export function EyebrowLabel({
 
   return (
     <Tag
-      className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${className}`.trim()}
+      className={`${EYEBROW_LABEL_BASE_CLASS} ${className}`.trim()}
       style={style}
     >
       {children}

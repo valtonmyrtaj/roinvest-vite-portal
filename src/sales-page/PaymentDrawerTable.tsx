@@ -1,5 +1,9 @@
 import { Trash2 } from "lucide-react";
 import type { Payment } from "../hooks/usePayments";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../components/ui/tabularHeader";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { fmtDate, NAVY } from "./shared";
 import { SkeletonRows } from "../components/SkeletonRows";
@@ -36,12 +40,12 @@ export function PaymentDrawerTable({
           <p className="px-5 py-4 text-[13px] text-black/35">Asnjë këst i regjistruar.</p>
         ) : (
           <div className="min-w-[700px]">
-            <div className="flex items-center border-b border-[#F3F4F6] px-5 py-2.5">
-              <div className="w-[60px] shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">Kësti</div>
-              <div className="w-[120px] shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">Shuma</div>
-              <div className="w-[155px] shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">Skadon më</div>
-              <div className="w-[155px] shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">Paguar më</div>
-              <div className="w-[115px] shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">Statusi</div>
+            <div className={`flex items-center px-5 py-2.5 ${TABULAR_HEADER_ROW_CLASS}`}>
+              <div className={`w-[60px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Kësti</div>
+              <div className={`w-[120px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Shuma</div>
+              <div className={`w-[155px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Skadon më</div>
+              <div className={`w-[155px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Paguar më</div>
+              <div className={`w-[115px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Statusi</div>
               <div className="flex-1" />
               <div className="w-[36px] shrink-0" />
             </div>

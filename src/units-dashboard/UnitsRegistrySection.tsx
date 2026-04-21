@@ -2,6 +2,10 @@ import { Filter, Search } from "lucide-react";
 import { SectionEyebrow } from "../components/ui/Eyebrow";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { PillBadge } from "../components/ui/PillBadge";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "../components/ui/tabularHeader";
 import type { Block, Level, Unit, UnitStatus } from "../hooks/useUnits";
 import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import { SkeletonRows } from "../components/SkeletonRows";
@@ -144,8 +148,8 @@ export function UnitsRegistrySection({
             <SkeletonRows rows={7} className="px-5 py-6" />
           ) : (
             <table className="w-full min-w-[1080px] text-[12px] font-normal">
-              <thead className="sticky top-0 z-10 bg-[#f9f9fb]">
-                <tr className="text-black/38">
+              <thead className="sticky top-0 z-10">
+                <tr className={TABULAR_HEADER_ROW_CLASS}>
                   {[
                     "ID e njësisë",
                     "Blloku",
@@ -161,7 +165,7 @@ export function UnitsRegistrySection({
                   ].map((h, i) => (
                     <th
                       key={h}
-                      className={`whitespace-nowrap py-3 font-normal ${
+                      className={`whitespace-nowrap py-3 ${TABULAR_HEADER_LABEL_CLASS} ${
                         i === 0
                           ? "pl-6 pr-3 text-left"
                           : i === 9

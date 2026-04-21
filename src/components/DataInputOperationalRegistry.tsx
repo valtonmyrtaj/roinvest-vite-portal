@@ -3,6 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { PillBadge } from "./ui/PillBadge";
 import { SectionHeader } from "./ui/SectionHeader";
+import {
+  TABULAR_HEADER_LABEL_CLASS,
+  TABULAR_HEADER_ROW_CLASS,
+} from "./ui/tabularHeader";
 import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import type { Payment } from "../hooks/usePayments";
 import { getUnitContractValue, getUnitFinalSalePrice } from "../lib/unitFinancials";
@@ -727,8 +731,8 @@ export function DataInputOperationalRegistry({
         <div className="overflow-hidden rounded-[18px] border border-[#ededf0] bg-white">
           <div className="max-h-[560px] overflow-auto">
             <table className="w-full min-w-[1160px] text-[12px] font-normal">
-              <thead className="sticky top-0 z-10 bg-[#f9f9fb]">
-                <tr className="text-black/38">
+              <thead className="sticky top-0 z-10">
+                <tr className={TABULAR_HEADER_ROW_CLASS}>
                   {[
                     "ID e njësisë",
                     "Blloku",
@@ -744,7 +748,7 @@ export function DataInputOperationalRegistry({
                   ].map((heading, index) => (
                     <th
                       key={heading}
-                      className={`py-3 font-normal ${
+                      className={`py-3 ${TABULAR_HEADER_LABEL_CLASS} ${
                         index === 0
                           ? "pl-6 pr-3 text-left"
                           : index === 8
