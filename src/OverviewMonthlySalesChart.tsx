@@ -55,17 +55,39 @@ function SalesTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
 
   return (
     <div
-      className="rounded-[12px] border border-[#e8e8ec] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-      style={{ minWidth: 160 }}
+      className="rounded-[12px] border border-[#e8e8ec] bg-white px-3.5 py-3"
+      style={{
+        minWidth: 164,
+        boxShadow:
+          "0 1px 2px rgba(16,24,40,0.045), 0 14px 32px rgba(16,24,40,0.08)",
+      }}
     >
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-black/35">
+      <p
+        className="mb-2 text-[10px] uppercase"
+        style={{
+          color: "rgba(15,23,42,0.42)",
+          fontWeight: 600,
+          letterSpacing: "0.12em",
+        }}
+      >
         {d.label}
       </p>
-      <p className="text-[20px] font-bold leading-none tracking-[-1px]" style={{ color: NAVY }}>
+      <p
+        className="text-[22px] leading-none tracking-[-0.03em]"
+        style={{ color: NAVY, fontWeight: 700 }}
+      >
         {d.units}
-        <span className="ml-1.5 text-[12px] font-normal text-black/40">njësi</span>
+        <span
+          className="ml-1.5 text-[11.5px]"
+          style={{ color: "rgba(15,23,42,0.4)", fontWeight: 500 }}
+        >
+          njësi
+        </span>
       </p>
-      <p className="mt-1.5 text-[13px] font-semibold text-black/60">
+      <p
+        className="mt-2 text-[12.5px]"
+        style={{ color: "rgba(15,23,42,0.58)", fontWeight: 600 }}
+      >
         {fmtEur(d.revenue)}
       </p>
     </div>

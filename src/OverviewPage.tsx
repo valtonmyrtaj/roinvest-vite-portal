@@ -177,6 +177,7 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
   const shouldReduceMotion = useReducedMotion();
   const animated = useAnimatedNumber(kpi.value, active, 0.95);
   const pct = kpi.total > 0 ? Math.round((kpi.value / kpi.total) * 100) : 0;
+  const showPct = kpi.key !== "total";
 
   return (
     <motion.div
@@ -198,9 +199,11 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
         <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#f4f4f5]">
           <kpi.icon size={16} style={{ color: NAVY }} strokeWidth={1.8} />
         </div>
-        <span className="text-[12px] text-black/30" style={{ fontWeight: 500 }}>
-          {pct}%
-        </span>
+        {showPct ? (
+          <span className="text-[12px] text-black/30" style={{ fontWeight: 500 }}>
+            {pct}%
+          </span>
+        ) : null}
       </div>
 
       <p
