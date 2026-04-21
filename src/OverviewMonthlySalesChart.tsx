@@ -278,9 +278,9 @@ export default function OverviewMonthlySalesChart({
               strokeWidth: 1,
             }}
             isAnimationActive={shouldPlayIntro}
-            animationBegin={70}
-            animationDuration={780}
-            animationEasing="ease-out"
+            animationBegin={120}
+            animationDuration={980}
+            animationEasing="ease-in-out"
           >
             {chartData.map((entry, index) => (
               <Cell
