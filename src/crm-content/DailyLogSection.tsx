@@ -138,7 +138,7 @@ export function DailyLogSection({
     delay: number;
   }> = [
     { key: "calls", label: "Thirrje", icon: Phone, delay: 0 },
-    { key: "contacts", label: "Kontakte", icon: Users, delay: 0.06 },
+    { key: "contacts", label: "Kontaktet", icon: Users, delay: 0.06 },
     { key: "showings", label: "Shfaqje", icon: Eye, delay: 0.12 },
     { key: "sales", label: "Shitje", icon: TrendingUp, delay: 0.18 },
   ];

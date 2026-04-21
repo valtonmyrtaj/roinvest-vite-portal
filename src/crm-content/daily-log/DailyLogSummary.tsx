@@ -196,7 +196,7 @@ export function DailyLogSummary({
     },
     {
       key: "contacts",
-      label: "Kontakte",
+      label: "Kontaktet",
       color: "#356fc8",
       strokeWidth: 2.8,
       strokeOpacity: 0.96,

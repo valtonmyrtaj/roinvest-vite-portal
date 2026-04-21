@@ -206,7 +206,7 @@ export function DailyLogTable({
                   <tr className={TABULAR_HEADER_ROW_CLASS}>
                     <th className={`${thCls} pl-5 text-left`}>Data</th>
                     <th className={thCls}>Thirrje</th>
-                    <th className={thCls}>Kontakte</th>
+                    <th className={thCls}>Kontaktet</th>
                     <th className={thCls}>Shfaqje</th>
                     <th className={thCls}>Shitje</th>
                     <th className={`${thCls} text-left`}>Komente</th>

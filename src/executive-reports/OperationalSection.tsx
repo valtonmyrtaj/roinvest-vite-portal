@@ -81,7 +81,7 @@ export function OperationalSection({
           delay={0}
         />
         <StatCard
-          label="Kontakte totale"
+          label="Kontaktet totale"
           value={formatCount(operationalTotals.contacts)}
           icon={Users}
           delay={0.05}
@@ -116,7 +116,7 @@ export function OperationalSection({
                   Thirrje
                 </th>
                 <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
-                  Kontakte
+                  Kontaktet
                 </th>
                 <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
                   Shfaqje

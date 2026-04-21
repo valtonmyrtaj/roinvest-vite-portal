@@ -53,7 +53,7 @@ export function ShowingSaleCompletionModal({
     const parsedPrice = Number(finalPrice);
 
     if (!buyerName.trim()) {
-      setError("Plotësoni blerësin / klientin.");
+      setError("Plotësoni blerësin.");
       return;
     }
 
@@ -169,7 +169,7 @@ export function ShowingSaleCompletionModal({
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-              Blerësi / klienti <span className="text-red-400">*</span>
+              Blerësi <span className="text-red-400">*</span>
             </span>
             <input
               type="text"

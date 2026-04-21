@@ -134,7 +134,7 @@ export function MarketingSection({
               {fmtEur(selectedMarketingSpend)}
             </p>
             <p className="mt-2 text-[12px] font-normal" style={{ color: "#9ca3af" }}>
-              Dixhital + Offline · {selectedMarketingLabel}
+              Digjital + offline · {selectedMarketingLabel}
             </p>
           </div>
         </Card>

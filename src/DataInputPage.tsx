@@ -280,7 +280,7 @@ export default function DataInputPage({
         >
           <PageHeader
             tone="brand"
-            title="Data Input"
+            title="Të dhënat"
             subtitle="Shto dhe menaxho njësitë sipas kategorisë së pronësisë"
             className="mb-0"
           />

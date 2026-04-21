@@ -164,7 +164,7 @@ function TypologyAccordionRow({
                           style={{ color: NAVY }}
                         >
                           <CreditCard size={13} />
-                          Plan pagese
+                          Plani i pagesave
                         </button>
                       </div>
                     </div>

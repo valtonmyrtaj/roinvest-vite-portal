@@ -343,7 +343,7 @@ function DigitalModal({
       >
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
-            Shto të dhëna dixhitale
+            Shto të dhëna digjitale
           </h2>
           <button
             onClick={onClose}
@@ -375,9 +375,9 @@ function DigitalModal({
           <ModalNumberField label="Shpenzime Facebook (€)" value={spendFB} onChange={setSpendFB} />
           <ModalNumberField label="Shikime Facebook"       value={viewsFB} onChange={setViewsFB} />
           <ModalNumberField label="Shikime TikTok"         value={viewsTT} onChange={setViewsTT} />
-          <ModalNumberField label="Leads Facebook"         value={leadsFB} onChange={setLeadsFB} />
-          <ModalNumberField label="Leads Instagram"        value={leadsIG} onChange={setLeadsIG} />
-          <ModalNumberField label="Leads TikTok"           value={leadsTT} onChange={setLeadsTT} />
+          <ModalNumberField label="Kontakte Facebook"      value={leadsFB} onChange={setLeadsFB} />
+          <ModalNumberField label="Kontakte Instagram"     value={leadsIG} onChange={setLeadsIG} />
+          <ModalNumberField label="Kontakte TikTok"        value={leadsTT} onChange={setLeadsTT} />
         </div>
 
         {errMsg && (
@@ -773,7 +773,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           }
           subtitle={
             <motion.span {...fadeUp(0.06)} className="block">
-              Përformanca e marketingut digjital dhe offline
+              Performanca e marketingut digjital dhe offline
             </motion.span>
           }
           right={
@@ -785,7 +785,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
                   style={{ backgroundColor: NAVY }}
                 >
                   <Database size={14} strokeWidth={2.1} />
-                  Hap Data Input
+                  Hap Të dhënat
                 </button>
               </motion.div>
             ) : null
@@ -818,7 +818,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
               style={{ backgroundColor: NAVY, fontWeight: 600 }}
             >
               <Plus size={13} strokeWidth={2.5} />
-              Shto të dhëna dixhitale
+              Shto të dhëna digjitale
             </button>
             <button
               onClick={() => setShowOfflineModal(true)}

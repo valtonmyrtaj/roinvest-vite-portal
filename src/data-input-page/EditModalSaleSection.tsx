@@ -91,7 +91,7 @@ export function EditModalSaleSection({
 
       <div className="grid grid-cols-2 gap-3">
         <TextField
-          label="Blerësi / klienti"
+          label="Blerësi"
           value={buyerName}
           onChange={onBuyerNameChange}
         />

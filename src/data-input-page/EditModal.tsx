@@ -144,7 +144,7 @@ export function EditModal({
     if (isSaleTransition) {
       const parsedFinalPrice = Number(finalPrice);
       if (!buyerName.trim()) {
-        setError("Plotësoni blerësin / klientin.");
+        setError("Plotësoni blerësin.");
         return;
       }
       if (!saleDate) {

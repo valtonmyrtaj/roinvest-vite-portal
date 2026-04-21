@@ -27,7 +27,7 @@ export function PaymentDrawerSummary({
   ];
   const saleMeta = [
     unit.buyer_name ? { label: "Blerësi", value: unit.buyer_name } : null,
-    paymentType ? { label: "Mënyra e pagesës", value: paymentType } : null,
+    paymentType ? { label: "Lloji i pagesës", value: paymentType } : null,
   ].filter((item): item is { label: string; value: string } => Boolean(item));
 
   return (

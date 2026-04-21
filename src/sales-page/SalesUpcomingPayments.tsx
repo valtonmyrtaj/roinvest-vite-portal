@@ -33,7 +33,7 @@ export function SalesUpcomingPayments({
     >
       <CardSectionHeader
         title="Pagesat e ardhshme"
-        subtitle="Këstët e papaguara të renditura sipas datës së skadimit"
+        subtitle="Këstet e papaguara të renditura sipas datës së skadimit"
         className="px-6 py-5"
         bodyClassName="max-w-[500px]"
       />

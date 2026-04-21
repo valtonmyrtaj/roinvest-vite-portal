@@ -248,7 +248,7 @@ export function UnitsRegistrySection({
                       </p>
                       <p className="mt-1 text-[11.5px] text-black/28">
                         {units.length === 0 || registryScopeUnits.length === 0
-                          ? "Ndrysho përzgjedhjen ose shto njësi të reja nga Data Input."
+                          ? "Ndrysho përzgjedhjen ose shto njësi të reja te Të dhënat."
                           : "Rishikoni filtrat për ta rikthyer listën e plotë."}
                       </p>
                     </td>

@@ -279,7 +279,7 @@ const getPaymentFollowUp = (row: RegistryRow) => {
 
   if (row.nextPayment) {
     return {
-      primary: "Plan pagese",
+      primary: "Plani i pagesave",
       secondary: `Kësti #${row.nextPayment.installment_number} · ${formatCompactDate(row.nextPayment.due_date)}`,
       secondaryClassName:
         row.nextPayment.status === "E vonuar" ? "text-[#b14b4b]" : "text-black/38",
@@ -288,14 +288,14 @@ const getPaymentFollowUp = (row: RegistryRow) => {
 
   if (row.paymentCount > 0) {
     return {
-      primary: "Plan pagese",
+      primary: "Plani i pagesave",
       secondary: "Të gjitha të paguara",
       secondaryClassName: "text-black/38",
     };
   }
 
   return {
-    primary: "Plan pagese",
+    primary: "Plani i pagesave",
     secondary: "Nuk është regjistruar ende",
     secondaryClassName: "text-black/38",
   };
