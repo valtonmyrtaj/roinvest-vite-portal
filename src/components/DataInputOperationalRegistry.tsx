@@ -11,6 +11,7 @@ import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import type { Payment } from "../hooks/usePayments";
 import { getUnitContractValue, getUnitFinalSalePrice } from "../lib/unitFinancials";
 import { normalizeCompatibleUnitFields } from "../lib/unitCompatibility";
+import { CANONICAL_UNIT_TYPES, getUnitTypeDisplay } from "../lib/unitType";
 
 export interface RegistryUnit {
   id: string;
@@ -65,12 +66,7 @@ const ALL_TYPES = "Të gjitha llojet";
 const ALL_LEVELS = "Të gjitha nivelet";
 const ALL_STATUSES = "Të gjitha statuset";
 
-// Four display categories for the "Lloji" filter dropdown.
-// "Penthouse" → row.level === "Penthouse"
-// "Banesë"    → row.type is an apartment sub-type (1+1 / 2+1 / 3+1)
-// "Lokal" / "Garazhë" → direct row.type match
-const TYPE_FILTER_OPTIONS = [ALL_TYPES, "Garazhë", "Lokal", "Banesë", "Penthouse"] as const;
-const APARTMENT_SUBTYPES_REGISTRY = new Set(["1+1", "2+1", "3+1"]);
+const TYPE_FILTER_OPTIONS = [ALL_TYPES, ...CANONICAL_UNIT_TYPES] as const;
 const FIXED_LEVEL_OPTIONS = [
   "Garazhë",
   "Përdhesa",
@@ -444,7 +440,7 @@ export function DataInputOperationalRegistry({
           unit,
           unitId: normalizedUnit.unitId || unit.id,
           block: unit.block?.trim() || "-",
-          type: normalizedUnit.type,
+          type: getUnitTypeDisplay(unit.type ?? normalizedUnit.type, normalizedUnit.level),
           level: normalizedUnit.level,
           ownerCategory: normalizeOwnershipCategory(unit.owner_category),
           ownerName: unit.owner_name?.trim() || "Pa pronar",
@@ -516,11 +512,7 @@ export function DataInputOperationalRegistry({
       }
 
       if (typeFilter !== ALL_TYPES) {
-        const typeMatch =
-          typeFilter === "Penthouse" ? row.level === "Penthouse" :
-          typeFilter === "Banesë"    ? APARTMENT_SUBTYPES_REGISTRY.has(row.type) :
-                                       row.type === typeFilter;
-        if (!typeMatch) return false;
+        if (row.type !== typeFilter) return false;
       }
 
       if (levelFilter !== ALL_LEVELS && row.level !== levelFilter) {

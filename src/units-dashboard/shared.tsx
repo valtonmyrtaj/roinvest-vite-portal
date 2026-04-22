@@ -1,10 +1,7 @@
 import type { Unit, UnitStatus, Block, Level, OwnerCategory } from "../hooks/useUnits";
+import { CANONICAL_UNIT_TYPES, getCanonicalUnitType, isApartmentStyleUnit } from "../lib/unitType";
 
-export const TYPES = ["Garazhë", "Lokal", "Banesë", "Penthouse"] as const;
-
-// DB stores apartment sub-types (1+1, 2+1, 3+1) — all map to the "Banesë"
-// category label. "Penthouse" is a separate category identified by unit.level.
-export const APARTMENT_SUBTYPES = new Set(["1+1", "2+1", "3+1"]);
+export const TYPES = CANONICAL_UNIT_TYPES;
 
 export const BLOCKS = ["Blloku A", "Blloku B", "Blloku C"] as const;
 
@@ -94,16 +91,11 @@ export function statusStyleFor(status: UnitStatus) {
 }
 
 export function getDhomaDisplay(unit: Unit) {
-  if (
-    unit.level === "Penthouse" ||
-    unit.type === "1+1" ||
-    unit.type === "2+1" ||
-    unit.type === "3+1"
-  ) {
+  if (isApartmentStyleUnit(unit.type, unit.level)) {
     if (!unit.bedrooms || unit.bedrooms === 0) return "—";
     return `${unit.bedrooms} dhoma · ${unit.bathrooms} banjo`;
   }
-  if (unit.type === "Lokal") {
+  if (getCanonicalUnitType(unit.type, unit.level) === "Lokal") {
     if (!unit.toilets || unit.toilets === 0) return "—";
     return `${unit.toilets} tualet`;
   }

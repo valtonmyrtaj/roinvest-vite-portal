@@ -6,6 +6,7 @@ import type {
   UnitStatus,
 } from "../hooks/useUnits";
 import type { CompleteUnitSaleInput, SalePaymentType } from "../lib/api/sales";
+import { CANONICAL_UNIT_TYPES, isApartmentStyleUnit } from "../lib/unitType";
 import { NAVY } from "../ui/tokens";
 
 // ─── Brand / accent ──────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@ export const ACCENT = NAVY;
 // ─── Unit taxonomy (form + modal selectors) ──────────────────────────────────
 
 export const BLOCKS: Block[] = ["Blloku A", "Blloku B", "Blloku C"];
-export const TYPES = ["Garazhë", "Lokal", "1+1", "2+1", "3+1"] as const;
+export const TYPES = CANONICAL_UNIT_TYPES;
 export const LEVELS: Level[] = [
   "Garazhë",
   "Përdhesa",
@@ -80,8 +81,6 @@ export function getDefaultOwnerName(
 ): string {
   return getOwnerNameOptions(ownerCategory, dynamicOptions, preferredOptions)[0] ?? "";
 }
-
-const APARTMENT_TYPES = new Set<string>(["1+1", "2+1", "3+1"]);
 
 // ─── Sale completion taxonomy ────────────────────────────────────────────────
 
@@ -157,7 +156,7 @@ export function roomCategory(
   type: string | undefined,
 ): "apartment" | "lokal" | "garazhe" | "none" {
   if (!type) return "none";
-  if (APARTMENT_TYPES.has(type)) return "apartment";
+  if (isApartmentStyleUnit(type)) return "apartment";
   if (type === "Lokal") return "lokal";
   if (type === "Garazhë") return "garazhe";
   return "none";

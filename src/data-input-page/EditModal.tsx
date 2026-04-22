@@ -8,6 +8,7 @@ import {
   getUnitFinalSalePrice,
   getUnitListingPrice,
 } from "../lib/unitFinancials";
+import { getCanonicalUnitType } from "../lib/unitType";
 import {
   ACCENT,
   BLOCKS,
@@ -59,7 +60,7 @@ export function EditModal({
   const [form, setForm] = useState<Partial<CreateUnitInput>>({
     unit_id: unit.unit_id,
     block: unit.block,
-    type: unit.type,
+    type: getCanonicalUnitType(unit.type, unit.level) ?? unit.type,
     level: unit.level,
     size: unit.size,
     price: listingPrice,

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { useOwnerEntities } from "./hooks/useOwnerEntities";
 import { useUnits } from "./hooks/useUnits";
 import type { Unit, UnitHistory, OwnerCategory, UnitStatus, Block, Level } from "./hooks/useUnits";
@@ -9,8 +10,8 @@ import { OwnershipSection } from "./units-dashboard/OwnershipSection";
 import { StockStatusSection } from "./units-dashboard/StockStatusSection";
 import { UnitsRegistrySection } from "./units-dashboard/UnitsRegistrySection";
 import { PAGE_BG } from "./ui/tokens";
+import { getCanonicalUnitType } from "./lib/unitType";
 import {
-  APARTMENT_SUBTYPES,
   BLOCKS,
   LEVELS,
   TYPES,
@@ -20,7 +21,7 @@ import {
 } from "./units-dashboard/shared";
 
 export function UnitsDashboard() {
-  const { units, loading, fetchUnitHistory } = useUnits();
+  const { units, loading, error, fetchUnitHistory } = useUnits();
   const { getOptionsForCategory } = useOwnerEntities(units);
 
   const [blockF, setBlockF] = useState<Block | "">("");
@@ -91,7 +92,7 @@ export function UnitsDashboard() {
     });
   }, [units]);
 
-  // "Lloji" always shows the three fixed category labels — not derived from data
+  // "Lloji" always shows the fixed canonical category labels — not derived from raw DB strings.
   const typeOptions = [...TYPES];
 
   const levelOptions = useMemo(() => {
@@ -120,11 +121,7 @@ export function UnitsDashboard() {
       .filter((u) => {
         return (
           (!activeBlockF || u.block === activeBlockF) &&
-          (!typeF || (
-            typeF === "Penthouse" ? u.level === "Penthouse" :
-            typeF === "Banesë"    ? APARTMENT_SUBTYPES.has(u.type) :
-                                    u.type === typeF
-          )) &&
+          (!typeF || getCanonicalUnitType(u.type, u.level) === typeF) &&
           (!activeLevelF || u.level === activeLevelF) &&
           (!activeStatusF || u.status === activeStatusF) &&
           (!search || normalize(String(u.unit_id ?? "")).includes(normalize(search)))
@@ -133,26 +130,96 @@ export function UnitsDashboard() {
       .sort((a, b) => statusOrderValue(a.status) - statusOrderValue(b.status));
   }, [activeBlockF, activeLevelF, activeStatusF, registryScopeUnits, search, typeF]);
 
+  const availableUnitsCount = useMemo(
+    () => units.filter((unit) => unit.status === "Në dispozicion").length,
+    [units],
+  );
+  const activeReservationsCount = useMemo(
+    () =>
+      units.filter((unit) => unit.status === "E rezervuar" && unit.reservation_expires_at).length,
+    [units],
+  );
+
   return (
     <div style={{ background: PAGE_BG }}>
       {historyUnit && (
         <HistoryDrawer
+          key={historyUnit.id}
           unit={historyUnit}
           onClose={() => setHistoryUnit(null)}
           fetchHistory={fetchUnitHistory as (id: string) => Promise<UnitHistory[]>}
         />
       )}
 
-      <div className="mx-auto max-w-[1280px] px-10 py-10">
+      <div className="mx-auto max-w-[1280px] px-10 pt-6 pb-10">
         <PageHeader
           tone="brand"
-          title="Të gjitha njësitë"
-          subtitle="Pamje e plotë e inventarit të njësive, me filtrim sipas llojit, nivelit, statusit dhe kategorisë së pronësisë."
+          title="Njësitë"
+          subtitle="Inventari i plotë i njësive me status, pronësi, rezervime aktive dhe histori ndryshimesh."
+          className="!mb-3 items-start gap-x-8 gap-y-2.5"
+          bodyClassName="min-w-[320px] flex-[1_1_560px] sm:self-center"
+          contentClassName="max-w-[620px]"
+          titleClassName="leading-[0.94]"
+          subtitleClassName="max-w-[620px]"
+          rightClassName="w-full sm:w-auto sm:self-start"
+          right={
+            <div className="w-full rounded-[16px] border border-black/[0.05] bg-[#fcfcfd] px-3 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.03)] sm:min-w-[404px] sm:max-w-[428px]">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-[12px] border border-[#edf0f4] bg-white px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                    Gjithsej njësi
+                  </p>
+                  {loading ? (
+                    <div className="mt-2 h-6 w-16 animate-pulse rounded-full bg-[#eef1f5]" />
+                  ) : (
+                    <p className="mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.04em] text-[#003883]">
+                      {units.length}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-[12px] border border-[#edf0f4] bg-white px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                    Rezervime aktive
+                  </p>
+                  {loading ? (
+                    <div className="mt-2 h-6 w-16 animate-pulse rounded-full bg-[#eef1f5]" />
+                  ) : (
+                    <p className="mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.04em] text-[#003883]">
+                      {activeReservationsCount}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {!loading && (
+                <p className="mt-2 px-0.5 text-[11.5px] text-black/34">
+                  {availableUnitsCount} në dispozicion në regjistrin aktual.
+                </p>
+              )}
+            </div>
+          }
         />
 
-        <OwnershipSection units={units} />
+        {error && (
+          <div className="mb-6 flex items-start gap-2 rounded-[16px] border border-[#f1dddd] bg-[#fdf7f7] px-4 py-3 text-[#8e4a4a] shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+            <AlertCircle size={15} className="mt-[2px] shrink-0" />
+            <div>
+              <p className="text-[12.5px] font-medium">
+                Inventari i njësive nuk u rifreskua plotësisht.
+              </p>
+              <p className="mt-1 text-[11.5px] text-[#8e4a4a]/80">
+                {units.length > 0
+                  ? "Po shfaqet pamja e fundit e disponueshme ndërsa rifreskimi nuk u përfundua."
+                  : "Kontrolloni lidhjen dhe rifreskoni faqen për ta ngarkuar regjistrin."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <OwnershipSection units={units} loading={loading} />
 
         <StockStatusSection
+          loading={loading}
           selectedOwnerCategory={selectedOwnerCategory}
           selectedOwnerEntity={activeSelectedOwnerEntity}
           ownerNames={ownerNames}
@@ -195,7 +262,7 @@ export function UnitsDashboard() {
           onOpenHistory={setHistoryUnit}
         />
 
-        <ActiveReservationsSection units={units} />
+        <ActiveReservationsSection units={units} loading={loading} />
       </div>
     </div>
   );

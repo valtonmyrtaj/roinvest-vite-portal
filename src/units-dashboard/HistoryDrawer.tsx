@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ChevronRight, X } from "lucide-react";
 import { EyebrowLabel } from "../components/ui/Eyebrow";
 import type { Unit, UnitHistory } from "../hooks/useUnits";
+import { getUnitTypeDisplay } from "../lib/unitType";
 import { SQ_MONTHS_LONG } from "./shared";
 import { SkeletonRows } from "../components/SkeletonRows";
 
@@ -19,10 +20,17 @@ export function HistoryDrawer({
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
-    fetchHistory(unit.id).then((h) => {
-      setHistory(h);
+    let isCancelled = false;
+
+    fetchHistory(unit.id).then((nextHistory) => {
+      if (isCancelled) return;
+      setHistory(nextHistory);
       setLoadingHistory(false);
     });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [unit.id, fetchHistory]);
 
   const formatDate = (iso: string) => {
@@ -46,9 +54,16 @@ export function HistoryDrawer({
   const isTimestamp = (val: string) => val.includes("T") && (val.includes("+") || val.includes("Z"));
   const isDateOnly = (val: string) => /^\d{4}-\d{2}-\d{2}$/.test(val);
 
-  const formatFieldValue = (val: unknown, field?: string): string => {
+  const formatFieldValue = (
+    val: unknown,
+    field?: string,
+    snapshot?: Partial<Unit>,
+  ): string => {
     if (val === null || val === undefined) return "—";
     const s = String(val);
+    if (field === "type") {
+      return getUnitTypeDisplay(s, snapshot?.level);
+    }
     if (field === "reservation_expires_at") {
       if (isDateOnly(s)) return formatDateShort(`${s}T00:00:00`);
       if (isTimestamp(s)) return formatDateShort(s);
@@ -94,7 +109,7 @@ export function HistoryDrawer({
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 flex h-full w-[480px] flex-col bg-white shadow-2xl"
+        className="relative z-10 flex h-full w-[480px] flex-col border-l border-[#eef0f4] bg-[#fcfcfd] shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-[#f0f0f2] px-6 py-5">
           <div>
@@ -114,20 +129,27 @@ export function HistoryDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          <EyebrowLabel as="p" className="mb-4 text-black/35">
-            Historia e ndryshimeve
-          </EyebrowLabel>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <EyebrowLabel as="p" className="text-black/35">
+              Historia e ndryshimeve
+            </EyebrowLabel>
+            <span className="rounded-full border border-[#e7ebf2] bg-white px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/32">
+              {loadingHistory ? "Duke ngarkuar" : `${history.length} hyrje`}
+            </span>
+          </div>
 
           {loadingHistory ? (
             <SkeletonRows rows={4} />
           ) : history.length === 0 ? (
-            <div className="text-center">
-              <p className="text-[13px] font-medium text-black/40">
-                Nuk ka ndryshime të regjistruara ende për këtë njësi
-              </p>
-              <p className="mt-1 text-[11.5px] text-black/28">
-                Sapo të ruhen përditësime, ato do të shfaqen këtu.
-              </p>
+            <div className="flex min-h-[220px] items-center justify-center text-center">
+              <div>
+                <p className="text-[13px] font-medium text-black/40">
+                  Nuk ka ndryshime të regjistruara ende për këtë njësi
+                </p>
+                <p className="mt-1 text-[11.5px] text-black/28">
+                  Sapo të ruhen përditësime, ato do të shfaqen këtu.
+                </p>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -139,9 +161,14 @@ export function HistoryDrawer({
                 );
 
                 return (
-                  <div key={h.id} className="rounded-[14px] border border-[#f0f0f2] bg-[#fafafa] p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[11px] text-black/40">{formatDate(h.changed_at)}</span>
+                  <div key={h.id} className="rounded-[16px] border border-[#eef0f4] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] text-black/40">{formatDate(h.changed_at)}</p>
+                        <p className="mt-1 text-[11.5px] text-black/32">
+                          {changedFields.length} fusha të përditësuara
+                        </p>
+                      </div>
                       {h.change_reason && (
                         <span
                           className="rounded-full px-2 py-0.5 text-[10.5px] font-medium"
@@ -160,18 +187,24 @@ export function HistoryDrawer({
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-2">
                       {changedFields.map((field) => (
-                        <div key={field} className="flex items-center gap-2 text-[12px]">
-                          <span className="text-black/40">
+                        <div
+                          key={field}
+                          className="grid grid-cols-[minmax(92px,116px)_minmax(0,1fr)_10px_minmax(0,1fr)] items-start gap-2 text-[12px]"
+                        >
+                          <span className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-black/32">
                             {fieldLabels[field] ?? field.replace(/_/g, " ")}:
                           </span>
-                          <span className="text-[#b14b4b] line-through">
-                            {formatFieldValue(prev[field as keyof Unit], field)}
+                          <span className="break-words text-[#b14b4b] line-through">
+                            {formatFieldValue(prev[field as keyof Unit], field, prev)}
                           </span>
-                          <ChevronRight size={10} className="text-black/25" />
-                          <span style={{ color: newStatusColor(next, field) }}>
-                            {formatFieldValue(next[field as keyof Unit], field)}
+                          <ChevronRight size={10} className="mt-1 text-black/25" />
+                          <span
+                            className="break-words"
+                            style={{ color: newStatusColor(next, field) }}
+                          >
+                            {formatFieldValue(next[field as keyof Unit], field, next)}
                           </span>
                         </div>
                       ))}

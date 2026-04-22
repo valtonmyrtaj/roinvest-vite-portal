@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { sales as salesApi, units as unitsApi } from "../lib/api";
+import type { UnitTypeValue } from "../lib/unitType";
 import type {
   CreateUnitPayload,
   InsertUnitHistoryPayload,
@@ -11,7 +12,7 @@ import type { UnitSaleRow } from "../lib/api/sales";
 import type { Json } from "../lib/database.types";
 
 export type UnitStatus = "Në dispozicion" | "E rezervuar" | "E shitur";
-export type UnitType = "Garazhë" | "Lokal" | "1+1" | "2+1" | "3+1";
+export type UnitType = UnitTypeValue;
 export type Block = "Blloku A" | "Blloku B" | "Blloku C";
 export type Level =
   | "Garazhë"
