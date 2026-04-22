@@ -36,6 +36,8 @@ const ALBANIAN_MONTH_SHORT_LABELS = [
 ] as const;
 
 const FULL_MONTH_LABEL_MIN_WIDTH = 720;
+const BAR_INTRO_DURATION = 1.05;
+const BAR_INTRO_MAX_DELAY = 0.4;
 
 interface ChartEntry {
   month: string;
@@ -47,6 +49,86 @@ interface ChartEntry {
 interface TooltipPayloadItem {
   value: number;
   payload: ChartEntry;
+}
+
+type SalesBarShapeProps = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  fillOpacity?: number | string;
+  stroke?: string;
+  strokeWidth?: number | string;
+  index?: number;
+  shouldAnimate?: boolean;
+};
+
+function SalesBarShape({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  fill = NAVY,
+  fillOpacity = 1,
+  stroke,
+  strokeWidth,
+  index = 0,
+  shouldAnimate = false,
+}: SalesBarShapeProps) {
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  const finalOpacity =
+    typeof fillOpacity === "number"
+      ? fillOpacity
+      : typeof fillOpacity === "string"
+        ? Number(fillOpacity)
+        : 1;
+
+  if (!shouldAnimate) {
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={fill}
+        fillOpacity={finalOpacity}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+    );
+  }
+
+  return (
+    <motion.rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fill={fill}
+      fillOpacity={finalOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      initial={
+        shouldAnimate
+          ? {
+              y: y + height,
+              height: 0,
+              opacity: Math.min(finalOpacity, 0.3),
+            }
+          : false
+      }
+      animate={{ y, height, opacity: finalOpacity }}
+      transition={{
+        duration: BAR_INTRO_DURATION,
+        delay: 0.12 + Math.min(index * 0.05, 0.28),
+        ease: [0.16, 1, 0.3, 1],
+      }}
+    />
+  );
 }
 
 function SalesTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadItem[] }) {
@@ -183,7 +265,7 @@ export default function OverviewMonthlySalesChart({
 
     const timeoutId = globalThis.setTimeout(() => {
       setHasPlayedIntro(true);
-    }, 860);
+    }, (BAR_INTRO_DURATION + BAR_INTRO_MAX_DELAY) * 1000);
 
     return () => {
       globalThis.clearTimeout(timeoutId);
@@ -272,15 +354,15 @@ export default function OverviewMonthlySalesChart({
             dataKey="units"
             radius={[0, 0, 0, 0]}
             maxBarSize={32}
+            shape={(props) => (
+              <SalesBarShape {...props} shouldAnimate={shouldPlayIntro} />
+            )}
             activeBar={{
               fillOpacity: 0.96,
               stroke: "rgba(255,255,255,0.85)",
               strokeWidth: 1,
             }}
-            isAnimationActive={shouldPlayIntro}
-            animationBegin={120}
-            animationDuration={980}
-            animationEasing="ease-in-out"
+            isAnimationActive={false}
           >
             {chartData.map((entry, index) => (
               <Cell

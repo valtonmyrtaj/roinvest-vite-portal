@@ -21,6 +21,8 @@ export function SalesRevenueChart({
     ticks: number[];
   };
 }) {
+  const hasRevenueData = chartData.some((item) => item.revenue > 0);
+
   return (
     <div className="mt-6">
       <Card className="overflow-hidden">
@@ -52,6 +54,17 @@ export function SalesRevenueChart({
               <p className="text-[12px] text-black/34">
                 Duke ngarkuar serinë mujore për {selectedYear}
               </p>
+            </div>
+          ) : !hasRevenueData ? (
+            <div className="flex h-full items-center justify-center rounded-[18px] border border-dashed border-[#e6e8ec] bg-[#fafbfc] px-6 text-center">
+              <div className="max-w-[320px]">
+                <p className="text-[13px] font-medium text-black/48">
+                  Nuk ka shitje të regjistruara për {selectedYear}
+                </p>
+                <p className="mt-1 text-[11.5px] text-black/34">
+                  Grafiku do të plotësohet sapo të regjistrohen kontrata gjatë këtij viti.
+                </p>
+              </div>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">

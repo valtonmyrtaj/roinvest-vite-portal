@@ -56,80 +56,85 @@ export function SalesSummary({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
-        <Card className="mb-6 overflow-hidden p-0">
-          <div className="grid items-end gap-5 px-6 py-5 lg:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
-            <div>
+        <Card className="mb-4 overflow-hidden p-0">
+          <div className="grid gap-3 px-6 py-3.5 lg:grid-cols-[minmax(0,1.22fr)_minmax(300px,0.78fr)]">
+            <div className="flex flex-col justify-start lg:justify-center">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/30">
                 Vlera e kontraktuar
               </p>
               {financialSummaryReady ? (
                 <>
-                  <p className="mt-2.5 text-[52px] leading-[0.94] tracking-[-0.055em]" style={{ color: NAVY, fontWeight: 700 }}>
+                  <p
+                    className="mt-1 text-[50px] leading-[0.9] tracking-[-0.055em] lg:text-[52px]"
+                    style={{ color: NAVY, fontWeight: 700 }}
+                  >
                     {fmtEur(contractedValue)}
                   </p>
-                  <p className="mt-2 text-[13px] leading-[1.35] text-black/42">
+                  <p className="mt-1 text-[13px] leading-[1.35] text-black/42">
                     {soldUnits} njësi të shitura {periodContextLabel}
                   </p>
                 </>
               ) : financialMetricsError ? (
                 <>
-                  <p className="mt-2.5 text-[52px] leading-[0.94] tracking-[-0.055em]" style={{ color: NAVY, fontWeight: 700 }}>
+                  <p
+                    className="mt-1 text-[50px] leading-[0.9] tracking-[-0.055em] lg:text-[52px]"
+                    style={{ color: NAVY, fontWeight: 700 }}
+                  >
                     —
                   </p>
-                  <p className="mt-2 text-[13px] leading-[1.35] text-[#b14b4b]/80">
+                  <p className="mt-1 text-[13px] leading-[1.35] text-[#b14b4b]/80">
                     Përmbledhja financiare nuk u ngarkua.
                   </p>
                 </>
               ) : (
                 <>
-                  <MetricSkeleton valueClassName="h-[52px] w-[280px] max-w-full" detailClassName="h-[13px] w-[190px] max-w-[72%]" />
-                  <p className="mt-3 text-[12px] text-black/34">
+                  <MetricSkeleton
+                    valueClassName="mt-1 h-[48px] w-[284px] max-w-full"
+                    detailClassName="h-[13px] w-[190px] max-w-[72%]"
+                  />
+                  <p className="mt-2 text-[12px] text-black/34">
                     Duke ngarkuar përmbledhjen financiare për {periodChipLabel}
                   </p>
                 </>
               )}
             </div>
 
-            <div className="border-t border-[#edf0f4] pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/28">
-                    Konteksti i stokut
-                  </p>
-                  <p className="mt-1 text-[12px] text-black/38">
-                    Pamje aktuale e stokut
-                  </p>
-                </div>
-                <span className="inline-flex items-center rounded-full border border-[#d8e1ee] bg-[#f7faff] px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-[#003883]">
-                  Aktuale
-                </span>
-              </div>
+            <div className="border-t border-[#edf0f4] pt-3 lg:border-t-0 lg:pt-4">
+              <div className="relative flex flex-col gap-2 pl-5">
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 left-0 top-0 hidden w-px bg-[#edf0f4] lg:block"
+                />
+                <p className="pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/28">
+                  Pamja aktuale e stokut
+                </p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[16px] border border-[#edf0f4] bg-[#fafbfd] px-4 py-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    Gjithsej njësi
-                  </p>
-                  {stockSnapshotReady ? (
-                    <p className="mt-2 text-[30px] leading-none tracking-[-0.04em]" style={{ color: NAVY, fontWeight: 700 }}>
-                      {totalUnits}
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <div className="rounded-[15px] border border-[#edf0f4] bg-[#fafbfd] px-3.5 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                      Gjithsej njësi
                     </p>
-                  ) : (
-                    <MetricSkeleton valueClassName="h-[30px] w-[88px]" detailClassName="hidden" />
-                  )}
-                </div>
+                    {stockSnapshotReady ? (
+                      <p className="mt-1.5 text-[28px] leading-none tracking-[-0.04em]" style={{ color: NAVY, fontWeight: 700 }}>
+                        {totalUnits}
+                      </p>
+                    ) : (
+                      <MetricSkeleton valueClassName="h-[30px] w-[88px]" detailClassName="hidden" />
+                    )}
+                  </div>
 
-                <div className="rounded-[16px] border border-[#edf0f4] bg-[#fafbfd] px-4 py-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    Në dispozicion
-                  </p>
-                  {stockSnapshotReady ? (
-                    <p className="mt-2 text-[30px] leading-none tracking-[-0.04em]" style={{ color: GREEN, fontWeight: 700 }}>
-                      {availableUnits}
+                  <div className="rounded-[15px] border border-[#edf0f4] bg-[#fafbfd] px-3.5 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                      Në dispozicion
                     </p>
-                  ) : (
-                    <MetricSkeleton valueClassName="h-[30px] w-[88px]" detailClassName="hidden" />
-                  )}
+                    {stockSnapshotReady ? (
+                      <p className="mt-1.5 text-[28px] leading-none tracking-[-0.04em]" style={{ color: GREEN, fontWeight: 700 }}>
+                        {availableUnits}
+                      </p>
+                    ) : (
+                      <MetricSkeleton valueClassName="h-[30px] w-[88px]" detailClassName="hidden" />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -137,9 +142,11 @@ export function SalesSummary({
         </Card>
       </motion.div>
 
-      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">
-        Periudha e zgjedhur
-      </p>
+      <div className="mb-2">
+        <p className="text-[12px] text-black/42">
+          Treguesit financiarë dhe ritmi i shitjeve për {periodChipLabel}
+        </p>
+      </div>
       {financialMetricsError && (
         <p className="mb-4 -mt-1 text-[12px] text-[#b14b4b]/80">
           Treguesit financiarë nuk u ngarkuan për periudhën e zgjedhur.
@@ -164,26 +171,33 @@ export function SalesSummary({
       </div>
 
       {reservationSummary && (
-        <div className="mt-4 flex items-center gap-2 text-[12px] text-black/42">
-          <Bookmark size={13} strokeWidth={2} className="shrink-0" style={{ color: NAVY, opacity: 0.55 }} />
-          <span>
-            <span className="font-medium text-black/58">
-              Rezervimet aktuale · {reservationSummary.activeCount} aktive
-            </span>
-            {reservationSummary.expiringThisWeekCount > 0 && (
-              <span className="ml-1 text-[#b0892f]">
-                · {reservationSummary.expiringThisWeekCount} skadon këtë javë
-              </span>
-            )}
-          </span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-[#e7ebf2] bg-[#fbfcfe] px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+          <div className="flex items-start gap-2.5 text-[12px] text-black/42">
+            <Bookmark
+              size={13}
+              strokeWidth={2}
+              className="mt-[2px] shrink-0"
+              style={{ color: NAVY, opacity: 0.58 }}
+            />
+            <div>
+              <p className="font-medium text-black/62">
+                Rezervimet aktuale · {reservationSummary.activeCount} aktive
+              </p>
+              <p className="mt-1 text-[11.5px] text-black/40">
+                {reservationSummary.expiringThisWeekCount > 0
+                  ? `${reservationSummary.expiringThisWeekCount} skadojnë këtë javë dhe kërkojnë ndjekje.`
+                  : "Nuk ka rezervime që skadojnë gjatë kësaj jave."}
+              </p>
+            </div>
+          </div>
           {onNavigate && (
             <button
               type="button"
               onClick={() => onNavigate("units")}
-              className="ml-1 font-medium underline underline-offset-2 transition hover:opacity-70"
+              className="inline-flex items-center rounded-[10px] border border-[#dbe3f2] bg-white px-3 py-2 text-[11.5px] font-semibold transition hover:bg-[#f8fbff]"
               style={{ color: NAVY }}
             >
-              → Shiko njësitë
+              Shiko njësitë
             </button>
           )}
         </div>

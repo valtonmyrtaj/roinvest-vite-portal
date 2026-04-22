@@ -1,11 +1,13 @@
 import { Trash2 } from "lucide-react";
 import type { Payment } from "../hooks/usePayments";
+import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import {
   TABULAR_HEADER_LABEL_CLASS,
   TABULAR_HEADER_ROW_CLASS,
 } from "../components/ui/tabularHeader";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { fmtDate, NAVY } from "./shared";
+import { PaymentStatusBadge } from "./primitives";
 import { SkeletonRows } from "../components/SkeletonRows";
 
 /**
@@ -27,11 +29,20 @@ export function PaymentDrawerTable({
 }) {
   return (
     <div className="mt-6 rounded-[22px] border border-[#ececf1] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-[#eef0f4] px-5 py-4">
-        <p className="text-[13px] font-semibold tracking-[-0.02em]" style={{ color: NAVY }}>
-          Lista e kësteve
-        </p>
-      </div>
+      <CardSectionHeader
+        title="Lista e kësteve"
+        subtitle="Shëno këstet e paguara dhe të papaguara"
+        className="px-5 py-4"
+        bodyClassName="max-w-[420px]"
+        right={
+          <span
+            className="inline-flex items-center rounded-full border border-[#d8e1ee] bg-[#f7faff] px-2.5 py-1 text-[10.5px] font-semibold shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
+            style={{ color: NAVY }}
+          >
+            {loading ? "Duke u ngarkuar" : `${payments.length} këste`}
+          </span>
+        }
+      />
 
       <div className="overflow-x-auto">
         {loading ? (
@@ -46,53 +57,48 @@ export function PaymentDrawerTable({
             </p>
           </div>
         ) : (
-          <div className="min-w-[700px]">
-            <div className={`flex items-center px-5 py-2.5 ${TABULAR_HEADER_ROW_CLASS}`}>
-              <div className={`w-[60px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Kësti</div>
-              <div className={`w-[120px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Shuma</div>
-              <div className={`w-[155px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Skadon më</div>
-              <div className={`w-[155px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Paguar më</div>
-              <div className={`w-[115px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Statusi</div>
-              <div className="flex-1" />
-              <div className="w-[36px] shrink-0" />
+          <div className="min-w-[600px] sm:min-w-0">
+            <div className={`flex items-center px-3 py-2.5 ${TABULAR_HEADER_ROW_CLASS}`}>
+              <div className={`w-[48px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Kësti</div>
+              <div className={`w-[96px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Shuma</div>
+              <div className={`w-[112px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Skadon më</div>
+              <div className={`w-[112px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Paguar më</div>
+              <div className={`w-[104px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Statusi</div>
+              <div className="min-w-[156px] flex-1" />
             </div>
 
             {payments.map((payment) => (
               <div
                 key={payment.id}
-                className={`group flex items-center border-b border-[#F3F4F6] px-5 py-3.5 last:border-b-0 transition-colors duration-150 ${
-                  payment.status !== "E paguar" ? "bg-[#FAFBFC]" : "bg-white"
+                className={`group flex items-center border-b border-[#F3F4F6] px-3 py-3.5 last:border-b-0 transition-colors duration-150 ${
+                  payment.status === "E vonuar"
+                    ? "bg-[#fdf8f8]"
+                    : payment.status !== "E paguar"
+                      ? "bg-[#FAFBFC]"
+                      : "bg-white"
                 }`}
               >
-                <div className="w-[60px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
+                <div className="w-[48px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
                   #{payment.installment_number}
                 </div>
 
-                <div className="w-[120px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
+                <div className="w-[96px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
                   {fmtEur(payment.amount)}
                 </div>
 
-                <div className="w-[155px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
+                <div className="w-[112px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
                   {fmtDate(payment.due_date)}
                 </div>
 
-                <div className="w-[155px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
+                <div className="w-[112px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
                   {fmtDate(payment.paid_date)}
                 </div>
 
-                <div className="w-[115px] shrink-0">
-                  {payment.status === "E paguar" ? (
-                    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-[#BBF7D0] bg-[#F0FDF4] px-2.5 py-1 text-[10.5px] font-semibold text-[#166534]">
-                      E paguar
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-[#FDE68A] bg-[#FFFBEB] px-2.5 py-1 text-[10.5px] font-semibold text-[#92400E]">
-                      {payment.status}
-                    </span>
-                  )}
+                <div className="w-[104px] shrink-0">
+                  <PaymentStatusBadge status={payment.status} />
                 </div>
 
-                <div className="flex flex-1 items-center">
+                <div className="flex min-w-[156px] flex-1 items-center justify-end gap-2">
                   {payment.status !== "E paguar" && (
                     <button
                       type="button"
@@ -103,13 +109,11 @@ export function PaymentDrawerTable({
                       Shëno si të paguar
                     </button>
                   )}
-                </div>
-
-                <div className="flex w-[36px] shrink-0 justify-center">
                   <button
                     type="button"
                     onClick={() => onRequestDelete(payment)}
-                    className="rounded-[7px] p-[6px] opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:text-black/28 hover:bg-red-50 hover:text-red-400"
+                    aria-label={`Fshi këstin #${payment.installment_number}`}
+                    className="rounded-[7px] p-[6px] text-black/24 opacity-55 transition-all duration-150 group-hover:opacity-100 group-hover:text-black/30 hover:bg-red-50 hover:text-red-400 focus-visible:opacity-100 focus-visible:outline-none"
                   >
                     <Trash2 size={13} />
                   </button>

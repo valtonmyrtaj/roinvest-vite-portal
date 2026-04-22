@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { CheckCircle2, X } from "lucide-react";
 import type { Payment } from "../hooks/usePayments";
 import type { Unit } from "../hooks/useUnits";
 import { NAVY } from "./shared";
@@ -49,6 +49,11 @@ export function PaymentDrawer({
   onMarkPaid: (payment: Payment, paidDate: string) => Promise<void>;
   onDeletePayment: (paymentId: string) => Promise<void>;
 }) {
+  const [feedback, setFeedback] = useState<{
+    key: number;
+    title: string;
+    detail: string;
+  } | null>(null);
   const [markPaidTarget, setMarkPaidTarget] = useState<Payment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
 
@@ -66,6 +71,56 @@ export function PaymentDrawer({
   );
 
   const finalPrice = getUnitContractValue(unit);
+
+  useEffect(() => {
+    if (!feedback) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback(null);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedback]);
+
+  const publishFeedback = (title: string, detail: string) => {
+    setFeedback({
+      key: Date.now(),
+      title,
+      detail,
+    });
+  };
+
+  const handleCreatePayment = async (data: {
+    unit_id: string;
+    installment_number: number;
+    amount: number;
+    due_date: string;
+    notes?: string | null;
+  }) => {
+    await onCreatePayment(data);
+    publishFeedback(
+      `Kësti #${data.installment_number} u shtua`,
+      `Plani i pagesave për ${unit.unit_id} u përditësua me sukses.`,
+    );
+  };
+
+  const handleMarkPaid = async (payment: Payment, paidDate: string) => {
+    await onMarkPaid(payment, paidDate);
+    publishFeedback(
+      `Kësti #${payment.installment_number} u shënua si i paguar`,
+      "Bilanci i arkëtimeve u rifreskua.",
+    );
+  };
+
+  const handleDeletePayment = async (payment: Payment) => {
+    await onDeletePayment(payment.id);
+    publishFeedback(
+      `Kësti #${payment.installment_number} u fshi`,
+      "Lista e kësteve u përditësua.",
+    );
+  };
 
   return (
     <>
@@ -107,6 +162,31 @@ export function PaymentDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto bg-[#fbfbfc] px-6 py-5">
+          <AnimatePresence initial={false}>
+            {feedback && (
+              <motion.div
+                key={feedback.key}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                role="status"
+                aria-live="polite"
+                className="mb-5 rounded-[16px] border border-[#dbe6f5] bg-[#f7faff] px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-[1px] inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[rgba(60,122,87,0.12)] text-[#3c7a57]">
+                    <CheckCircle2 size={12} strokeWidth={2.2} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[12.5px] font-semibold text-black/82">{feedback.title}</p>
+                    <p className="mt-0.5 text-[11.5px] text-black/48">{feedback.detail}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <PaymentDrawerSummary unit={unit} paidAmount={paidAmount} />
 
           <PaymentDrawerTimeline
@@ -126,7 +206,7 @@ export function PaymentDrawer({
           <PaymentDrawerAddForm
             unitId={unit.id}
             nextInstallmentNumber={nextInstallmentNumber}
-            onCreate={onCreatePayment}
+            onCreate={handleCreatePayment}
           />
         </div>
       </motion.aside>
@@ -136,7 +216,7 @@ export function PaymentDrawer({
           <MarkPaidModal
             payment={markPaidTarget}
             onClose={() => setMarkPaidTarget(null)}
-            onConfirm={(paidDate) => onMarkPaid(markPaidTarget, paidDate)}
+            onConfirm={(paidDate) => handleMarkPaid(markPaidTarget, paidDate)}
           />
         )}
       </AnimatePresence>
@@ -147,7 +227,7 @@ export function PaymentDrawer({
             title="Fshi këstin"
             description={`Kësti #${deleteTarget.installment_number} do të hiqet nga plani i pagesave. Ky veprim nuk mund të kthehet.`}
             onClose={() => setDeleteTarget(null)}
-            onConfirm={() => onDeletePayment(deleteTarget.id)}
+            onConfirm={() => handleDeletePayment(deleteTarget)}
           />
         )}
       </AnimatePresence>

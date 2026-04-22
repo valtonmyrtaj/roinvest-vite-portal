@@ -61,10 +61,40 @@ export default function SalesPage({
   const [highlightedUnitId, setHighlightedUnitId] = useState<string | null>(null);
   const [paymentsSectionPulse, setPaymentsSectionPulse] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
+  const [upcomingPaymentsLoading, setUpcomingPaymentsLoading] = useState(true);
+  const [upcomingPaymentsError, setUpcomingPaymentsError] = useState<string | null>(null);
   const upcomingPaymentsSectionRef = useRef<HTMLDivElement | null>(null);
 
+  const refreshUpcomingPayments = async () => {
+    setUpcomingPaymentsLoading(true);
+    setUpcomingPaymentsError(null);
+
+    const result = await fetchAllPayments();
+    setUpcomingPaymentsError(result.error ?? null);
+    setUpcomingPaymentsLoading(false);
+
+    return result;
+  };
+
   useEffect(() => {
-    void fetchAllPayments();
+    let isCancelled = false;
+
+    const loadUpcomingPayments = async () => {
+      const result = await fetchAllPayments();
+
+      if (isCancelled) {
+        return;
+      }
+
+      setUpcomingPaymentsError(result.error ?? null);
+      setUpcomingPaymentsLoading(false);
+    };
+
+    void loadUpcomingPayments();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [fetchAllPayments]);
 
   useEffect(() => {
@@ -288,7 +318,7 @@ export default function SalesPage({
 
   const refreshPayments = async (unitId: string) => {
     await fetchPayments(unitId);
-    await fetchAllPayments();
+    await refreshUpcomingPayments();
   };
 
   const handleCreatePayment = async (data: {
@@ -345,7 +375,7 @@ export default function SalesPage({
         )}
       </AnimatePresence>
 
-      <div className="mx-auto max-w-[1280px] px-10 pb-9 pt-10">
+      <div className="mx-auto max-w-[1280px] px-10 pb-9 pt-6">
         <SalesHeader
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
@@ -389,6 +419,8 @@ export default function SalesPage({
 
         <div className="mt-6" ref={upcomingPaymentsSectionRef}>
           <SalesUpcomingPayments
+            loading={upcomingPaymentsLoading}
+            error={upcomingPaymentsError}
             upcomingPayments={upcomingPayments}
             onOpenPaymentPlan={handleOpenPaymentPlan}
             highlightedUnitId={highlightedUnitId}

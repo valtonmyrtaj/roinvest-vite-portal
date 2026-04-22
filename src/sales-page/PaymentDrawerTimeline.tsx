@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import type { Payment } from "../hooks/usePayments";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
-import { fmtDateCompact, GREEN, NAVY, RED } from "./shared";
+import { fmtDateCompact, GOLD, GREEN, RED } from "./shared";
 import { SkeletonRows } from "../components/SkeletonRows";
 
 /**
@@ -48,7 +48,7 @@ export function PaymentDrawerTimeline({
           </div>
           <div className="rounded-[16px] border border-[#e7ebf2] bg-white/92 px-3.5 py-3">
             <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-black/28">Në pritje</p>
-            <p className="mt-1.5 text-[16px] leading-none tracking-[-0.03em]" style={{ color: NAVY, fontWeight: 700 }}>
+            <p className="mt-1.5 text-[16px] leading-none tracking-[-0.03em]" style={{ color: GOLD, fontWeight: 700 }}>
               {fmtEur(remainingAmount)}
             </p>
           </div>
@@ -70,7 +70,7 @@ export function PaymentDrawerTimeline({
         <>
           <div className="relative mt-6 overflow-x-auto pb-2">
             <div className="relative flex min-w-max gap-5 px-1">
-              {payments.map((payment, index) => {
+              {payments.map((payment) => {
                 const isPaid = payment.status === "E paguar";
                 const isHovered = hoveredInstallmentId === payment.id;
                 const nodeBorder = isPaid ? "#2D6A4F" : payment.status === "E vonuar" ? RED : "#B0892F";
@@ -89,9 +89,6 @@ export function PaymentDrawerTimeline({
                     }`}
                     style={isHovered ? { borderLeftColor: "#003883", borderLeftWidth: "3px" } : undefined}
                   >
-                    {index < payments.length - 1 && (
-                      <span className="absolute left-[calc(50%+18px)] right-[-44px] top-[25px] h-px bg-[#E5E7EB]" />
-                    )}
                     <div
                       className={`relative z-10 mb-3 flex h-11 w-11 items-center justify-center rounded-full border-2 text-[12px] font-semibold transition-all duration-200 ${
                         isHovered ? "scale-[1.03]" : ""

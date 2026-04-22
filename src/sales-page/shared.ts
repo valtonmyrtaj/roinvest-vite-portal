@@ -27,7 +27,7 @@ export const SQ_MONTHS = [
   "Dhjetor",
 ];
 
-export const ALL_MONTHS_LABEL = "Të gjithë muajt";
+export const ALL_MONTHS_LABEL = "Gjithë muajt";
 export const YEAR_OPTIONS = ["2026", "2027", "2028", "2029", "2030"] as const;
 
 export type TypologyLabel = (typeof TYPOLOGY_DEFS)[number]["label"];
@@ -77,7 +77,7 @@ export function getNiceAxisStep(maxValue: number) {
 export function statusTone(status: PaymentStatus) {
   if (status === "E paguar") return { bg: "#edf7f1", color: GREEN, border: GREEN };
   if (status === "E vonuar") return { bg: "#fbeeee", color: RED, border: RED };
-  return { bg: "#f4f4f5", color: GRAY, border: GRAY };
+  return { bg: "#fff8e8", color: GOLD, border: GOLD };
 }
 
 export function triggerOnActionKey(event: ReactKeyboardEvent<HTMLElement>, action: () => void) {

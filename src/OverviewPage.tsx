@@ -94,7 +94,8 @@ const fadeUp = (delay = 0) => ({
 
 const OVERVIEW_CARD_SHADOW = "0 1px 2px rgba(0,0,0,0.04), 0 10px 26px rgba(0,0,0,0.035)";
 const OVERVIEW_HERO_SHADOW = "0 1px 2px rgba(0,0,0,0.045), 0 16px 36px rgba(0,0,0,0.04)";
-const OVERVIEW_OWNERSHIP_BORDER = "#e5e7eb";
+const OVERVIEW_CARD_TACTILE_CLASS =
+  "transform-gpu will-change-transform transition-[transform,box-shadow,border-color] duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1.5px] hover:border-[#dde1e7] hover:shadow-[0_1px_2px_rgba(15,23,42,0.045),0_20px_40px_rgba(15,23,42,0.085)] motion-reduce:transform-none motion-reduce:transition-none";
 
 const sectionReveal = (delay = 0) => ({
   initial: { opacity: 0, y: 14 },
@@ -180,8 +181,7 @@ function KpiCard({ kpi, delay, active }: { kpi: KpiDef; delay: number; active: b
   return (
     <motion.div
       {...fadeUp(delay)}
-      className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-5"
-      style={{ boxShadow: OVERVIEW_CARD_SHADOW }}
+      className={`flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_26px_rgba(0,0,0,0.035)] ${OVERVIEW_CARD_TACTILE_CLASS}`}
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#f4f4f5]">
@@ -266,8 +266,7 @@ function SecondaryPartyCard({
   return (
     <motion.div
       {...ownershipSectionReveal(delay)}
-      className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
-      style={{ borderColor: OVERVIEW_OWNERSHIP_BORDER, boxShadow: OVERVIEW_CARD_SHADOW }}
+      className={`flex-1 rounded-[18px] border border-[#e5e7eb] bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_26px_rgba(0,0,0,0.035)] ${OVERVIEW_CARD_TACTILE_CLASS}`}
     >
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
