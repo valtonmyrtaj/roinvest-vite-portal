@@ -44,6 +44,7 @@ export function ShowingModal({
   const [outcome, setOutcome] = useState<ShowingOutcomeValue>(
     (initial?.outcome as ShowingOutcomeValue) ?? "Pa rezultat",
   );
+  const [reservationExpiresAt, setReservationExpiresAt] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -55,6 +56,8 @@ export function ShowingModal({
   const leadOptions = leads.map((lead) => lead.name);
   const leadIdByName = Object.fromEntries(leads.map((lead) => [lead.name, lead.id]));
   const selectedLeadName = leads.find((lead) => lead.id === leadId)?.name ?? "";
+  const needsReservationExpiry =
+    outcome === "Rezervoi" && (initial?.outcome as ShowingOutcomeValue | undefined) !== "Rezervoi";
 
   const handleSave = async () => {
     if (contactMode === "existing" && !leadId) {
@@ -92,6 +95,11 @@ export function ShowingModal({
       return;
     }
 
+    if (needsReservationExpiry && !reservationExpiresAt) {
+      setError("Zgjidhni datën e skadimit të rezervimit.");
+      return;
+    }
+
     const normalizedStatus: ShowingStatus = outcome === "Pa rezultat" ? status : "E kryer";
 
     setSaving(true);
@@ -112,6 +120,7 @@ export function ShowingModal({
         scheduled_at: `${date}T${time || "00:00"}:00`,
         status: normalizedStatus,
         outcome,
+        reservation_expires_at: needsReservationExpiry ? reservationExpiresAt : null,
         notes: notes || null,
       });
 
@@ -298,6 +307,24 @@ export function ShowingModal({
               className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
             />
           </label>
+          {needsReservationExpiry && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
+                Skadon më <span className="text-red-400">*</span>
+              </span>
+              <input
+                type="date"
+                value={reservationExpiresAt}
+                onChange={(event) => setReservationExpiresAt(event.target.value)}
+                className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+              />
+            </label>
+          )}
+          {needsReservationExpiry && (
+            <p className="col-span-2 -mt-1 text-[11.5px] text-black/40">
+              Me ruajtjen e kësaj shfaqjeje do të krijohet edhe rezervimi autoritativ i njësisë.
+            </p>
+          )}
           <label className="col-span-2 flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
               Shënime

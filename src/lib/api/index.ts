@@ -12,8 +12,12 @@ export * as history from "./history";
 export * as marketing from "./marketing";
 export * as ownerEntities from "./ownerEntities";
 export * as payments from "./payments";
+export * as reservations from "./reservations";
 export * as reporting from "./reporting";
 export * as sales from "./sales";
+export * as unitDetail from "./unitDetail";
 export * as units from "./units";
+export * as unitsRegistry from "./unitsRegistry";
+export * as unitsShell from "./unitsShell";
 
 export type { ApiResult } from "./_types";

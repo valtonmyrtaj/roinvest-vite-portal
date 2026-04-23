@@ -54,7 +54,7 @@ const navItems: { key: PageKey; label: string; icon: LucideIcon }[] = [
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type NotifType = "sold" | "reserved" | "expired" | "other";
+type NotifType = "sold" | "reserved" | "expired" | "released" | "other";
 
 interface Notification {
   id: string;
@@ -78,9 +78,19 @@ function timeAgo(iso: string, nowTs: number): string {
   return `${days} ditë më parë`;
 }
 
-function notifType(rec: { new_data: Record<string, unknown>; previous_data: Record<string, unknown> }): NotifType {
+function notifType(rec: {
+  new_data: Record<string, unknown>;
+  previous_data: Record<string, unknown>;
+  change_reason: string;
+}): NotifType {
   const newStatus  = rec.new_data?.status  as string | undefined;
   const prevStatus = rec.previous_data?.status as string | undefined;
+  if (rec.change_reason === "Rezervimi u anulua") {
+    return "released";
+  }
+  if (rec.change_reason === "Rezervimi skadoi") {
+    return "expired";
+  }
   if (newStatus === "E shitur")    return "sold";
   if (newStatus === "E rezervuar") return "reserved";
   if (newStatus === "Në dispozicion" && prevStatus === "E rezervuar") return "expired";
@@ -91,6 +101,7 @@ const NOTIF_META: Record<NotifType, { icon: LucideIcon; color: string; bg: strin
   sold:     { icon: BadgeCheck,  color: "#3c7a57", bg: "#edf7f1", title: "Njësi e shitur"       },
   reserved: { icon: Clock3,      color: "#b0892f", bg: "#fff8e8", title: "Njësi e rezervuar"    },
   expired:  { icon: AlertCircle, color: "#b14b4b", bg: "#fbeeee", title: "Rezervimi skadoi"     },
+  released: { icon: X,           color: "#8e4a4a", bg: "#fbeeee", title: "Rezervimi u anulua"   },
   other:    { icon: Pencil,      color: "#003883", bg: "#eaf0fa", title: "Ndryshim i të dhënave" },
 };
 
@@ -296,7 +307,11 @@ export default function DashboardShell({
             : {};
         return {
           id: rec.id,
-          type: notifType({ previous_data: previousData, new_data: newData }),
+          type: notifType({
+            previous_data: previousData,
+            new_data: newData,
+            change_reason: rec.change_reason ?? "",
+          }),
           unitDisplay: rec.units?.unit_id ?? rec.id.slice(0, 8),
           changed_at: rec.changed_at ?? "",
           change_reason: rec.change_reason ?? "",

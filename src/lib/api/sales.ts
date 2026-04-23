@@ -1,19 +1,53 @@
 import { supabase } from "../supabase";
 import type { Database, Tables } from "../database.types";
+import type { PaymentRow } from "./payments";
 import type { ApiResult } from "./_types";
 import { apiFail, apiOk } from "./_types";
+import { findActiveReservationLinkByUnit } from "./reservations";
 
 // ─── Row type ────────────────────────────────────────────────────────────────
 
 /** Raw `unit_sales` row as returned by the driver. */
 export type UnitSaleRow = Tables<"unit_sales">;
-type UnitReservationRow = Tables<"unit_reservations">;
 
-export interface ActiveReservationLink {
-  reservation_id: string;
-  unit_id: string;
-  showing_id: string | null;
+export type SalesOwnerScope =
+  | "Investitor"
+  | "Pronarët e tokës"
+  | "Kompani ndërtimore"
+  | "all";
+
+export type SalesUnitRow = Pick<
+  Tables<"units">,
+  | "id"
+  | "unit_id"
+  | "block"
+  | "type"
+  | "level"
+  | "size"
+  | "price"
+  | "status"
+  | "owner_category"
+  | "owner_name"
+  | "created_at"
+  | "updated_at"
+> & {
+  final_price: number | null;
+  sale_date: string | null;
+  buyer_name: string | null;
+  payment_type: string | null;
+  crm_lead_id: string | null;
+};
+
+export interface UpcomingSalePaymentRow {
+  payment: PaymentRow;
+  unit: SalesUnitRow;
 }
+
+const SALES_UNIT_SELECT =
+  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,created_at,updated_at";
+
+type UpcomingSalePaymentRpcRow =
+  Database["public"]["Functions"]["list_sales_upcoming_payments"]["Returns"][number];
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
@@ -35,29 +69,129 @@ export async function listActiveSales(): Promise<ApiResult<UnitSaleRow[]>> {
   return apiOk((data ?? []) as UnitSaleRow[]);
 }
 
-/**
- * List the minimal active-reservation linkage the frontend may safely consume
- * for preflight decisions and to avoid mutating the `units` reservation mirror
- * while an authoritative reservation row is still active.
- */
-export async function listActiveReservationLinks(): Promise<
-  ApiResult<ActiveReservationLink[]>
-> {
-  const { data, error } = await supabase
-    .from("unit_reservations")
-    .select("id, unit_id, showing_id")
-    .eq("status", "Aktive");
+export async function listSaleUnitsByIds(
+  unitIds: string[],
+): Promise<ApiResult<SalesUnitRow[]>> {
+  const normalizedUnitIds = Array.from(new Set(unitIds.filter(Boolean)));
 
-  if (error) return apiFail(error.message);
-  return apiOk(
-    ((data ?? []) as Array<Pick<UnitReservationRow, "id" | "unit_id" | "showing_id">>).map(
-      (row) => ({
-        reservation_id: row.id,
-        unit_id: row.unit_id,
-        showing_id: row.showing_id,
-      }),
-    ),
+  if (normalizedUnitIds.length === 0) {
+    return apiOk([]);
+  }
+
+  const [unitsResult, activeSalesResult] = await Promise.all([
+    supabase
+      .from("units")
+      .select(SALES_UNIT_SELECT)
+      .in("id", normalizedUnitIds),
+    supabase
+      .from("unit_sales")
+      .select("unit_id,final_price,sale_date,buyer_name,payment_type,crm_lead_id")
+      .eq("status", "active")
+      .in("unit_id", normalizedUnitIds),
+  ]);
+
+  const error = unitsResult.error ?? activeSalesResult.error;
+
+  if (error) {
+    return apiFail(error.message);
+  }
+
+  const activeSaleByUnitId = new Map(
+    (activeSalesResult.data ?? []).map((row) => [
+      row.unit_id,
+      {
+        final_price: row.final_price,
+        sale_date: row.sale_date,
+        buyer_name: row.buyer_name,
+        payment_type: row.payment_type,
+        crm_lead_id: row.crm_lead_id,
+      },
+    ]),
   );
+
+  const sortedUnits = [...(unitsResult.data ?? [])].sort((left, right) => {
+    const leftIndex = normalizedUnitIds.indexOf(left.id);
+    const rightIndex = normalizedUnitIds.indexOf(right.id);
+    return leftIndex - rightIndex;
+  });
+
+  return apiOk(
+    sortedUnits.map((row) => {
+      const activeSale = activeSaleByUnitId.get(row.id);
+      return {
+        ...row,
+        final_price: activeSale?.final_price ?? null,
+        sale_date: activeSale?.sale_date ?? null,
+        buyer_name: activeSale?.buyer_name ?? null,
+        payment_type: activeSale?.payment_type ?? null,
+        crm_lead_id: activeSale?.crm_lead_id ?? null,
+      };
+    }),
+  );
+}
+
+export async function getSaleUnitById(
+  unitId: string,
+): Promise<ApiResult<SalesUnitRow | null>> {
+  const result = await listSaleUnitsByIds([unitId]);
+
+  if (result.error) {
+    return apiFail(result.error);
+  }
+
+  return apiOk(result.data?.[0] ?? null);
+}
+
+export async function listUpcomingSalePayments(
+  ownerScope: SalesOwnerScope,
+): Promise<ApiResult<UpcomingSalePaymentRow[]>> {
+  const { data, error } = await supabase.rpc("list_sales_upcoming_payments", {
+    p_owner_scope: ownerScope,
+  });
+
+  if (error) {
+    return apiFail(error.message);
+  }
+
+  return apiOk((data ?? []).map(mapUpcomingSalePaymentRpcRow));
+}
+
+function mapUpcomingSalePaymentRpcRow(
+  row: UpcomingSalePaymentRpcRow,
+): UpcomingSalePaymentRow {
+  return {
+    payment: {
+      id: row.payment_id,
+      unit_id: row.payment_unit_id,
+      sale_id: row.payment_sale_id,
+      installment_number: row.payment_installment_number,
+      amount: row.payment_amount,
+      due_date: row.payment_due_date,
+      paid_date: row.payment_paid_date,
+      status: row.payment_status as PaymentRow["status"],
+      notes: row.payment_notes,
+      created_at: row.payment_created_at,
+    },
+    unit: {
+      id: row.unit_id,
+      unit_id: row.unit_code,
+      block: row.unit_block,
+      type: row.unit_type,
+      level: row.unit_level,
+      size: row.unit_size,
+      price: row.unit_price,
+      status: row.unit_status,
+      owner_category: row.unit_owner_category,
+      owner_name: row.unit_owner_name,
+      created_at: row.unit_created_at,
+      updated_at: row.unit_updated_at,
+      final_price: row.sale_final_price,
+      sale_date: row.sale_date,
+      buyer_name: row.sale_buyer_name,
+      payment_type: row.sale_payment_type,
+      crm_lead_id: row.sale_crm_lead_id,
+    },
+  };
 }
 
 // ─── Domain types (RPC-facing) ───────────────────────────────────────────────
@@ -91,61 +225,19 @@ export const DIRECT_SALE_ACTIVE_RESERVATION_ERROR =
 type CompleteUnitSaleRpcArgs = Database["public"]["Functions"]["complete_unit_sale"]["Args"];
 type CompleteUnitSaleRpcReturn = Database["public"]["Functions"]["complete_unit_sale"]["Returns"];
 
-async function resolveActiveReservationId(
-  unitRecordId: string,
-): Promise<ApiResult<string | null>> {
-  const { data, error } = await supabase
-    .from("unit_reservations")
-    .select("id")
-    .eq("unit_id", unitRecordId)
-    .eq("status", "Aktive")
-    .maybeSingle();
-
-  if (error) return apiFail(error.message);
-  return apiOk(data?.id ?? null);
-}
-
-/**
- * Look up the id of the active reservation linked to a given showing. Used
- * by the showing → sale completion flow to thread the reservation through
- * the `complete_unit_sale` RPC so the reservation gets closed atomically.
- *
- * Returns `null` when no active reservation is linked — that is NOT an
- * error, because a showing that never produced a reservation still
- * legitimately completes as a sale.
- *
- * Reservations are currently owned by this module because the codebase
- * has no dedicated `api/reservations.ts` yet; grouping this lookup beside
- * `resolveActiveReservationId` and `completeUnitSale` keeps all reservation
- * reads in one place pending that future split.
- */
-export async function findActiveReservationIdByShowing(
-  showingId: string,
-): Promise<ApiResult<string | null>> {
-  const { data, error } = await supabase
-    .from("unit_reservations")
-    .select("id")
-    .eq("showing_id", showingId)
-    .eq("status", "Aktive")
-    .maybeSingle();
-
-  if (error) return apiFail(error.message);
-  return apiOk(data?.id ?? null);
-}
-
 export async function completeUnitSale(
   input: CompleteUnitSaleInput,
 ): Promise<ApiResult<CompleteUnitSaleRpcReturn>> {
   let reservationId: string | null = input.reservation_id ?? null;
 
   if (!reservationId && input.autoResolveReservation !== false) {
-    const { data: resolvedId, error: resolveError } =
-      await resolveActiveReservationId(input.unitRecordId);
+    const { data: activeReservation, error: resolveError } =
+      await findActiveReservationLinkByUnit(input.unitRecordId);
     if (resolveError) return apiFail(resolveError);
-    if (resolvedId && !input.showing_id) {
+    if (activeReservation && !input.showing_id) {
       return apiFail(DIRECT_SALE_ACTIVE_RESERVATION_ERROR);
     }
-    reservationId = resolvedId ?? null;
+    reservationId = activeReservation?.reservation_id ?? null;
   }
 
   const rpcArgs: CompleteUnitSaleRpcArgs = {

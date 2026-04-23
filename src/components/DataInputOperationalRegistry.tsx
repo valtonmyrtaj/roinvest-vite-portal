@@ -7,6 +7,7 @@ import {
   TABULAR_HEADER_LABEL_CLASS,
   TABULAR_HEADER_ROW_CLASS,
 } from "./ui/tabularHeader";
+import { LEVELS } from "../lib/unitLevel";
 import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import type { Payment } from "../hooks/usePayments";
 import { getUnitContractValue, getUnitFinalSalePrice } from "../lib/unitFinancials";
@@ -67,17 +68,6 @@ const ALL_LEVELS = "Të gjitha nivelet";
 const ALL_STATUSES = "Të gjitha statuset";
 
 const TYPE_FILTER_OPTIONS = [ALL_TYPES, ...CANONICAL_UNIT_TYPES] as const;
-const FIXED_LEVEL_OPTIONS = [
-  "Garazhë",
-  "Përdhesa",
-  "Kati 1",
-  "Kati 2",
-  "Kati 3",
-  "Kati 4",
-  "Kati 5",
-  "Kati 6",
-  "Penthouse",
-] as const;
 
 const currencyFormatter = new Intl.NumberFormat("de-DE", {
   style: "currency",
@@ -484,7 +474,7 @@ export function DataInputOperationalRegistry({
   // Hardcoded — options are always the four category labels, not derived from raw data
   const typeOptions = [...TYPE_FILTER_OPTIONS];
 
-  const levelOptions = useMemo(() => [ALL_LEVELS, ...FIXED_LEVEL_OPTIONS], []);
+  const levelOptions = useMemo(() => [ALL_LEVELS, ...LEVELS], []);
 
   const statusOptions = useMemo(
     () => [ALL_STATUSES, ...sortLabels(Array.from(new Set(rows.map((row) => row.status))))],

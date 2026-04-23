@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { sales as salesApi, units as unitsApi } from "../lib/api";
+import { reservations as reservationsApi, sales as salesApi, units as unitsApi } from "../lib/api";
+import type { Level } from "../lib/unitLevel";
 import type { UnitTypeValue } from "../lib/unitType";
 import type {
   CreateUnitPayload,
@@ -11,19 +12,11 @@ import type {
 import type { UnitSaleRow } from "../lib/api/sales";
 import type { Json } from "../lib/database.types";
 
+export type { Level } from "../lib/unitLevel";
+
 export type UnitStatus = "Në dispozicion" | "E rezervuar" | "E shitur";
 export type UnitType = UnitTypeValue;
 export type Block = "Blloku A" | "Blloku B" | "Blloku C";
-export type Level =
-  | "Garazhë"
-  | "Përdhesa"
-  | "Kati 1"
-  | "Kati 2"
-  | "Kati 3"
-  | "Kati 4"
-  | "Kati 5"
-  | "Kati 6"
-  | "Penthouse";
 export type OwnerCategory =
   | "Investitor"
   | "Pronarët e tokës"
@@ -172,6 +165,7 @@ interface SaleTruth {
 interface UseUnitsOptions {
   includeSaleTruth?: boolean;
   includeReservationTruth?: boolean;
+  enabled?: boolean;
 }
 
 interface ReservationTruth {
@@ -220,12 +214,13 @@ function indexSaleTruth(rows: UnitSaleRow[]): Record<string, SaleTruth> {
 export function useUnits(options: UseUnitsOptions = {}) {
   const includeSaleTruth = options.includeSaleTruth ?? true;
   const includeReservationTruth = options.includeReservationTruth ?? false;
+  const enabled = options.enabled ?? true;
   const [units, setUnits] = useState<Unit[]>([]);
   const [saleTruthByUnitId, setSaleTruthByUnitId] = useState<Record<string, SaleTruth>>({});
   const [reservationTruthByUnitId, setReservationTruthByUnitId] = useState<
     Record<string, ReservationTruth>
   >({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const latestFetchRequestIdRef = useRef(0);
   const isMountedRef = useRef(true);
@@ -247,11 +242,10 @@ export function useUnits(options: UseUnitsOptions = {}) {
    * stale-overlay window that exists if the two fetches are awaited serially
    * with a `setState` in between.
    *
-   * Reservations past their expiry date are auto-expired only when the `units`
-   * row appears to be a mirror-only reservation. If an active
-   * `unit_reservations` row still exists for that unit, this hook refuses to
-   * clear the mirror so frontend reads never drift away from reservation
-   * authority.
+   * Reservations past their expiry date are expired through reservation
+   * authority first: active `unit_reservations` rows are closed server-side and
+   * the corresponding `units` mirror/history are updated atomically. Any
+   * remaining mirror-only expired rows are then cleaned up as legacy fallback.
    *
    * When the reservations read fails, mirror expiry is skipped entirely instead
    * of guessing. That preserves safety over eagerness.
@@ -261,9 +255,9 @@ export function useUnits(options: UseUnitsOptions = {}) {
    *     previously committed state;
    *   - a sales read failure degrades silently to an empty overlay;
    *   - a reservations read failure degrades silently to an empty overlay and
-   *     suppresses mirror expiry because reservation authority could not be
-   *     verified;
-   *   - the bulk-expire write and any fallback units refetch both tolerate
+   *     suppresses reservation expiry because authority could not be verified;
+   *   - the authoritative expiry write, legacy mirror cleanup write, and any
+   *     fallback refetches all tolerate
    *     failure silently (the refetch falls back to an empty list, matching
    *     the previous `fresh ?? []` behavior).
    */
@@ -277,7 +271,7 @@ export function useUnits(options: UseUnitsOptions = {}) {
           data: [] as UnitSaleRow[],
           error: null,
         });
-    const reservationsQuery = salesApi.listActiveReservationLinks();
+    const reservationsQuery = reservationsApi.listActiveReservationLinks();
 
     const [unitsResult, salesResult, reservationsResult] = await Promise.all([
       unitsApi.listUnits(),
@@ -296,28 +290,33 @@ export function useUnits(options: UseUnitsOptions = {}) {
     }
 
     let mappedUnits = unitsResult.data.map(mapDbUnit);
-    const today = new Date().toISOString().slice(0, 10);
-    const authoritativeReservationUnitIds =
+    const cutoffDate = new Date();
+    cutoffDate.setHours(0, 0, 0, 0);
+    const cutoffIso = cutoffDate.toISOString();
+    const today = cutoffIso.slice(0, 10);
+    let activeReservationLinks =
+      reservationsResult.error === null ? (reservationsResult.data ?? []) : [];
+    let authoritativeReservationUnitIds =
       reservationsResult.error === null
-        ? new Set((reservationsResult.data ?? []).map((row) => row.unit_id))
+        ? new Set(activeReservationLinks.map((row) => row.unit_id))
         : null;
 
-    const expired = mappedUnits.filter(
-      (u) =>
-        u.status === "E rezervuar" &&
-        u.reservation_expires_at &&
-        u.reservation_expires_at <= today &&
-        authoritativeReservationUnitIds !== null &&
-        !authoritativeReservationUnitIds.has(u.id)
-    );
+    const expiredAuthoritative =
+      authoritativeReservationUnitIds === null
+        ? []
+        : mappedUnits.filter(
+            (u) =>
+              u.status === "E rezervuar" &&
+              u.reservation_expires_at &&
+              u.reservation_expires_at <= today &&
+              authoritativeReservationUnitIds!.has(u.id),
+          );
 
-    if (expired.length > 0) {
-      // Bulk expire — one UPDATE instead of a serial loop. When the
-      // server returns the updated rows, patch them into the already-read
-      // list and avoid a second full-table read. If the write fails or
-      // returns an unexpected row set, fall back to a full refetch so
-      // whatever the DB committed is what we commit to state.
-      const expireResult = await unitsApi.expireReservations(expired.map((u) => u.id));
+    if (expiredAuthoritative.length > 0) {
+      const expireResult = await reservationsApi.expireUnitReservations({
+        unitRecordIds: expiredAuthoritative.map((u) => u.id),
+        cutoff: cutoffIso,
+      });
 
       if (!isMountedRef.current || requestId !== latestFetchRequestIdRef.current) {
         return;
@@ -328,7 +327,69 @@ export function useUnits(options: UseUnitsOptions = {}) {
           ? new Map(expireResult.data.map((row) => [row.id, mapDbUnit(row)]))
           : null;
 
-      if (expiredById && expiredById.size === expired.length) {
+      if (expiredById && expiredById.size === expiredAuthoritative.length) {
+        const expiredUnitIds = new Set(expiredAuthoritative.map((unit) => unit.id));
+        mappedUnits = mappedUnits.map((unit) => expiredById.get(unit.id) ?? unit);
+        activeReservationLinks = activeReservationLinks.filter(
+          (row) => !expiredUnitIds.has(row.unit_id),
+        );
+      } else {
+        const [freshUnits, freshReservations] = await Promise.all([
+          unitsApi.listUnits(),
+          reservationsApi.listActiveReservationLinks(),
+        ]);
+
+        if (!isMountedRef.current || requestId !== latestFetchRequestIdRef.current) {
+          return;
+        }
+
+        mappedUnits = (freshUnits.data ?? []).map(mapDbUnit);
+        if (freshReservations.error === null) {
+          activeReservationLinks = freshReservations.data ?? [];
+          authoritativeReservationUnitIds = new Set(
+            activeReservationLinks.map((row) => row.unit_id),
+          );
+        } else {
+          activeReservationLinks = [];
+          authoritativeReservationUnitIds = null;
+        }
+      }
+
+      if (authoritativeReservationUnitIds !== null) {
+        authoritativeReservationUnitIds = new Set(
+          activeReservationLinks.map((row) => row.unit_id),
+        );
+      }
+    }
+
+    const expiredMirrorOnly =
+      authoritativeReservationUnitIds === null
+        ? []
+        : mappedUnits.filter(
+            (u) =>
+              u.status === "E rezervuar" &&
+              u.reservation_expires_at &&
+              u.reservation_expires_at <= today &&
+              !authoritativeReservationUnitIds!.has(u.id),
+          );
+
+    if (expiredMirrorOnly.length > 0) {
+      // Legacy cleanup only — these rows no longer have authoritative
+      // reservation backing, so clearing the mirror directly is safe.
+      const expireResult = await unitsApi.expireReservations(
+        expiredMirrorOnly.map((u) => u.id),
+      );
+
+      if (!isMountedRef.current || requestId !== latestFetchRequestIdRef.current) {
+        return;
+      }
+
+      const expiredById =
+        expireResult.error === null
+          ? new Map(expireResult.data.map((row) => [row.id, mapDbUnit(row)]))
+          : null;
+
+      if (expiredById && expiredById.size === expiredMirrorOnly.length) {
         mappedUnits = mappedUnits.map((unit) => expiredById.get(unit.id) ?? unit);
       } else {
         const fresh = await unitsApi.listUnits();
@@ -343,7 +404,7 @@ export function useUnits(options: UseUnitsOptions = {}) {
 
     const nextSaleTruth = indexSaleTruth(salesResult.data ?? []);
     const nextReservationTruth = includeReservationTruth
-      ? indexReservationTruth(reservationsResult.data ?? [])
+      ? indexReservationTruth(activeReservationLinks)
       : {};
 
     if (!isMountedRef.current || requestId !== latestFetchRequestIdRef.current) {
@@ -360,10 +421,22 @@ export function useUnits(options: UseUnitsOptions = {}) {
   }, [includeReservationTruth, includeSaleTruth]);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     fetchUnits();
-  }, [fetchUnits]);
+  }, [enabled, fetchUnits]);
 
   const createUnit = async (input: CreateUnitInput) => {
+    if (input.status === "E rezervuar") {
+      return {
+        error:
+          "Rezervimet administrohen nga rrjedha kanonike e rezervimeve. Njësitë e reja duhet të nisin si 'Në dispozicion' ose të shiten nga rrjedha kanonike e shitjes.",
+      };
+    }
+
     const payload: CreateUnitPayload = {
       ...input,
       updated_at: new Date().toISOString(),
@@ -387,6 +460,33 @@ export function useUnits(options: UseUnitsOptions = {}) {
   ) => {
     const existing = units.find((u) => u.id === id);
     if (!existing) return { error: "Unit not found" };
+
+    const nextStatus = (changes.status ?? existing.status) as UnitStatus;
+    const currentReservationMirror =
+      existing.status === "E rezervuar"
+        ? normalizeReservationMirror(existing.reservation_expires_at)
+        : null;
+    const nextReservationMirror =
+      nextStatus === "E rezervuar"
+        ? normalizeReservationMirror(changes.reservation_expires_at ?? existing.reservation_expires_at)
+        : null;
+    const hasAuthoritativeReservation = Boolean(existing.active_reservation_id);
+    const reservationStateChanged =
+      nextStatus !== existing.status || nextReservationMirror !== currentReservationMirror;
+
+    if (nextStatus === "E rezervuar" && !hasAuthoritativeReservation) {
+      return {
+        error:
+          "Rezervimet administrohen nga rrjedha kanonike e rezervimeve. Kjo rrugë nuk mund të ruajë statusin 'E rezervuar' pa një rezervim autoritativ aktiv.",
+      };
+    }
+
+    if (hasAuthoritativeReservation && reservationStateChanged) {
+      return {
+        error:
+          "Njësia ka rezervim autoritativ aktiv. Statusi dhe data e skadimit nuk mund të ndryshohen nga kjo rrugë.",
+      };
+    }
 
     const payload: UpdateUnitPayload = {
       ...changes,
@@ -550,4 +650,8 @@ export function useUnits(options: UseUnitsOptions = {}) {
     renameOwnerEntityAcrossUnits,
     fetchUnitHistory,
   };
+}
+
+function normalizeReservationMirror(value: string | null | undefined): string | null {
+  return value ? value.slice(0, 10) : null;
 }

@@ -16,9 +16,9 @@ import {
   getDefaultOwnerName,
   getOwnerNameOptions,
   LEVELS,
+  MANUAL_UNIT_STATUSES,
   OWNER_CATEGORIES,
   type SaleInstallmentDraft,
-  STATUSES,
   TYPES,
   todayIso,
 } from "./shared";
@@ -28,6 +28,16 @@ import {
   type SaleSuccessSnapshot,
 } from "./EditModalSaleSuccess";
 import { EditModalSaleSection } from "./EditModalSaleSection";
+
+const RESERVATION_CREATE_BLOCK_MESSAGE =
+  "Rezervimet administrohen nga rrjedha kanonike e rezervimeve. Kjo dritare nuk mund të ruajë statusin 'E rezervuar' pa një rezervim autoritativ aktiv.";
+
+const RESERVATION_ACTIVE_LOCK_MESSAGE =
+  "Njësia ka rezervim autoritativ aktiv. Statusi dhe data e skadimit nuk mund të ndryshohen nga kjo dritare.";
+
+function normalizeReservationMirror(value: string | null | undefined): string | null {
+  return value ? value.slice(0, 10) : null;
+}
 
 /**
  * Modal for editing a persisted unit. Acts as the state owner for both
@@ -91,6 +101,7 @@ export function EditModal({
   const set = (field: keyof CreateUnitInput, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   const isSaleTransition = unit.status !== "E shitur" && form.status === "E shitur";
+  const reservationManagedUnit = unit.status === "E rezervuar" || Boolean(unit.active_reservation_id);
   const ownerCategory = form.owner_category ?? "Investitor";
   const ownerNameOptions = getOwnerNameOptions(
     ownerCategory,
@@ -134,6 +145,30 @@ export function EditModal({
       setError("Ju lutem shkruani arsyen e ndryshimit.");
       return;
     }
+
+    const nextStatus = (form.status ?? unit.status) as UnitStatus;
+    const currentReservationMirror =
+      unit.status === "E rezervuar" ? normalizeReservationMirror(unit.reservation_expires_at) : null;
+    const nextReservationMirror =
+      nextStatus === "E rezervuar"
+        ? normalizeReservationMirror(form.reservation_expires_at ?? null)
+        : null;
+    const hasAuthoritativeReservation = Boolean(unit.active_reservation_id);
+    const reservationStateChanged =
+      nextStatus !== unit.status || nextReservationMirror !== currentReservationMirror;
+
+    if (!isSaleTransition) {
+      if (nextStatus === "E rezervuar" && !hasAuthoritativeReservation) {
+        setError(RESERVATION_CREATE_BLOCK_MESSAGE);
+        return;
+      }
+
+      if (hasAuthoritativeReservation && reservationStateChanged) {
+        setError(RESERVATION_ACTIVE_LOCK_MESSAGE);
+        return;
+      }
+    }
+
     const normalizedNotes = typeof form.notes === "string" ? form.notes : null;
     const baseChanges: Partial<CreateUnitInput> = {
       ...form,
@@ -358,15 +393,29 @@ export function EditModal({
                 label="Statusi"
                 value={form.status ?? ""}
                 onChange={(v) => set("status", v as UnitStatus)}
-                options={STATUSES}
+                options={
+                  reservationManagedUnit
+                    ? [form.status ?? unit.status].filter(
+                        (value, index, all): value is UnitStatus =>
+                          Boolean(value) && all.indexOf(value) === index,
+                      )
+                    : MANUAL_UNIT_STATUSES
+                }
                 placeholder="Zgjidh"
+                disabled={reservationManagedUnit}
               />
               {form.status === "E rezervuar" && (
                 <DateField
                   label="Skadon më"
                   value={form.reservation_expires_at}
                   onChange={(v) => set("reservation_expires_at", v)}
+                  disabled={reservationManagedUnit}
                 />
+              )}
+              {reservationManagedUnit && (
+                <p className="col-span-3 -mt-1 text-[11.5px] text-black/40">
+                  Rezervimi administrohet nga rrjedha kanonike e rezervimeve. Kjo dritare nuk e ndryshon statusin ose afatin e rezervimit.
+                </p>
               )}
               <label className="col-span-3 flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">

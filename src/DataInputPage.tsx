@@ -167,9 +167,9 @@ export default function DataInputPage({
       const cat = roomCategory(rawInput.type as string | undefined);
       const input: CreateUnitInput = {
         ...(rawInput as CreateUnitInput),
-        bedrooms: cat === "apartment" ? (rawInput.bedrooms ?? 0) : 0,
-        bathrooms: cat === "apartment" ? (rawInput.bathrooms ?? 0) : 0,
-        toilets: cat === "lokal" ? (rawInput.toilets ?? 0) : 0,
+        bedrooms: cat === "apartment" ? (rawInput.bedrooms ?? null) : null,
+        bathrooms: cat === "apartment" ? (rawInput.bathrooms ?? null) : null,
+        toilets: cat === "lokal" ? (rawInput.toilets ?? null) : null,
       };
       const result = await createUnit(input);
       if (result.error) {

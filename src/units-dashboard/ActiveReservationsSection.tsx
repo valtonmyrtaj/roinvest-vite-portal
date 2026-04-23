@@ -1,15 +1,28 @@
 import { useMemo } from "react";
+import { SectionEyebrow } from "../components/ui/Eyebrow";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { PillBadge } from "../components/ui/PillBadge";
 import {
   TABULAR_HEADER_LABEL_CLASS,
   TABULAR_HEADER_ROW_CLASS,
 } from "../components/ui/tabularHeader";
+import { SkeletonRows } from "../components/SkeletonRows";
 import type { Unit } from "../hooks/useUnits";
 import { Card } from "./primitives";
 import { fmtDateShort } from "./shared";
 
-export function ActiveReservationsSection({ units }: { units: Unit[] }) {
+export function ActiveReservationsSection({
+  units,
+  loading = false,
+  onExtendReservation,
+  onReleaseReservation,
+}: {
+  units: Unit[];
+  loading?: boolean;
+  onExtendReservation?: (unit: Unit) => void;
+  onReleaseReservation?: (unit: Unit) => void;
+}) {
+  const showActions = Boolean(onExtendReservation || onReleaseReservation);
   const activeReservations = useMemo(
     () =>
       units
@@ -22,29 +35,84 @@ export function ActiveReservationsSection({ units }: { units: Unit[] }) {
     [units],
   );
 
+  const expiringSoonCount = useMemo(
+    () =>
+      activeReservations.filter((u) => {
+        const expiry = new Date(u.reservation_expires_at!);
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+        expiry.setHours(0, 0, 0, 0);
+        const daysLeft = Math.round(
+          (expiry.getTime() - todayMidnight.getTime()) / 86400000,
+        );
+        return daysLeft >= 0 && daysLeft <= 7;
+      }).length,
+    [activeReservations],
+  );
+
+  const subtitle = loading
+    ? "Duke ngarkuar rezervimet aktive"
+    : activeReservations.length === 0
+      ? "Nuk ka rezervime që kërkojnë ndjekje për momentin"
+      : expiringSoonCount > 0
+        ? `${expiringSoonCount} skadojnë brenda 7 ditëve të ardhshme`
+        : "Rezervimet e renditura sipas datës së skadimit";
+
   return (
-    <div className="mt-5">
+    <div className="mt-6">
+      <SectionEyebrow
+        className="mb-4"
+        label="Rezervimet aktive"
+        detail={
+          loading
+            ? "duke ngarkuar ndjekjen"
+            : activeReservations.length === 0
+              ? "pa afate që kërkojnë vëmendje"
+              : `${activeReservations.length} njësi me afat rezervimi`
+        }
+      />
+
       <Card className="overflow-hidden p-0">
         <CardSectionHeader
-          title="Rezervimet aktive"
-          subtitle="Rezervimet e renditura sipas datës së skadimit"
+          title="Afatet e rezervimeve"
+          subtitle={subtitle}
+          right={
+            <span className="rounded-full border border-[#e7ebf2] bg-[#fbfcfe] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/32">
+              {loading ? "Duke ngarkuar" : `${activeReservations.length} aktive`}
+            </span>
+          }
         />
 
         <div className="overflow-x-auto">
-          {activeReservations.length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <p className="text-[12.5px] font-medium text-black/38">
-                Nuk ka rezervime aktive për momentin
-              </p>
-              <p className="mt-1 text-[11.5px] text-black/26">
-                Njësitë e rezervuara do të shfaqen këtu sipas datës së skadimit.
-              </p>
+          {loading ? (
+            <div className="px-5 py-6">
+              <SkeletonRows rows={4} />
+            </div>
+          ) : activeReservations.length === 0 ? (
+            <div className="px-5 py-6">
+              <div className="flex min-h-[148px] items-center justify-center rounded-[14px] border border-dashed border-[#e5eaf1] bg-[#fcfcfd] px-4 text-center">
+                <div>
+                  <p className="text-[12.5px] font-medium text-black/42">
+                    Nuk ka rezervime aktive për momentin.
+                  </p>
+                  <p className="mt-1 text-[11.5px] text-black/28">
+                    Sapo një njësi të rezervohet, afati i saj do të shfaqet këtu për ndjekje.
+                  </p>
+                </div>
+              </div>
             </div>
           ) : (
             <table className="w-full min-w-[640px] text-left">
               <thead>
                 <tr className={TABULAR_HEADER_ROW_CLASS}>
-                  {["Njësia", "Pronari", "Skadon më", "Ditë mbetur", "Statusi"].map((col) => (
+                  {[
+                    "Njësia",
+                    "Pronari",
+                    "Skadon më",
+                    "Ditë mbetur",
+                    "Statusi",
+                    ...(showActions ? ["Veprime"] : []),
+                  ].map((col) => (
                     <th
                       key={col}
                       className={`px-5 py-2.5 ${TABULAR_HEADER_LABEL_CLASS}`}
@@ -112,6 +180,30 @@ export function ActiveReservationsSection({ units }: { units: Unit[] }) {
                           {chipText}
                         </PillBadge>
                       </td>
+                      {showActions && (
+                        <td className="px-5 py-3">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {onExtendReservation && u.active_reservation_id && (
+                              <button
+                                type="button"
+                                onClick={() => onExtendReservation(u)}
+                                className="rounded-full border border-[#dce4f3] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#f6f8fd]"
+                              >
+                                Zgjat
+                              </button>
+                            )}
+                            {onReleaseReservation && u.active_reservation_id && (
+                              <button
+                                type="button"
+                                onClick={() => onReleaseReservation(u)}
+                                className="rounded-full border border-[#ecd6d6] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#8e4a4a] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#fff8f8]"
+                              >
+                                Liro
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
