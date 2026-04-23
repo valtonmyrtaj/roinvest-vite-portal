@@ -1,8 +1,13 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { animate, useInView } from "framer-motion";
+import { animate, motion, useInView } from "framer-motion";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { CustomSelect } from "../components/CustomSelect";
 import { SurfaceCard } from "../components/ui/SurfaceCard";
+import { SOFT_EASE, SURFACE_BG, SURFACE_BORDER } from "../ui/tokens";
+
+const UNITS_KPI_BASE_SHADOW = "0 1px 2px rgba(0,0,0,0.04), 0 10px 26px rgba(0,0,0,0.035)";
+const UNITS_KPI_HOVER_SHADOW =
+  "0 1px 2px rgba(15,23,42,0.045), 0 20px 40px rgba(15,23,42,0.085)";
 
 function useHasEnteredView<T extends HTMLElement>(amount = 0.35) {
   const ref = useRef<T | null>(null);
@@ -24,16 +29,47 @@ export function Card({
   );
 }
 
+export function KpiCardSurface({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      className={`transform-gpu rounded-[18px] border bg-white p-5 will-change-transform ${className}`.trim()}
+      style={{
+        background: SURFACE_BG,
+        borderColor: SURFACE_BORDER,
+        boxShadow: UNITS_KPI_BASE_SHADOW,
+      }}
+      whileHover={{
+        y: -1.5,
+        boxShadow: UNITS_KPI_HOVER_SHADOW,
+        borderColor: "#dde1e7",
+      }}
+      transition={{ duration: 0.15, ease: SOFT_EASE }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export function FilterSelect({
   options,
   value,
   onChange,
   placeholder,
+  size = "lg",
+  className = "min-w-[172px]",
 }: {
   options: readonly string[];
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }) {
   return (
     <CustomSelect
@@ -41,9 +77,24 @@ export function FilterSelect({
       onChange={onChange}
       options={[...options]}
       placeholder={placeholder}
-      size="lg"
-      className="min-w-[172px]"
+      size={size}
+      className={className}
     />
+  );
+}
+
+export function MetricCardSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <Card className={className}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="h-10 w-10 animate-pulse rounded-[12px] bg-[#eef1f5]" />
+        <div className="h-5 w-12 animate-pulse rounded-full bg-[#f2f4f7]" />
+      </div>
+      <div className="mt-4 space-y-2.5">
+        <div className="h-8 w-20 animate-pulse rounded-full bg-[#eef1f5]" />
+        <div className="h-3 w-28 animate-pulse rounded-full bg-[#f2f4f7]" />
+      </div>
+    </Card>
   );
 }
 

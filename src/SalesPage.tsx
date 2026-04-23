@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { usePortfolioMetrics } from "./hooks/usePortfolioMetrics";
 import { usePayments, type Payment } from "./hooks/usePayments";
 import {
   useSaleMonthlySeries,
   useSaleReporting,
   useSaleTypologyBreakdown,
 } from "./hooks/useSaleReporting";
-import { useUnits, type Unit } from "./hooks/useUnits";
+import { useSalesUpcomingPayments } from "./hooks/useSalesUpcomingPayments";
+import { mapSalesUnitRowToUnit, useSalesUnits } from "./hooks/useSalesUnits";
+import { useUnitsShell } from "./hooks/useUnitsShell";
+import type { Unit } from "./hooks/useUnits";
+import { sales as salesApi } from "./lib/api";
 import { PaymentDrawer } from "./sales-page/PaymentDrawer";
 import { SalesHeader } from "./sales-page/SalesHeader";
 import { SalesRevenueChart } from "./sales-page/SalesRevenueChart";
@@ -37,12 +40,9 @@ export default function SalesPage({
   onNavigate?: (page: string) => void;
   navigationSearch?: string;
 }) {
-  const { units, loading } = useUnits();
   const {
     payments,
-    allPayments,
     fetchPayments,
-    fetchAllPayments,
     createPayment,
     updatePayment,
     deletePayment,
@@ -61,41 +61,23 @@ export default function SalesPage({
   const [highlightedUnitId, setHighlightedUnitId] = useState<string | null>(null);
   const [paymentsSectionPulse, setPaymentsSectionPulse] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
-  const [upcomingPaymentsLoading, setUpcomingPaymentsLoading] = useState(true);
-  const [upcomingPaymentsError, setUpcomingPaymentsError] = useState<string | null>(null);
   const upcomingPaymentsSectionRef = useRef<HTMLDivElement | null>(null);
 
-  const refreshUpcomingPayments = async () => {
-    setUpcomingPaymentsLoading(true);
-    setUpcomingPaymentsError(null);
+  const {
+    stockCounts,
+    activeReservations,
+    loading: shellLoading,
+    error: shellError,
+  } = useUnitsShell({
+    stockCategory: ownerScope,
+  });
 
-    const result = await fetchAllPayments();
-    setUpcomingPaymentsError(result.error ?? null);
-    setUpcomingPaymentsLoading(false);
-
-    return result;
-  };
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    const loadUpcomingPayments = async () => {
-      const result = await fetchAllPayments();
-
-      if (isCancelled) {
-        return;
-      }
-
-      setUpcomingPaymentsError(result.error ?? null);
-      setUpcomingPaymentsLoading(false);
-    };
-
-    void loadUpcomingPayments();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [fetchAllPayments]);
+  const {
+    rows: upcomingPayments,
+    loading: upcomingPaymentsLoading,
+    error: upcomingPaymentsError,
+    refresh: refreshUpcomingPayments,
+  } = useSalesUpcomingPayments(ownerScope);
 
   useEffect(() => {
     const tickId = window.setInterval(() => {
@@ -136,14 +118,19 @@ export default function SalesPage({
     month: selectedMonth === "all" ? null : selectedMonth + 1,
   });
 
-  const metrics = usePortfolioMetrics({
-    units,
-    payments: allPayments,
-    ownerScope,
-    year: selectedYear,
-    month: selectedMonth,
-    seriesYear: selectedYear,
-  });
+  const typologyUnitIds = useMemo(
+    () =>
+      Array.from(
+        new Set(typologyBreakdown.flatMap((row) => row.unitRecordIds).filter(Boolean)),
+      ),
+    [typologyBreakdown],
+  );
+
+  const {
+    units: typologyUnits,
+    loading: typologyUnitsLoading,
+    error: typologyUnitsError,
+  } = useSalesUnits(typologyUnitIds);
 
   const chartData = useMemo<ChartPoint[]>(
     () =>
@@ -161,7 +148,7 @@ export default function SalesPage({
     selectedMonth === "all" ? `${selectedYear}` : `${SQ_MONTHS[selectedMonth]} ${selectedYear}`;
   const financialSummaryReady =
     !financialMetricsLoading && financialMetrics !== null && !financialMetricsError;
-  const stockSnapshotReady = !loading;
+  const stockSnapshotReady = !shellLoading && !shellError;
   const financialMetricsValue = financialMetrics ?? {
     ownerScope,
     periodYear: selectedYear,
@@ -194,8 +181,8 @@ export default function SalesPage({
   }, [chartData]);
 
   const scopedUnitsById = useMemo(
-    () => new Map(metrics.scopedUnits.map((unit) => [unit.id, unit])),
-    [metrics.scopedUnits],
+    () => new Map(typologyUnits.map((unit) => [unit.id, unit])),
+    [typologyUnits],
   );
 
   const typologyRows = useMemo<SalesTypologyRow[]>(() => {
@@ -235,15 +222,15 @@ export default function SalesPage({
   );
 
   const reservationSummary = useMemo(() => {
-    if (loading) return null;
+    if (shellLoading || shellError) return null;
 
-    const activeReservations = metrics.scopedUnits.filter(
-      (unit) => unit.status === "E rezervuar" && unit.reservation_expires_at,
+    const scopedActiveReservations = activeReservations.filter(
+      (unit) => unit.owner_category === ownerScope && unit.reservation_expires_at,
     );
 
-    if (activeReservations.length === 0) return null;
+    if (scopedActiveReservations.length === 0) return null;
 
-    const expiringThisWeek = activeReservations.filter((unit) => {
+    const expiringThisWeek = scopedActiveReservations.filter((unit) => {
       const days = Math.ceil(
         (new Date(unit.reservation_expires_at!).getTime() - nowTs) / 86400000,
       );
@@ -251,28 +238,18 @@ export default function SalesPage({
     });
 
     return {
-      activeCount: activeReservations.length,
+      activeCount: scopedActiveReservations.length,
       expiringThisWeekCount: expiringThisWeek.length,
     };
-  }, [loading, metrics.scopedUnits, nowTs]);
+  }, [activeReservations, nowTs, ownerScope, shellError, shellLoading]);
 
-  const upcomingPayments = useMemo<UpcomingPaymentRow[]>(() => {
-    const unitsById = new Map(metrics.scopedUnits.map((unit) => [unit.id, unit]));
-
-    return allPayments
-      .filter((payment) => payment.status !== "E paguar" && unitsById.has(payment.unit_id))
-      .map((payment) => ({
-        payment,
-        unit: unitsById.get(payment.unit_id),
-      }))
-      .filter((row): row is UpcomingPaymentRow => !!row.unit)
-      .sort((a, b) => a.payment.due_date.localeCompare(b.payment.due_date));
-  }, [allPayments, metrics.scopedUnits]);
-
-  const handleOpenPaymentPlan = async (unit: Unit) => {
-    setActivePaymentUnit(unit);
-    await fetchPayments(unit.id);
-  };
+  const handleOpenPaymentPlan = useCallback(
+    async (unit: Unit) => {
+      setActivePaymentUnit(unit);
+      await fetchPayments(unit.id);
+    },
+    [fetchPayments],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -286,40 +263,67 @@ export default function SalesPage({
       return undefined;
     }
 
-    const targetUnit = units.find((unit) => unit.id === focusUnitId);
     const url = new URL(window.location.href);
     url.searchParams.delete("focusUnitId");
     window.history.replaceState(window.history.state, "", url.toString());
 
-    if (!targetUnit) {
-      return undefined;
-    }
-
+    let cancelled = false;
     let timeout = 0;
-    const frame = window.requestAnimationFrame(() => {
-      void handleOpenPaymentPlan(targetUnit);
-      setHighlightedUnitId(targetUnit.id);
-      setPaymentsSectionPulse(true);
-      upcomingPaymentsSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
+    let frame = 0;
+
+    const openFocusedUnit = async () => {
+      const cachedUnit =
+        upcomingPayments.find(({ unit }) => unit.id === focusUnitId)?.unit ??
+        scopedUnitsById.get(focusUnitId) ??
+        null;
+
+      let targetUnit = cachedUnit;
+
+      if (!targetUnit) {
+        const result = await salesApi.getSaleUnitById(focusUnitId);
+
+        if (cancelled || result.error || !result.data) {
+          return;
+        }
+
+        targetUnit = mapSalesUnitRowToUnit(result.data);
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      frame = window.requestAnimationFrame(() => {
+        void handleOpenPaymentPlan(targetUnit);
+        setHighlightedUnitId(targetUnit.id);
+        setPaymentsSectionPulse(true);
+        upcomingPaymentsSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        timeout = window.setTimeout(() => {
+          setHighlightedUnitId(null);
+          setPaymentsSectionPulse(false);
+        }, 2200);
       });
-      timeout = window.setTimeout(() => {
-        setHighlightedUnitId(null);
-        setPaymentsSectionPulse(false);
-      }, 2200);
-    });
+    };
+
+    void openFocusedUnit();
 
     return () => {
+      cancelled = true;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timeout);
     };
-  }, [navigationSearch, units]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigationSearch, upcomingPayments, scopedUnitsById, handleOpenPaymentPlan]);
 
-  const refreshPayments = async (unitId: string) => {
-    await fetchPayments(unitId);
-    await refreshUpcomingPayments();
-  };
+  const refreshPayments = useCallback(
+    async (unitId: string) => {
+      await fetchPayments(unitId);
+      await refreshUpcomingPayments();
+    },
+    [fetchPayments, refreshUpcomingPayments],
+  );
 
   const handleCreatePayment = async (data: {
     unit_id: string;
@@ -355,7 +359,7 @@ export default function SalesPage({
     if (target) {
       await refreshPayments(target.unit_id);
     } else {
-      await fetchAllPayments();
+      await refreshUpcomingPayments();
     }
   };
 
@@ -391,8 +395,8 @@ export default function SalesPage({
           soldUnits={financialMetricsValue.soldUnits}
           periodContextLabel={periodContextLabel}
           periodChipLabel={periodChipLabel}
-          totalUnits={metrics.totalUnits}
-          availableUnits={metrics.availableUnits}
+          totalUnits={stockCounts.total}
+          availableUnits={stockCounts.available}
           stockSnapshotReady={stockSnapshotReady}
           kpis={kpis}
           reservationSummary={reservationSummary}
@@ -409,8 +413,8 @@ export default function SalesPage({
         />
 
         <SalesTypologyBreakdown
-          loading={typologyBreakdownLoading}
-          error={typologyBreakdownError}
+          loading={typologyBreakdownLoading || typologyUnitsLoading}
+          error={typologyBreakdownError ?? typologyUnitsError}
           rows={typologyRows}
           onOpenPaymentPlan={(unit) => {
             void handleOpenPaymentPlan(unit);
@@ -421,7 +425,7 @@ export default function SalesPage({
           <SalesUpcomingPayments
             loading={upcomingPaymentsLoading}
             error={upcomingPaymentsError}
-            upcomingPayments={upcomingPayments}
+            upcomingPayments={upcomingPayments as UpcomingPaymentRow[]}
             onOpenPaymentPlan={handleOpenPaymentPlan}
             highlightedUnitId={highlightedUnitId}
             paymentsSectionPulse={paymentsSectionPulse}

@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import * as crmApi from "../lib/api/crm";
+import * as reservationsApi from "../lib/api/reservations";
 import * as unitsApi from "../lib/api/units";
 import * as salesApi from "../lib/api/sales";
+import type { ActiveReservationDetail } from "../lib/api/reservations";
+import { toReservationExpiryTimestamp } from "../lib/reservationExpiry";
 import {
   type SaleInstallmentInput,
   type SalePaymentType,
@@ -26,6 +29,16 @@ export type LeadSource =
 
 export type ShowingStatus = "E planifikuar" | "E kryer" | "E anuluar";
 export type ShowingOutcome = "Pa rezultat" | "Rezervoi" | "Bleu";
+
+export interface CRMActiveReservation {
+  reservation_id: string;
+  contact_id: string | null;
+  reserved_at: string;
+  expires_at: string | null;
+  notes: string | null;
+  status: string;
+  updated_at: string;
+}
 
 export interface CRMLead {
   id: string;
@@ -52,6 +65,8 @@ export interface CRMShowing {
   scheduled_at: string; // derived: date + time, for display/sorting
   status: ShowingStatus;
   outcome?: ShowingOutcome | null;
+  active_reservation?: CRMActiveReservation | null;
+  latest_reservation?: CRMActiveReservation | null;
   notes: string | null;
   created_at: string;
 }
@@ -84,6 +99,7 @@ export interface ManualShowingContactInput {
 export interface CreateShowingInput {
   manual_contact?: ManualShowingContactInput | null;
   outcome?: ShowingOutcome;
+  reservation_expires_at?: string | null;
 }
 
 export interface CompleteShowingSaleInput {
@@ -108,6 +124,16 @@ function buildManualLeadName(input: ManualShowingContactInput): string {
 
 const MANUAL_CONTACT_ROLLBACK_ERROR =
   "Shfaqja nuk u ruajt dot. Kontakti i ri u krijua, por nuk u fshi automatikisht. Verifikojeni manualisht.";
+const RESERVATION_EXPIRES_AT_REQUIRED_ERROR =
+  "Zgjidhni datën e skadimit të rezervimit.";
+const ACTIVE_RESERVATION_CONFLICT_ERROR =
+  "Njësia ka tashmë një rezervim aktiv. Përdorni rezervimin ekzistues ose zgjidhni njësi tjetër.";
+const SHOWING_ACTIVE_RESERVATION_LOCK_ERROR =
+  "Kjo shfaqje ka rezervim aktiv të lidhur. Ndryshimet që prekin rezervimin duhet të bëhen nga rrjedha kanonike e rezervimeve.";
+const RESERVATION_CREATE_ROLLBACK_ERROR =
+  "Rezervimi nuk u krijua dot. Shfaqja u ruajt, por nuk u fshi automatikisht. Verifikojeni manualisht.";
+const RESERVATION_UPDATE_ROLLBACK_ERROR =
+  "Rezervimi nuk u krijua dot. Shfaqja u përditësua, por nuk u rikthye automatikisht. Verifikojeni manualisht.";
 
 // Hook-scoped wrapper around unitsApi.findUnitRecordIdByCode that collapses
 // both "DB failure" and "no row" into the same Albanian user-facing string
@@ -164,11 +190,21 @@ export async function completeShowingSale(
     return apiFail("Njësia e zgjedhur nuk u gjet në regjistër.");
   }
 
-  const { data: activeReservationId, error: reservationError } =
-    await salesApi.findActiveReservationIdByShowing(input.showing_id);
+  const { data: activeReservationLink, error: reservationError } =
+    await reservationsApi.findActiveReservationLinkByUnit(unitResolution.data);
 
   if (reservationError) {
     return apiFail(reservationError);
+  }
+
+  if (
+    activeReservationLink &&
+    activeReservationLink.showing_id &&
+    activeReservationLink.showing_id !== input.showing_id
+  ) {
+    return apiFail(
+      "Njësia ka rezervim aktiv të lidhur me një tjetër shfaqje. Shitja duhet të kompletohet nga rrjedha e atij rezervimi.",
+    );
   }
 
   return salesApi.completeUnitSale({
@@ -181,13 +217,15 @@ export async function completeShowingSale(
     crm_lead_id: input.lead_id ?? null,
     installments: input.installments ?? [],
     showing_id: input.showing_id,
-    reservation_id: activeReservationId ?? null,
+    reservation_id: activeReservationLink?.reservation_id ?? null,
     // CRM sale completion should only convert the reservation tied to this showing.
     autoResolveReservation: false,
   });
 }
 
 function mapShowingRow(row: Record<string, unknown>): CRMShowing {
+  const activeReservation =
+    (row.active_reservation as CRMActiveReservation | null | undefined) ?? null;
   const date = (row.date as string) ?? "";
   const time = (row.time as string | null) ?? null;
   return {
@@ -195,14 +233,54 @@ function mapShowingRow(row: Record<string, unknown>): CRMShowing {
     contact_id: row.contact_id as string,
     lead_name: (row.crm_leads as { name: string } | null)?.name ?? "—",
     unit_id: row.unit_id as string,
+    unit_record_id: (row.unit_record_id as string | null) ?? null,
     date,
     time,
     scheduled_at: buildScheduledAt(date, time),
     status: row.status as ShowingStatus,
     outcome: (row.outcome as ShowingOutcome | null) ?? null,
+    active_reservation: activeReservation,
+    latest_reservation:
+      (row.latest_reservation as CRMActiveReservation | null | undefined) ?? activeReservation,
     notes: row.notes as string | null,
     created_at: (row.created_at as string) ?? "",
   };
+}
+
+function indexActiveReservationsByShowingId(
+  rows: ActiveReservationDetail[],
+): Record<string, CRMActiveReservation> {
+  return (rows ?? []).reduce<Record<string, CRMActiveReservation>>((acc, row) => {
+    if (!row.showing_id) return acc;
+    acc[row.showing_id] = {
+      reservation_id: row.reservation_id,
+      contact_id: row.contact_id,
+      reserved_at: row.reserved_at,
+      expires_at: row.expires_at,
+      notes: row.notes,
+      status: row.status,
+      updated_at: row.updated_at,
+    };
+    return acc;
+  }, {});
+}
+
+function indexLatestReservationsByShowingId(
+  rows: ActiveReservationDetail[],
+): Record<string, CRMActiveReservation> {
+  return (rows ?? []).reduce<Record<string, CRMActiveReservation>>((acc, row) => {
+    if (!row.showing_id || acc[row.showing_id]) return acc;
+    acc[row.showing_id] = {
+      reservation_id: row.reservation_id,
+      contact_id: row.contact_id,
+      reserved_at: row.reserved_at,
+      expires_at: row.expires_at,
+      notes: row.notes,
+      status: row.status,
+      updated_at: row.updated_at,
+    };
+    return acc;
+  }, {});
 }
 
 export interface DailyLogEntry {
@@ -311,15 +389,34 @@ export function useCRM() {
 
   const loadShowings = useCallback(async () => {
     const version = ++showingsVersionRef.current;
-    const { data, error } = await crmApi.listShowings();
+    const [showingsResult, reservationsResult] = await Promise.all([
+      crmApi.listShowings(),
+      reservationsApi.listShowingReservationDetails(),
+    ]);
 
     if (!isMountedRef.current || version !== showingsVersionRef.current) {
       return;
     }
 
-    if (!error && data) {
-      const mapped = data.map((row) =>
-        mapShowingRow(row as unknown as Record<string, unknown>),
+    if (!showingsResult.error && showingsResult.data) {
+      const latestReservationsByShowingId =
+        reservationsResult.error === null
+          ? indexLatestReservationsByShowingId(reservationsResult.data ?? [])
+          : {};
+      const activeReservationsByShowingId =
+        reservationsResult.error === null
+          ? indexActiveReservationsByShowingId(
+              (reservationsResult.data ?? []).filter((row) => row.status === "Aktive"),
+            )
+          : {};
+      const mapped = showingsResult.data.map((row) =>
+        mapShowingRow({
+          ...(row as unknown as Record<string, unknown>),
+          active_reservation:
+            activeReservationsByShowingId[(row as { id: string }).id] ?? null,
+          latest_reservation:
+            latestReservationsByShowingId[(row as { id: string }).id] ?? null,
+        }),
       );
       crmCache.showings = mapped;
       crmCache.hasShowings = true;
@@ -436,6 +533,23 @@ export function useCRM() {
       return { error: unitResolution.error };
     }
 
+    if (storedOutcome === "Rezervoi") {
+      if (!input.reservation_expires_at) {
+        return { error: RESERVATION_EXPIRES_AT_REQUIRED_ERROR };
+      }
+
+      const { data: activeReservation, error: activeReservationError } =
+        await reservationsApi.findActiveReservationLinkByUnit(unitResolution.data!);
+
+      if (activeReservationError) {
+        return { error: activeReservationError };
+      }
+
+      if (activeReservation) {
+        return { error: ACTIVE_RESERVATION_CONFLICT_ERROR };
+      }
+    }
+
     let leadId = input.lead_id;
     let leadName: string | undefined;
     let createdLeadId: string | null = null;
@@ -477,9 +591,61 @@ export function useCRM() {
       return { error };
     }
 
+    if (!data) {
+      return { error: "Shfaqja nuk u kthye nga serveri pas ruajtjes." };
+    }
+
+    let createdReservation: CRMActiveReservation | null = null;
+
+    if (storedOutcome === "Rezervoi") {
+      const reservationResult = await reservationsApi.createUnitReservation({
+        unitRecordId: unitResolution.data!,
+        contactId: leadId,
+        showingId: data.id,
+        reservedAt: input.scheduled_at,
+        expiresAt: toReservationExpiryTimestamp(input.reservation_expires_at!),
+        notes: input.notes ?? null,
+      });
+
+      if (reservationResult.error) {
+        const { error: rollbackShowingError } = await crmApi.deleteShowing(data.id);
+
+        if (createdLeadId && !rollbackShowingError) {
+          const rollbackLeadError = await rollbackManualShowingLead(createdLeadId);
+          if (rollbackLeadError) {
+            return { error: rollbackLeadError };
+          }
+        }
+
+        if (rollbackShowingError) {
+          return { error: RESERVATION_CREATE_ROLLBACK_ERROR };
+        }
+
+        return { error: reservationResult.error };
+      }
+
+      if (!reservationResult.data) {
+        return { error: "Rezervimi nuk u kthye nga serveri pas ruajtjes." };
+      }
+
+      createdReservation = {
+        reservation_id: reservationResult.data,
+        contact_id: leadId,
+        reserved_at: input.scheduled_at,
+        expires_at: toReservationExpiryTimestamp(input.reservation_expires_at!),
+        notes: input.notes ?? null,
+        status: "Aktive",
+        updated_at: new Date().toISOString(),
+      };
+    }
+
     // Refetch to ensure state is in sync with DB
     await fetchShowings();
-    const mapped = mapShowingRow(data as unknown as Record<string, unknown>);
+    const mapped = mapShowingRow({
+      ...(data as unknown as Record<string, unknown>),
+      active_reservation: createdReservation,
+      latest_reservation: createdReservation,
+    });
     return {
       data: {
         ...mapped,
@@ -491,9 +657,44 @@ export function useCRM() {
   };
 
   const updateShowing = async (id: string, changes: Partial<CreateShowingInput>) => {
+    const existingShowing = showings.find((showing) => showing.id === id);
+    if (!existingShowing) {
+      return { error: "Shfaqja nuk u gjet." };
+    }
+    let nextActiveReservation = existingShowing.active_reservation ?? null;
+
+    const nextOutcome = (changes.outcome ?? existingShowing.outcome ?? "Pa rezultat") as ShowingOutcome;
+    const isEnteringReservationOutcome =
+      nextOutcome === "Rezervoi" && (existingShowing.outcome ?? "Pa rezultat") !== "Rezervoi";
+    const nextUnitId = changes.unit_id ?? existingShowing.unit_id;
+    const nextScheduledAt = changes.scheduled_at ?? `${existingShowing.date}T${existingShowing.time ?? "00:00"}:00`;
+
+    const { data: activeReservationForShowingId, error: activeReservationForShowingError } =
+      await reservationsApi.findActiveReservationIdByShowing(id);
+
+    if (activeReservationForShowingError) {
+      return { error: activeReservationForShowingError };
+    }
+
+    const hasLinkedActiveReservation = Boolean(activeReservationForShowingId);
+    const isChangingReservationOwner =
+      (changes.unit_id !== undefined && changes.unit_id !== existingShowing.unit_id) ||
+      (changes.lead_id !== undefined && changes.lead_id !== existingShowing.contact_id) ||
+      Boolean(changes.manual_contact);
+    const isChangingOutcomeAwayFromReservation =
+      changes.outcome !== undefined && changes.outcome !== "Rezervoi";
+
+    if (
+      hasLinkedActiveReservation &&
+      (isChangingReservationOwner || isChangingOutcomeAwayFromReservation)
+    ) {
+      return { error: SHOWING_ACTIVE_RESERVATION_LOCK_ERROR };
+    }
+
     const dbChanges: Record<string, string | null | undefined> = {};
     let leadId = changes.lead_id;
     let createdLeadId: string | null = null;
+    let targetUnitRecordId = changes.unit_id ? null : existingShowing.unit_record_id ?? null;
 
     if (changes.unit_id) {
       const unitResolution = await resolveUnitRecordId(changes.unit_id);
@@ -501,6 +702,32 @@ export function useCRM() {
         return { error: unitResolution.error };
       }
       dbChanges.unit_record_id = unitResolution.data;
+      targetUnitRecordId = unitResolution.data ?? null;
+    }
+
+    if (isEnteringReservationOutcome && !hasLinkedActiveReservation) {
+      if (!changes.reservation_expires_at) {
+        return { error: RESERVATION_EXPIRES_AT_REQUIRED_ERROR };
+      }
+
+      if (!targetUnitRecordId) {
+        const fallbackUnitResolution = await resolveUnitRecordId(nextUnitId);
+        if (fallbackUnitResolution.error) {
+          return { error: fallbackUnitResolution.error };
+        }
+        targetUnitRecordId = fallbackUnitResolution.data!;
+      }
+
+      const { data: activeReservation, error: activeReservationError } =
+        await reservationsApi.findActiveReservationLinkByUnit(targetUnitRecordId);
+
+      if (activeReservationError) {
+        return { error: activeReservationError };
+      }
+
+      if (activeReservation && activeReservation.showing_id !== id) {
+        return { error: ACTIVE_RESERVATION_CONFLICT_ERROR };
+      }
     }
 
     if (changes.manual_contact) {
@@ -537,7 +764,65 @@ export function useCRM() {
       return { error };
     }
 
-    const mapped = mapShowingRow(data as unknown as Record<string, unknown>);
+    if (isEnteringReservationOutcome && !hasLinkedActiveReservation) {
+      const reservationResult = await reservationsApi.createUnitReservation({
+        unitRecordId: targetUnitRecordId!,
+        contactId: leadId ?? existingShowing.contact_id,
+        showingId: id,
+        reservedAt: nextScheduledAt,
+        expiresAt: toReservationExpiryTimestamp(changes.reservation_expires_at!),
+        notes: changes.notes ?? existingShowing.notes ?? null,
+      });
+
+      if (reservationResult.error) {
+        const rollbackPatch = {
+          contact_id: existingShowing.contact_id,
+          unit_id: existingShowing.unit_id,
+          unit_record_id: existingShowing.unit_record_id ?? null,
+          date: existingShowing.date,
+          time: existingShowing.time,
+          status: existingShowing.status,
+          outcome: existingShowing.outcome ?? undefined,
+          notes: existingShowing.notes ?? null,
+        };
+
+        const { error: rollbackShowingError } = await crmApi.updateShowing(id, rollbackPatch);
+
+        if (createdLeadId && !rollbackShowingError) {
+          const rollbackLeadError = await rollbackManualShowingLead(createdLeadId);
+          if (rollbackLeadError) {
+            return { error: rollbackLeadError };
+          }
+        }
+
+        if (rollbackShowingError) {
+          return { error: RESERVATION_UPDATE_ROLLBACK_ERROR };
+        }
+
+        await fetchShowings();
+        return { error: reservationResult.error };
+      }
+
+      if (!reservationResult.data) {
+        return { error: "Rezervimi nuk u kthye nga serveri pas ruajtjes." };
+      }
+
+      nextActiveReservation = {
+        reservation_id: reservationResult.data,
+        contact_id: leadId ?? existingShowing.contact_id,
+        reserved_at: nextScheduledAt,
+        expires_at: toReservationExpiryTimestamp(changes.reservation_expires_at!),
+        notes: changes.notes ?? existingShowing.notes ?? null,
+        status: "Aktive",
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    const mapped = mapShowingRow({
+      ...(data as unknown as Record<string, unknown>),
+      active_reservation: nextActiveReservation,
+      latest_reservation: nextActiveReservation ?? existingShowing.latest_reservation ?? null,
+    });
     showingsVersionRef.current += 1;
     setShowings((prev) => {
       const next = prev.map((showing) => (showing.id === id ? mapped : showing));

@@ -1,21 +1,10 @@
 import type { Unit, UnitStatus, Block, Level, OwnerCategory } from "../hooks/useUnits";
 import { CANONICAL_UNIT_TYPES, getCanonicalUnitType, isApartmentStyleUnit } from "../lib/unitType";
+export { LEVELS } from "../lib/unitLevel";
 
 export const TYPES = CANONICAL_UNIT_TYPES;
 
 export const BLOCKS = ["Blloku A", "Blloku B", "Blloku C"] as const;
-
-export const LEVELS = [
-  "Garazhë",
-  "Përdhesa",
-  "Kati 1",
-  "Kati 2",
-  "Kati 3",
-  "Kati 4",
-  "Kati 5",
-  "Kati 6",
-  "Penthouse",
-] as const;
 
 export const OWNER_CATEGORIES = [
   "Investitor",

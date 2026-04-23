@@ -1,29 +1,41 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
-import { useOwnerEntities } from "./hooks/useOwnerEntities";
-import { useUnits } from "./hooks/useUnits";
-import type { Unit, UnitHistory, OwnerCategory, UnitStatus, Block, Level } from "./hooks/useUnits";
+import {
+  ReservationActionDialog,
+  type ReservationActionMode,
+} from "./components/ReservationActionDialog";
+import { useUnitsShell } from "./hooks/useUnitsShell";
+import { useUnitDetail } from "./hooks/useUnitDetail";
+import { useUnitsRegistry } from "./hooks/useUnitsRegistry";
+import type {
+  Unit,
+  UnitHistory,
+  OwnerCategory,
+  UnitStatus,
+  Block,
+  Level,
+} from "./hooks/useUnits";
+import { reservations as reservationsApi, units as unitsApi } from "./lib/api";
+import { toReservationExpiryTimestamp } from "./lib/reservationExpiry";
 import { ActiveReservationsSection } from "./units-dashboard/ActiveReservationsSection";
 import { PageHeader } from "./components/ui/PageHeader";
-import { HistoryDrawer } from "./units-dashboard/HistoryDrawer";
 import { OwnershipSection } from "./units-dashboard/OwnershipSection";
 import { StockStatusSection } from "./units-dashboard/StockStatusSection";
+import { UnitDetailDrawer } from "./units-dashboard/UnitDetailDrawer";
 import { UnitsRegistrySection } from "./units-dashboard/UnitsRegistrySection";
 import { PAGE_BG } from "./ui/tokens";
-import { getCanonicalUnitType } from "./lib/unitType";
 import {
   BLOCKS,
   LEVELS,
   TYPES,
   STATUS_ORDER,
-  normalize,
   statusOrderValue,
 } from "./units-dashboard/shared";
+import type { RegistryUnitRow } from "./lib/api/unitsRegistry";
+
+const REGISTRY_PAGE_SIZE = 40;
 
 export function UnitsDashboard() {
-  const { units, loading, error, fetchUnitHistory } = useUnits();
-  const { getOptionsForCategory } = useOwnerEntities(units);
-
   const [blockF, setBlockF] = useState<Block | "">("");
   const [typeF, setTypeF] = useState("");
   const [levelF, setLevelF] = useState<Level | "">("");
@@ -31,39 +43,60 @@ export function UnitsDashboard() {
   const [registryCategoryF, setRegistryCategoryF] = useState("");
   const [registryEntityF, setRegistryEntityF] = useState("");
   const [search, setSearch] = useState("");
+  const [registryPage, setRegistryPage] = useState(1);
   const [selectedOwnerCategory, setSelectedOwnerCategory] = useState<OwnerCategory>("Investitor");
   const [selectedOwnerEntity, setSelectedOwnerEntity] = useState("");
-  const [historyUnit, setHistoryUnit] = useState<Unit | null>(null);
+  const [activeUnitDrawer, setActiveUnitDrawer] = useState<{
+    unitId: string;
+    initialTab: "summary" | "history";
+    unit: Unit;
+  } | null>(null);
+  const [reservationAction, setReservationAction] = useState<{
+    unit: Unit;
+    mode: ReservationActionMode;
+  } | null>(null);
 
-  const scopedUnits = useMemo(() => {
-    return units.filter((u) => u.owner_category === selectedOwnerCategory);
-  }, [units, selectedOwnerCategory]);
+  const deferredSearch = useDeferredValue(search);
 
-  const ownerNames = useMemo(() => {
-    return getOptionsForCategory(selectedOwnerCategory);
-  }, [getOptionsForCategory, selectedOwnerCategory]);
+  const {
+    totalUnits,
+    availableUnitsCount,
+    activeReservationsCount,
+    ownerOptionsByCategory,
+    ownershipCounts,
+    stockCounts,
+    activeReservations,
+    loading: shellLoading,
+    error: shellError,
+    refresh: refreshShell,
+  } = useUnitsShell({
+    stockCategory: selectedOwnerCategory,
+    stockEntity: selectedOwnerEntity,
+  });
 
+  const ownerNames = ownerOptionsByCategory[selectedOwnerCategory];
   const activeSelectedOwnerEntity =
     selectedOwnerEntity && ownerNames.includes(selectedOwnerEntity)
       ? selectedOwnerEntity
       : "";
 
-  const stockStatusUnits = useMemo(() => {
-    return scopedUnits.filter((u) => {
-      const matchEntity = !activeSelectedOwnerEntity || u.owner_name === activeSelectedOwnerEntity;
-      return matchEntity;
-    });
-  }, [activeSelectedOwnerEntity, scopedUnits]);
-
   const registryEntityNames = useMemo(() => {
     if (!registryCategoryF) return [];
-    return getOptionsForCategory(registryCategoryF as OwnerCategory);
-  }, [getOptionsForCategory, registryCategoryF]);
-
+    return ownerOptionsByCategory[registryCategoryF as OwnerCategory] ?? [];
+  }, [ownerOptionsByCategory, registryCategoryF]);
   const activeRegistryEntityF =
     registryEntityF && registryEntityNames.includes(registryEntityF)
       ? registryEntityF
       : "";
+  const {
+    unit: detailedDrawerUnit,
+    refresh: refreshUnitDetail,
+  } = useUnitDetail(activeUnitDrawer?.unitId ?? null);
+
+  const activeDrawerUnit = useMemo(() => {
+    if (!activeUnitDrawer) return null;
+    return detailedDrawerUnit ?? activeUnitDrawer.unit;
+  }, [activeUnitDrawer, detailedDrawerUnit]);
 
   const registryEntityPlaceholder = useMemo(() => {
     if (registryCategoryF === "Investitor") return "Të gjithë investitorët";
@@ -72,82 +105,117 @@ export function UnitsDashboard() {
     return "Të gjithë pronarët";
   }, [registryCategoryF]);
 
-  const registryScopeUnits = useMemo(() => {
-    return units.filter((u) => {
-      const matchCategory = !registryCategoryF || u.owner_category === registryCategoryF;
-      const matchEntity = !activeRegistryEntityF || u.owner_name === activeRegistryEntityF;
-      return matchCategory && matchEntity;
-    });
-  }, [activeRegistryEntityF, registryCategoryF, units]);
+  const {
+    rows: registryRows,
+    filteredCount,
+    scopeCount: registryScopeCount,
+    page: resolvedRegistryPage,
+    pageSize: resolvedRegistryPageSize,
+    loading: registryLoading,
+    error: registryError,
+    refresh: refreshRegistry,
+  } = useUnitsRegistry({
+    block: blockF,
+    type: typeF,
+    level: levelF,
+    status: statusF,
+    category: registryCategoryF,
+    entity: activeRegistryEntityF,
+    search: deferredSearch,
+    page: registryPage,
+    pageSize: REGISTRY_PAGE_SIZE,
+  });
 
-  // Derive dropdown options directly from actual unit data so options always
-  // match whatever string values are stored in the database.
-  const blockOptions = useMemo(() => {
-    const vals = [...new Set(
-      units.map((u) => u.block).filter((v): v is Block => typeof v === "string" && v.trim() !== ""),
-    )];
-    return vals.sort((a, b) => {
-      const ai = BLOCKS.indexOf(a); const bi = BLOCKS.indexOf(b);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-    });
-  }, [units]);
+  const registryPageSize = resolvedRegistryPageSize || REGISTRY_PAGE_SIZE;
+  const registryTotalPages = Math.max(1, Math.ceil(filteredCount / registryPageSize));
 
-  // "Lloji" always shows the fixed canonical category labels — not derived from raw DB strings.
-  const typeOptions = [...TYPES];
+  const inventoryError = shellError ?? registryError;
+  const hasVisibleInventory = totalUnits > 0 || filteredCount > 0;
 
-  const levelOptions = useMemo(() => {
-    const vals = [...new Set(
-      units.map((u) => u.level).filter((v): v is Level => typeof v === "string" && v.trim() !== ""),
-    )];
-    return vals.sort((a, b) => {
-      const ai = LEVELS.indexOf(a); const bi = LEVELS.indexOf(b);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-    });
-  }, [units]);
-
-  const statusOptions = useMemo(() => {
-    const vals = [...new Set(
-      units.map((u) => u.status).filter((v): v is UnitStatus => typeof v === "string" && v.trim() !== ""),
-    )];
-    return vals.sort((a, b) => (STATUS_ORDER[a] ?? 99) - (STATUS_ORDER[b] ?? 99));
-  }, [units]);
-
-  const activeBlockF = blockF && blockOptions.includes(blockF) ? blockF : "";
-  const activeLevelF = levelF && levelOptions.includes(levelF) ? levelF : "";
-  const activeStatusF = statusF && statusOptions.includes(statusF) ? statusF : "";
+  const blockOptions = BLOCKS;
+  const typeOptions = TYPES;
+  const levelOptions = LEVELS;
+  const statusOptions = useMemo(() => Object.keys(STATUS_ORDER) as UnitStatus[], []);
 
   const filtered = useMemo(() => {
-    return [...registryScopeUnits]
-      .filter((u) => {
-        return (
-          (!activeBlockF || u.block === activeBlockF) &&
-          (!typeF || getCanonicalUnitType(u.type, u.level) === typeF) &&
-          (!activeLevelF || u.level === activeLevelF) &&
-          (!activeStatusF || u.status === activeStatusF) &&
-          (!search || normalize(String(u.unit_id ?? "")).includes(normalize(search)))
-        );
-      })
+    return registryRows
+      .map(mapRegistryRowToUnit)
       .sort((a, b) => statusOrderValue(a.status) - statusOrderValue(b.status));
-  }, [activeBlockF, activeLevelF, activeStatusF, registryScopeUnits, search, typeF]);
+  }, [registryRows]);
 
-  const availableUnitsCount = useMemo(
-    () => units.filter((unit) => unit.status === "Në dispozicion").length,
-    [units],
-  );
-  const activeReservationsCount = useMemo(
-    () =>
-      units.filter((unit) => unit.status === "E rezervuar" && unit.reservation_expires_at).length,
-    [units],
-  );
+  const fetchUnitHistory = async (unitId: string): Promise<UnitHistory[]> => {
+    const result = await unitsApi.listUnitHistory(unitId);
+
+    if (result.error !== null) return [];
+    return result.data.map((row) => ({
+      id: row.id,
+      unit_id: row.unit_id ?? "",
+      changed_at: row.changed_at ?? "",
+      change_reason: row.change_reason ?? "",
+      previous_data: toUnitHistorySnapshot(row.previous_data),
+      new_data: toUnitHistorySnapshot(row.new_data),
+    }));
+  };
+
+  const openReservationAction = (unit: Unit, mode: ReservationActionMode) => {
+    setReservationAction({ unit, mode });
+  };
+
+  const handleReservationActionSubmit = async ({
+    expiresAt,
+    notes,
+  }: {
+    expiresAt?: string;
+    notes?: string;
+  }) => {
+    if (!reservationAction?.unit.active_reservation_id) {
+      throw new Error("Rezervimi aktiv nuk u gjet.");
+    }
+
+    const result =
+      reservationAction.mode === "extend"
+        ? await reservationsApi.extendUnitReservation({
+            reservationId: reservationAction.unit.active_reservation_id,
+            expiresAt: toReservationExpiryTimestamp(expiresAt ?? ""),
+            notes,
+          })
+        : await reservationsApi.cancelUnitReservation({
+            reservationId: reservationAction.unit.active_reservation_id,
+            notes,
+          });
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    await Promise.all([
+      refreshShell(),
+      refreshRegistry(),
+      refreshUnitDetail(),
+    ]);
+  };
 
   return (
     <div style={{ background: PAGE_BG }}>
-      {historyUnit && (
-        <HistoryDrawer
-          key={historyUnit.id}
-          unit={historyUnit}
-          onClose={() => setHistoryUnit(null)}
+      {reservationAction && (
+        <ReservationActionDialog
+          key={`${reservationAction.unit.id}-${reservationAction.mode}`}
+          unit={reservationAction.unit}
+          mode={reservationAction.mode}
+          onClose={() => setReservationAction(null)}
+          onSubmit={handleReservationActionSubmit}
+        />
+      )}
+
+      {activeDrawerUnit && activeUnitDrawer && (
+        <UnitDetailDrawer
+          key={`${activeDrawerUnit.id}-${activeUnitDrawer.initialTab}`}
+          unit={activeDrawerUnit}
+          initialTab={activeUnitDrawer.initialTab}
+          onClose={() => setActiveUnitDrawer(null)}
           fetchHistory={fetchUnitHistory as (id: string) => Promise<UnitHistory[]>}
+          onExtendReservation={(unit) => openReservationAction(unit, "extend")}
+          onReleaseReservation={(unit) => openReservationAction(unit, "release")}
         />
       )}
 
@@ -169,11 +237,11 @@ export function UnitsDashboard() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
                     Gjithsej njësi
                   </p>
-                  {loading ? (
+                  {shellLoading ? (
                     <div className="mt-2 h-6 w-16 animate-pulse rounded-full bg-[#eef1f5]" />
                   ) : (
                     <p className="mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.04em] text-[#003883]">
-                      {units.length}
+                      {totalUnits}
                     </p>
                   )}
                 </div>
@@ -182,7 +250,7 @@ export function UnitsDashboard() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
                     Rezervime aktive
                   </p>
-                  {loading ? (
+                  {shellLoading ? (
                     <div className="mt-2 h-6 w-16 animate-pulse rounded-full bg-[#eef1f5]" />
                   ) : (
                     <p className="mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.04em] text-[#003883]">
@@ -191,7 +259,7 @@ export function UnitsDashboard() {
                   )}
                 </div>
               </div>
-              {!loading && (
+              {!shellLoading && (
                 <p className="mt-2 px-0.5 text-[11.5px] text-black/34">
                   {availableUnitsCount} në dispozicion në regjistrin aktual.
                 </p>
@@ -200,7 +268,7 @@ export function UnitsDashboard() {
           }
         />
 
-        {error && (
+        {inventoryError && (
           <div className="mb-6 flex items-start gap-2 rounded-[16px] border border-[#f1dddd] bg-[#fdf7f7] px-4 py-3 text-[#8e4a4a] shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
             <AlertCircle size={15} className="mt-[2px] shrink-0" />
             <div>
@@ -208,7 +276,7 @@ export function UnitsDashboard() {
                 Inventari i njësive nuk u rifreskua plotësisht.
               </p>
               <p className="mt-1 text-[11.5px] text-[#8e4a4a]/80">
-                {units.length > 0
+                {hasVisibleInventory
                   ? "Po shfaqet pamja e fundit e disponueshme ndërsa rifreskimi nuk u përfundua."
                   : "Kontrolloni lidhjen dhe rifreskoni faqen për ta ngarkuar regjistrin."}
               </p>
@@ -216,14 +284,18 @@ export function UnitsDashboard() {
           </div>
         )}
 
-        <OwnershipSection units={units} loading={loading} />
+        <OwnershipSection
+          totalUnits={totalUnits}
+          ownershipCounts={ownershipCounts}
+          loading={shellLoading}
+        />
 
         <StockStatusSection
-          loading={loading}
+          loading={shellLoading}
           selectedOwnerCategory={selectedOwnerCategory}
           selectedOwnerEntity={activeSelectedOwnerEntity}
           ownerNames={ownerNames}
-          stockStatusUnits={stockStatusUnits}
+          stockCounts={stockCounts}
           onOwnerCategoryChange={(category) => {
             setSelectedOwnerCategory(category);
             setSelectedOwnerEntity("");
@@ -232,15 +304,16 @@ export function UnitsDashboard() {
         />
 
         <UnitsRegistrySection
-          loading={loading}
-          units={units}
+          loading={registryLoading && filtered.length === 0}
+          totalUnits={totalUnits}
           filtered={filtered}
-          registryScopeUnits={registryScopeUnits}
+          filteredCount={filteredCount}
+          registryScopeCount={registryScopeCount}
           search={search}
-          blockF={activeBlockF}
+          blockF={blockF}
           typeF={typeF}
-          levelF={activeLevelF}
-          statusF={activeStatusF}
+          levelF={levelF}
+          statusF={statusF}
           registryCategoryF={registryCategoryF}
           registryEntityF={activeRegistryEntityF}
           blockOptions={blockOptions}
@@ -249,23 +322,93 @@ export function UnitsDashboard() {
           statusOptions={statusOptions}
           registryEntityNames={registryEntityNames}
           registryEntityPlaceholder={registryEntityPlaceholder}
-          onSearchChange={setSearch}
-          onBlockChange={setBlockF}
-          onTypeChange={setTypeF}
-          onLevelChange={setLevelF}
-          onStatusChange={setStatusF}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setRegistryPage(1);
+          }}
+          onBlockChange={(value) => {
+            setBlockF(value);
+            setRegistryPage(1);
+          }}
+          onTypeChange={(value) => {
+            setTypeF(value);
+            setRegistryPage(1);
+          }}
+          onLevelChange={(value) => {
+            setLevelF(value);
+            setRegistryPage(1);
+          }}
+          onStatusChange={(value) => {
+            setStatusF(value);
+            setRegistryPage(1);
+          }}
           onRegistryCategoryChange={(value) => {
             setRegistryCategoryF(value);
             setRegistryEntityF("");
+            setRegistryPage(1);
           }}
-          onRegistryEntityChange={setRegistryEntityF}
-          onOpenHistory={setHistoryUnit}
+          onRegistryEntityChange={(value) => {
+            setRegistryEntityF(value);
+            setRegistryPage(1);
+          }}
+          onPageChange={setRegistryPage}
+          currentPage={resolvedRegistryPage}
+          totalPages={registryTotalPages}
+          pageSize={registryPageSize}
+          onOpenUnitDetails={(unit) =>
+            setActiveUnitDrawer({ unitId: unit.id, initialTab: "summary", unit })
+          }
+          onOpenHistory={(unit) =>
+            setActiveUnitDrawer({ unitId: unit.id, initialTab: "history", unit })
+          }
         />
 
-        <ActiveReservationsSection units={units} loading={loading} />
+        <ActiveReservationsSection
+          units={activeReservations}
+          loading={shellLoading}
+          onExtendReservation={(unit) => openReservationAction(unit, "extend")}
+          onReleaseReservation={(unit) => openReservationAction(unit, "release")}
+        />
       </div>
     </div>
   );
+}
+
+function toUnitHistorySnapshot(value: unknown): Partial<Unit> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Partial<Unit>;
+}
+
+function mapRegistryRowToUnit(row: RegistryUnitRow): Unit {
+  return {
+    id: row.id,
+    unit_id: row.unit_id,
+    block: row.block as Block,
+    type: row.type as Unit["type"],
+    level: row.level as Level,
+    size: row.size,
+    price: row.price,
+    status: row.status as UnitStatus,
+    owner_category: row.owner_category as OwnerCategory,
+    owner_name: row.owner_name,
+    has_active_reservation: false,
+    active_reservation_id: null,
+    active_reservation_showing_id: null,
+    reservation_expires_at: null,
+    notes: null,
+    created_at: row.created_at ?? "",
+    updated_at: row.updated_at ?? "",
+    bedrooms: null,
+    bathrooms: null,
+    toilets: null,
+    final_price: row.final_price,
+    sale_date: row.sale_date,
+    buyer_name: row.buyer_name,
+    payment_type: row.payment_type,
+    crm_lead_id: row.crm_lead_id,
+  };
 }
 
 export default UnitsDashboard;

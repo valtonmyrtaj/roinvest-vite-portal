@@ -1,17 +1,16 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Copy, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, Copy, Trash2 } from "lucide-react";
 import type { UnitStatus } from "../hooks/useUnits";
 import {
   BLOCKS,
   type DraftUnit,
   LEVELS,
-  STATUSES,
+  MANUAL_UNIT_STATUSES,
   TYPES,
   roomCategory,
 } from "./shared";
 import {
-  DateField,
   NumberField,
   RoomNumberField,
   SelectField,
@@ -20,9 +19,8 @@ import {
 
 /**
  * A single editable draft-unit row inside the "Shto njësi të reja" list.
- * Owns only the ephemeral `touchedRooms` flags (so the apartment/lokal
- * room-field errors appear after the user actually touches the input,
- * not on initial render). All persistent state is raised to the parent
+ * Keeps only lightweight local UI state such as the optional plan-details
+ * disclosure. All persistent draft state is raised to the parent
  * via `onChange` — `onRemove` / `onDuplicate` trigger list-level edits.
  */
 export function UnitForm({
@@ -40,13 +38,26 @@ export function UnitForm({
   onDuplicate: () => void;
   index: number;
 }) {
-  const [touchedRooms, setTouchedRooms] = useState({
-    bedrooms: false,
-    bathrooms: false,
-    toilets: false,
-  });
+  const [showPlanDetails, setShowPlanDetails] = useState(
+    () => Boolean(draft.bedrooms || draft.bathrooms || draft.toilets),
+  );
   const set = (field: keyof DraftUnit, value: unknown) =>
     onChange({ ...draft, [field]: value });
+  const roomDetailsCategory = roomCategory(draft.type as string | undefined);
+  const supportsPlanDetails =
+    roomDetailsCategory === "apartment" || roomDetailsCategory === "lokal";
+  const hasRoomMetadata =
+    draft.bedrooms != null || draft.bathrooms != null || draft.toilets != null;
+  const planDetailsSummary =
+    roomDetailsCategory === "apartment"
+      ? hasRoomMetadata
+        ? `${draft.bedrooms ?? "—"} dhoma gjumi · ${draft.bathrooms ?? "—"} banjo`
+        : "Opsionale për ofertat dhe referencën e planit"
+      : roomDetailsCategory === "lokal"
+        ? hasRoomMetadata
+          ? `${draft.toilets ?? "—"} tualet`
+          : "Opsionale për ofertat dhe referencën e planit"
+        : "";
 
   return (
     <motion.div
@@ -62,12 +73,14 @@ export function UnitForm({
         </span>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={onDuplicate}
             className="flex items-center gap-1.5 rounded-[8px] border border-black/08 bg-white px-2.5 py-1 text-[11px] text-black/40 transition hover:text-black/70"
           >
             <Copy size={11} /> Duplikim
           </button>
           <button
+            type="button"
             onClick={onRemove}
             className="flex items-center gap-1.5 rounded-[8px] border border-red-100 bg-white px-2.5 py-1 text-[11px] text-red-400 transition hover:bg-red-50"
           >
@@ -116,62 +129,6 @@ export function UnitForm({
           onChange={(v) => set("price", v)}
           placeholder="p.sh. 180000"
         />
-        {(() => {
-          const cat = roomCategory(draft.type as string | undefined);
-          if (cat === "apartment")
-            return (
-              <>
-                <RoomNumberField
-                  label="Dhoma gjumi"
-                  value={draft.bedrooms}
-                  onChange={(v) => {
-                    setTouchedRooms((t) => ({ ...t, bedrooms: true }));
-                    set("bedrooms", v);
-                  }}
-                  placeholder="p.sh. 2"
-                  error={
-                    touchedRooms.bedrooms &&
-                    (!draft.bedrooms || draft.bedrooms <= 0)
-                      ? "Dhoma gjumi është e detyrueshme"
-                      : undefined
-                  }
-                />
-                <RoomNumberField
-                  label="Banjo"
-                  value={draft.bathrooms}
-                  onChange={(v) => {
-                    setTouchedRooms((t) => ({ ...t, bathrooms: true }));
-                    set("bathrooms", v);
-                  }}
-                  placeholder="p.sh. 1"
-                  error={
-                    touchedRooms.bathrooms &&
-                    (!draft.bathrooms || draft.bathrooms <= 0)
-                      ? "Banjo është e detyrueshme"
-                      : undefined
-                  }
-                />
-              </>
-            );
-          if (cat === "lokal")
-            return (
-              <RoomNumberField
-                label="Tualet"
-                value={draft.toilets}
-                onChange={(v) => {
-                  setTouchedRooms((t) => ({ ...t, toilets: true }));
-                  set("toilets", v);
-                }}
-                placeholder="p.sh. 1"
-                error={
-                  touchedRooms.toilets && (!draft.toilets || draft.toilets <= 0)
-                    ? "Tualet është i detyrueshëm"
-                    : undefined
-                }
-              />
-            );
-          return null;
-        })()}
         <SelectField
           label="Pronari"
           value={draft.owner_name ?? ""}
@@ -183,16 +140,71 @@ export function UnitForm({
           label="Statusi"
           value={draft.status ?? ""}
           onChange={(v) => set("status", v as UnitStatus)}
-          options={STATUSES}
+          options={MANUAL_UNIT_STATUSES}
           placeholder="Zgjidh statusin"
         />
-        {draft.status === "E rezervuar" && (
-          <DateField
-            label="Skadon më"
-            value={draft.reservation_expires_at}
-            onChange={(v) => set("reservation_expires_at", v)}
-          />
+
+        {supportsPlanDetails && (
+          <div className="col-span-3 rounded-[12px] border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.02)]">
+            <button
+              type="button"
+              onClick={() => setShowPlanDetails((prev) => !prev)}
+              className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+            >
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
+                  Detaje të planit
+                </p>
+                <p className="mt-1 text-[12px] text-black/42">{planDetailsSummary}</p>
+              </div>
+              <ChevronDown
+                size={15}
+                className={`shrink-0 text-black/35 transition-transform duration-200 ${
+                  showPlanDetails ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showPlanDetails && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="overflow-hidden border-t border-black/[0.06]"
+                >
+                  <div className="grid grid-cols-3 gap-3 px-3 py-3">
+                    {roomDetailsCategory === "apartment" ? (
+                      <>
+                        <RoomNumberField
+                          label="Dhoma gjumi"
+                          value={draft.bedrooms}
+                          onChange={(v) => set("bedrooms", v)}
+                          placeholder="p.sh. 2"
+                        />
+                        <RoomNumberField
+                          label="Banjo"
+                          value={draft.bathrooms}
+                          onChange={(v) => set("bathrooms", v)}
+                          placeholder="p.sh. 1"
+                        />
+                      </>
+                    ) : (
+                      <RoomNumberField
+                        label="Tualet"
+                        value={draft.toilets}
+                        onChange={(v) => set("toilets", v)}
+                        placeholder="p.sh. 1"
+                      />
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
+
         <label className="col-span-3 flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
             Shënime

@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useUnits } from "./hooks/useUnits";
+import {
+  ReservationActionDialog,
+  type ReservationActionMode,
+} from "./components/ReservationActionDialog";
+import { useUnits, type Unit } from "./hooks/useUnits";
 import {
   completeShowingSale,
   useCRM,
   type CRMShowing,
   type CreateShowingInput,
 } from "./hooks/useCRM";
+import { reservations as reservationsApi } from "./lib/api";
 import { formatEuro as formatEuroCompact } from "./lib/formatCurrency";
+import { toReservationExpiryTimestamp } from "./lib/reservationExpiry";
 import { ActivityTimeline } from "./crm-content/ActivityTimeline";
 import { ConfirmDeleteModal } from "./crm-content/ConfirmDeleteModal";
 import { DailyLogSection } from "./crm-content/DailyLogSection";
@@ -40,15 +46,31 @@ export default function CRMContent() {
     fetchLeads,
     fetchShowings,
   } = useCRM();
-  const { units, fetchUnits } = useUnits();
+  const { units, fetchUnits } = useUnits({ includeReservationTruth: true });
 
   const [showAddShowing, setShowAddShowing] = useState(false);
   const [editShowing, setEditShowing] = useState<CRMShowing | null>(null);
   const [deletingShowingId, setDeletingShowingId] = useState<string | null>(null);
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
   const [saleToast, setSaleToast] = useState<ShowingSaleToast | null>(null);
+  const [reservationAction, setReservationAction] = useState<{
+    showingId: string;
+    mode: ReservationActionMode;
+  } | null>(null);
 
   const unitIds = units.map((unit) => unit.unit_id);
+  const reservationUnitByShowingId = useMemo(() => {
+    return units.reduce<Record<string, Unit>>((acc, unit) => {
+      if (unit.active_reservation_id && unit.active_reservation_showing_id) {
+        acc[unit.active_reservation_showing_id] = unit;
+      }
+      return acc;
+    }, {});
+  }, [units]);
+  const activeReservationActionUnit = useMemo(() => {
+    if (!reservationAction) return null;
+    return reservationUnitByShowingId[reservationAction.showingId] ?? null;
+  }, [reservationAction, reservationUnitByShowingId]);
 
   useEffect(() => {
     if (!saleToast) return;
@@ -60,6 +82,11 @@ export default function CRMContent() {
     const result = await createShowing(data);
     if (result.error) {
       throw new Error(result.error);
+    }
+
+    if (data.outcome === "Rezervoi") {
+      await fetchUnits();
+      setTimelineRefreshKey((value) => value + 1);
     }
 
     if (data.outcome === "Bleu" && result.data) {
@@ -95,6 +122,11 @@ export default function CRMContent() {
     const result = await updateShowing(editShowing.id, data);
     if (result.error) {
       throw new Error(result.error);
+    }
+
+    if (data.outcome === "Rezervoi") {
+      await fetchUnits();
+      setTimelineRefreshKey((value) => value + 1);
     }
 
     if (data.outcome === "Bleu" && result.data) {
@@ -143,6 +175,42 @@ export default function CRMContent() {
 
   const handleUpdateShowingStatus = async (id: string, status: "E planifikuar" | "E kryer" | "E anuluar") => {
     await updateShowing(id, { status });
+  };
+
+  const openReservationAction = (showingId: string, mode: ReservationActionMode) => {
+    setReservationAction({ showingId, mode });
+  };
+
+  const handleReservationActionSubmit = async ({
+    expiresAt,
+    notes,
+  }: {
+    expiresAt?: string;
+    notes?: string;
+  }) => {
+    if (!reservationAction || !activeReservationActionUnit?.active_reservation_id) {
+      throw new Error("Rezervimi aktiv nuk u gjet.");
+    }
+
+    const result =
+      reservationAction.mode === "extend"
+        ? await reservationsApi.extendUnitReservation({
+            reservationId: activeReservationActionUnit.active_reservation_id,
+            expiresAt: toReservationExpiryTimestamp(expiresAt ?? ""),
+            notes,
+          })
+        : await reservationsApi.cancelUnitReservation({
+            reservationId: activeReservationActionUnit.active_reservation_id,
+            notes,
+          });
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    await fetchUnits();
+    await fetchShowings();
+    setTimelineRefreshKey((value) => value + 1);
   };
 
   const handleDeleteShowing = async () => {
@@ -203,6 +271,15 @@ export default function CRMContent() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {activeReservationActionUnit && reservationAction && (
+          <ReservationActionDialog
+            key={`${activeReservationActionUnit.id}-${reservationAction.mode}`}
+            unit={activeReservationActionUnit}
+            mode={reservationAction.mode}
+            onClose={() => setReservationAction(null)}
+            onSubmit={handleReservationActionSubmit}
+          />
+        )}
         {showAddShowing && (
           <ShowingModal
             leads={leads}
@@ -263,6 +340,8 @@ export default function CRMContent() {
               onUpdateStatus={handleUpdateShowingStatus}
               onDelete={(id) => setDeletingShowingId(id)}
               onEdit={(showing) => setEditShowing(showing)}
+              onExtendReservation={(showing) => openReservationAction(showing.id, "extend")}
+              onReleaseReservation={(showing) => openReservationAction(showing.id, "release")}
             />
           )}
         </motion.div>

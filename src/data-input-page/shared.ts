@@ -1,13 +1,13 @@
 import type {
   Block,
   CreateUnitInput,
-  Level,
   OwnerCategory,
   UnitStatus,
 } from "../hooks/useUnits";
 import type { CompleteUnitSaleInput, SalePaymentType } from "../lib/api/sales";
 import { CANONICAL_UNIT_TYPES, isApartmentStyleUnit } from "../lib/unitType";
 import { NAVY } from "../ui/tokens";
+export { LEVELS } from "../lib/unitLevel";
 
 // ─── Brand / accent ──────────────────────────────────────────────────────────
 
@@ -17,18 +17,8 @@ export const ACCENT = NAVY;
 
 export const BLOCKS: Block[] = ["Blloku A", "Blloku B", "Blloku C"];
 export const TYPES = CANONICAL_UNIT_TYPES;
-export const LEVELS: Level[] = [
-  "Garazhë",
-  "Përdhesa",
-  "Kati 1",
-  "Kati 2",
-  "Kati 3",
-  "Kati 4",
-  "Kati 5",
-  "Kati 6",
-  "Penthouse",
-];
 export const STATUSES: UnitStatus[] = ["Në dispozicion", "E rezervuar", "E shitur"];
+export const MANUAL_UNIT_STATUSES: UnitStatus[] = ["Në dispozicion", "E shitur"];
 export const OWNER_CATEGORIES: OwnerCategory[] = [
   "Investitor",
   "Pronarët e tokës",
@@ -186,8 +176,8 @@ export function emptyDraft(
 }
 
 /** Full-row validity check used both for the per-draft save filter and the
- *  "Ruaj N njësi" counter label. Apartment and local units have extra
- *  required room fields beyond the generic required set. */
+ *  "Ruaj N njësi" counter label. Room metadata is optional and secondary;
+ *  only the core operational fields are required to save a draft unit. */
 export function isDraftValid(d: DraftUnit): boolean {
   if (
     !(
@@ -202,13 +192,5 @@ export function isDraftValid(d: DraftUnit): boolean {
     )
   )
     return false;
-  const cat = roomCategory(d.type as string | undefined);
-  if (cat === "apartment") {
-    if (!d.bedrooms || d.bedrooms <= 0) return false;
-    if (!d.bathrooms || d.bathrooms <= 0) return false;
-  }
-  if (cat === "lokal") {
-    if (!d.toilets || d.toilets <= 0) return false;
-  }
   return true;
 }

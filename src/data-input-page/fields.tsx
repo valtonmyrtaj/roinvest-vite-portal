@@ -6,12 +6,14 @@ export function SelectField({
   onChange,
   options,
   placeholder,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   placeholder: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -22,7 +24,8 @@ export function SelectField({
         <select
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 w-full cursor-pointer appearance-none rounded-[11px] border border-black/10 bg-white pl-3 pr-8 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+          disabled={disabled}
+          className="h-10 w-full appearance-none rounded-[11px] border border-black/10 bg-white pl-3 pr-8 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/45 disabled:shadow-none"
         >
           <option value="">{placeholder}</option>
           {options.map((o) => (
@@ -98,10 +101,12 @@ export function DateField({
   label,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string | null | undefined;
   onChange: (v: string | null) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -112,7 +117,8 @@ export function DateField({
         type="date"
         value={value ? value.slice(0, 10) : ""}
         onChange={(e) => onChange(e.target.value || null)}
-        className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+        disabled={disabled}
+        className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/45 disabled:shadow-none"
       />
     </label>
   );

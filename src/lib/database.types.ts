@@ -643,6 +643,114 @@ export type Database = {
         }
         Returns: string
       }
+      cancel_unit_reservation: {
+        Args: {
+          p_notes?: string
+          p_reservation_id: string
+        }
+        Returns: string
+      }
+      extend_unit_reservation: {
+        Args: {
+          p_expires_at: string
+          p_notes?: string
+          p_reservation_id: string
+        }
+        Returns: string
+      }
+      expire_unit_reservations: {
+        Args: {
+          p_cutoff?: string
+          p_unit_ids?: string[]
+        }
+        Returns: {
+          bathrooms: number | null
+          bedrooms: number | null
+          block: string
+          buyer_lead_id: string | null
+          buyer_name: string | null
+          created_at: string | null
+          id: string
+          level: string
+          notes: string | null
+          owner_category: string
+          owner_name: string
+          price: number
+          reservation_expires_at: string | null
+          sale_date: string | null
+          sale_price: number | null
+          size: number
+          status: string
+          toilets: number | null
+          type: string
+          unit_id: string
+          updated_at: string | null
+        }[]
+      }
+      get_units_shell_summary: {
+        Args: {
+          p_stock_category?: string
+          p_stock_entity?: string
+        }
+        Returns: {
+          available_units_count: number
+          construction_companies_units_count: number
+          investitor_units_count: number
+          land_owners_units_count: number
+          scope_available_count: number
+          scope_reserved_count: number
+          scope_sold_count: number
+          scope_total_count: number
+          total_units: number
+        }[]
+      }
+      list_unit_owner_options: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          category: string
+          name: string
+        }[]
+      }
+      list_sales_upcoming_payments: {
+        Args: {
+          p_owner_scope?: string
+        }
+        Returns: {
+          payment_amount: number
+          payment_created_at: string | null
+          payment_due_date: string
+          payment_id: string
+          payment_installment_number: number
+          payment_notes: string | null
+          payment_paid_date: string | null
+          payment_sale_id: string | null
+          payment_status: string
+          payment_unit_id: string
+          sale_buyer_name: string | null
+          sale_crm_lead_id: string | null
+          sale_date: string | null
+          sale_final_price: number | null
+          sale_payment_type: string | null
+          unit_block: string
+          unit_code: string
+          unit_created_at: string | null
+          unit_id: string
+          unit_level: string
+          unit_owner_category: string
+          unit_owner_name: string
+          unit_price: number
+          unit_size: number
+          unit_status: string
+          unit_type: string
+          unit_updated_at: string | null
+        }[]
+      }
+      run_reservation_expiry_job: {
+        Args: {
+          p_cutoff?: string
+        }
+        Returns: number
+      }
       reporting_get_sale_metrics: {
         Args: {
           p_month?: number
