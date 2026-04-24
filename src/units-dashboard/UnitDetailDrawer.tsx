@@ -7,7 +7,7 @@ import { SkeletonRows } from "../components/SkeletonRows";
 import type { Unit, UnitHistory } from "../hooks/useUnits";
 import { getUnitTypeDisplay } from "../lib/unitType";
 import { NAVY } from "../ui/tokens";
-import { fmtDateShort, fmtPrice, SQ_MONTHS_LONG, statusStyleFor } from "./shared";
+import { fmtDateShort, fmtPrice, getDhomaDisplay, SQ_MONTHS_LONG, statusStyleFor } from "./shared";
 
 type UnitDetailTab = "summary" | "history";
 
@@ -63,6 +63,28 @@ function DetailSectionCard({
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="rounded-[16px] border border-black/[0.04] bg-white/78 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.025)]">
+      <p className="text-[9.5px] font-semibold uppercase tracking-[0.15em] text-black/28">
+        {label}
+      </p>
+      <div
+        className="mt-1.5 text-[14px] leading-[1.2] tracking-[-0.02em] text-black/76"
+        style={{ fontWeight: 650 }}
+      >
+        {value}
       </div>
     </div>
   );
@@ -315,6 +337,22 @@ export function UnitDetailDrawer({
 
   const primaryPriceLabel = unit.final_price != null ? "Çmimi final" : "Çmimi";
   const primaryPriceValue = unit.final_price ?? unit.price;
+  const roomSummary = getDhomaDisplay(unit);
+  const roomSummaryLabel = roomSummary === "—" ? "—" : roomSummary;
+  const priceDelta =
+    unit.final_price != null && Number.isFinite(unit.price) ? unit.final_price - unit.price : null;
+  const priceDeltaLabel =
+    priceDelta === null || priceDelta === 0
+      ? null
+      : priceDelta < 0
+        ? `${fmtPrice(Math.abs(priceDelta))} nën listë`
+        : `${fmtPrice(priceDelta)} mbi listë`;
+  const statusContext =
+    unit.status === "E rezervuar" && unit.reservation_expires_at
+      ? `Rezervuar deri më ${fmtDateShort(unit.reservation_expires_at)}`
+      : unit.status === "E shitur" && unit.sale_date
+        ? `Shitur më ${fmtDateShort(unit.sale_date)}`
+        : null;
 
   return (
     <>
@@ -396,95 +434,108 @@ export function UnitDetailDrawer({
                 transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                 className="space-y-4"
               >
-                <div className="rounded-[24px] border border-[#ececf1] bg-[linear-gradient(180deg,#fcfcfd_0%,#f7f9fc_100%)] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-[240px] flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <PillBadge weight="medium" style={statusStyleFor(unit.status)}>
-                          {unit.status}
-                        </PillBadge>
-                        <PillBadge weight="medium" style={OWNER_CATEGORY_STYLE}>
-                          {unit.owner_category}
-                        </PillBadge>
-                        {unit.payment_type && (
-                          <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-black/52 ring-1 ring-black/[0.06]">
-                            {unit.payment_type}
-                          </span>
-                        )}
-                      </div>
+                <div className="overflow-hidden rounded-[26px] border border-[#e7ebf2] bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
+                  <div className="flex flex-col gap-5 px-5 py-5 md:flex-row md:items-stretch">
+                    <div className="flex min-w-0 flex-1 flex-col justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <PillBadge weight="medium" style={statusStyleFor(unit.status)}>
+                            {unit.status}
+                          </PillBadge>
+                          {unit.payment_type && (
+                            <span className="inline-flex items-center rounded-full bg-white/86 px-2.5 py-1 text-[10.5px] font-semibold text-black/52 ring-1 ring-black/[0.06]">
+                              {unit.payment_type}
+                            </span>
+                          )}
+                        </div>
 
-                      <p
-                        className="mt-3 text-[30px] leading-none tracking-[-0.04em]"
-                        style={{ color: NAVY, fontWeight: 700 }}
-                      >
-                        {unit.unit_id}
-                      </p>
-                      <p className="mt-1.5 text-[13px] leading-[1.45] text-black/50">
-                        {headerMeta}
-                      </p>
+                        <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.15em] text-black/28">
+                          Pronari
+                        </p>
+                        <p
+                          className="mt-2 truncate text-[24px] leading-none tracking-[-0.04em]"
+                          style={{ color: NAVY, fontWeight: 700 }}
+                        >
+                          {unit.owner_name || "—"}
+                        </p>
+                        <p className="mt-2 text-[13px] leading-[1.45] text-black/44">
+                          {unit.owner_category}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="min-w-[240px] rounded-[20px] border border-[#dfe6f1] bg-white px-4 py-4 shadow-[0_4px_14px_rgba(15,23,42,0.04)]">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/30">
-                        {primaryPriceLabel}
-                      </p>
-                      <p
-                        className="mt-2 text-[30px] leading-none tracking-[-0.04em]"
-                        style={{ color: NAVY, fontWeight: 700 }}
-                      >
-                        {fmtPrice(primaryPriceValue)}
-                      </p>
+                    <div className="min-w-[260px] md:w-[270px]">
+                      <div className="rounded-[20px] border border-[#dfe6f1] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/30">
+                          {primaryPriceLabel}
+                        </p>
+                        <p
+                          className="mt-2 text-[32px] leading-none tracking-[-0.05em]"
+                          style={{ color: NAVY, fontWeight: 700 }}
+                        >
+                          {fmtPrice(primaryPriceValue)}
+                        </p>
 
-                      {unit.final_price != null && (
-                        <div className="mt-3 rounded-[14px] bg-[#f5f7fb] px-3 py-2.5">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-black/28">
-                            Çmimi i listës
-                          </p>
-                          <p className="mt-1 text-[14px] leading-none tracking-[-0.03em] text-black/68">
-                            {fmtPrice(unit.price)}
-                          </p>
-                        </div>
-                      )}
-
-                      {unit.status === "E rezervuar" && unit.reservation_expires_at ? (
-                        <>
-                          <p className="mt-3 text-[11.5px] text-black/42">
-                            Rezervuar deri më {fmtDateShort(unit.reservation_expires_at)}
-                          </p>
-                          {(onExtendReservation || onReleaseReservation) &&
-                            unit.active_reservation_id && (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {onExtendReservation && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onExtendReservation(unit)}
-                                    className="rounded-full border border-[#dce4f3] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#f6f8fd]"
-                                  >
-                                    Zgjat afatin
-                                  </button>
-                                )}
-                                {onReleaseReservation && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onReleaseReservation(unit)}
-                                    className="rounded-full border border-[#ecd6d6] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#8e4a4a] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#fff8f8]"
-                                  >
-                                    Liro njësinë
-                                  </button>
-                                )}
+                        {unit.final_price != null && (
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-1">
+                            <div className="rounded-[14px] bg-[#f5f7fb] px-3 py-2.5">
+                              <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/28">
+                                Lista
+                              </p>
+                              <p className="mt-1 text-[13px] leading-none tracking-[-0.03em] text-black/66">
+                                {fmtPrice(unit.price)}
+                              </p>
+                            </div>
+                            {priceDeltaLabel && (
+                              <div className="rounded-[14px] bg-[#f5f7fb] px-3 py-2.5">
+                                <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/28">
+                                  Diferenca
+                                </p>
+                                <p className="mt-1 text-[13px] leading-none tracking-[-0.03em] text-black/66">
+                                  {priceDeltaLabel}
+                                </p>
                               </div>
                             )}
-                        </>
-                      ) : unit.status === "E shitur" && unit.sale_date ? (
-                        <p className="mt-3 text-[11.5px] text-black/42">
-                          Shitur më {fmtDateShort(unit.sale_date)}
-                        </p>
-                      ) : (
-                        <p className="mt-3 text-[11.5px] text-black/40">
-                          Pamje e inventarit aktiv për këtë njësi.
-                        </p>
-                      )}
+                          </div>
+                        )}
+
+                        {statusContext && (
+                          <p className="mt-3 text-[11.5px] text-black/42">{statusContext}</p>
+                        )}
+
+                        {unit.status === "E rezervuar" &&
+                          (onExtendReservation || onReleaseReservation) &&
+                          unit.active_reservation_id && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {onExtendReservation && (
+                                <button
+                                  type="button"
+                                  onClick={() => onExtendReservation(unit)}
+                                  className="rounded-full border border-[#dce4f3] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#f6f8fd]"
+                                >
+                                  Zgjat afatin
+                                </button>
+                              )}
+                              {onReleaseReservation && (
+                                <button
+                                  type="button"
+                                  onClick={() => onReleaseReservation(unit)}
+                                  className="rounded-full border border-[#ecd6d6] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#8e4a4a] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#fff8f8]"
+                                >
+                                  Liro njësinë
+                                </button>
+                              )}
+                            </div>
+                        )}
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="grid gap-2.5 border-t border-[#edf0f5] bg-white/56 p-3 sm:grid-cols-2 md:grid-cols-4">
+                    <SummaryMetric label="Lloji" value={typeLabel} />
+                    <SummaryMetric label="Niveli" value={unit.level} />
+                    <SummaryMetric label="Sipërfaqja" value={`${unit.size} m²`} />
+                    <SummaryMetric label="Konfigurimi" value={roomSummaryLabel} />
                   </div>
                 </div>
 
