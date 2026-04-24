@@ -81,12 +81,16 @@ export function statusStyleFor(status: UnitStatus) {
 
 export function getDhomaDisplay(unit: Unit) {
   if (isApartmentStyleUnit(unit.type, unit.level)) {
-    if (!unit.bedrooms || unit.bedrooms === 0) return "—";
-    return `${unit.bedrooms} dhoma · ${unit.bathrooms} banjo`;
+    const parts = [
+      unit.bedrooms && unit.bedrooms > 0 ? `${unit.bedrooms} dhoma` : null,
+      unit.bathrooms && unit.bathrooms > 0 ? `${unit.bathrooms} banjo` : null,
+    ].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(" · ") : "—";
   }
   if (getCanonicalUnitType(unit.type, unit.level) === "Lokal") {
     if (!unit.toilets || unit.toilets === 0) return "—";
-    return `${unit.toilets} tualet`;
+    return `${unit.toilets} ${unit.toilets === 1 ? "tualet" : "tualete"}`;
   }
   return "—";
 }
