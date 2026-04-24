@@ -19,6 +19,7 @@ export const ACCENT = NAVY;
 export const BLOCKS: Block[] = ["Blloku A", "Blloku B", "Blloku C"];
 export const TYPES = CANONICAL_UNIT_TYPES;
 export const STATUSES: UnitStatus[] = ["Në dispozicion", "E rezervuar", "E shitur"];
+export const DRAFT_UNIT_STATUSES: UnitStatus[] = ["Në dispozicion"];
 export const MANUAL_UNIT_STATUSES: UnitStatus[] = ["Në dispozicion", "E shitur"];
 export const OWNER_CATEGORIES: OwnerCategory[] = [
   "Investitor",
