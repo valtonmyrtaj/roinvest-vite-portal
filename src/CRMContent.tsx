@@ -15,6 +15,7 @@ import { reservations as reservationsApi } from "./lib/api";
 import { formatEuro as formatEuroCompact } from "./lib/formatCurrency";
 import { toReservationExpiryTimestamp } from "./lib/reservationExpiry";
 import { ActivityTimeline } from "./crm-content/ActivityTimeline";
+import { ArchiveShowingModal } from "./crm-content/ArchiveShowingModal";
 import { ConfirmDeleteModal } from "./crm-content/ConfirmDeleteModal";
 import { DailyLogSection } from "./crm-content/DailyLogSection";
 import {
@@ -39,6 +40,8 @@ export default function CRMContent() {
     dailyLogLoading,
     createShowing,
     updateShowing,
+    archiveShowing,
+    restoreShowing,
     deleteShowing,
     createDailyEntry,
     updateDailyEntry,
@@ -50,6 +53,8 @@ export default function CRMContent() {
 
   const [showAddShowing, setShowAddShowing] = useState(false);
   const [editShowing, setEditShowing] = useState<CRMShowing | null>(null);
+  const [archivingShowingId, setArchivingShowingId] = useState<string | null>(null);
+  const [archiveShowingError, setArchiveShowingError] = useState("");
   const [deletingShowingId, setDeletingShowingId] = useState<string | null>(null);
   const [deleteShowingError, setDeleteShowingError] = useState("");
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
@@ -176,6 +181,22 @@ export default function CRMContent() {
 
   const handleUpdateShowingStatus = async (id: string, status: "E planifikuar" | "E kryer" | "E anuluar") => {
     await updateShowing(id, { status });
+  };
+
+  const handleArchiveShowing = async (reason: string) => {
+    if (!archivingShowingId) return;
+    setArchiveShowingError("");
+    const result = await archiveShowing(archivingShowingId, reason);
+    if (result.error) {
+      setArchiveShowingError(result.error);
+      return;
+    }
+    setArchivingShowingId(null);
+  };
+
+  const handleRestoreShowing = async (id: string) => {
+    const result = await restoreShowing(id);
+    return result.error ? { error: result.error } : {};
   };
 
   const openReservationAction = (showingId: string, mode: ReservationActionMode) => {
@@ -305,6 +326,17 @@ export default function CRMContent() {
             onCompleteSale={handleCompleteShowingSale}
           />
         )}
+        {archivingShowingId && (
+          <ArchiveShowingModal
+            label="Kjo shfaqje"
+            error={archiveShowingError}
+            onClose={() => {
+              setArchivingShowingId(null);
+              setArchiveShowingError("");
+            }}
+            onConfirm={handleArchiveShowing}
+          />
+        )}
         {deletingShowingId && (
           <ConfirmDeleteModal
             label="këtë shfaqje"
@@ -348,6 +380,11 @@ export default function CRMContent() {
               showings={showings}
               onAdd={() => setShowAddShowing(true)}
               onUpdateStatus={handleUpdateShowingStatus}
+              onArchive={(id) => {
+                setArchivingShowingId(id);
+                setArchiveShowingError("");
+              }}
+              onRestore={handleRestoreShowing}
               onDelete={(id) => {
                 setDeletingShowingId(id);
                 setDeleteShowingError("");

@@ -205,6 +205,44 @@ export async function updateShowing(
   return apiOk(data as unknown as ShowingRowWithLead);
 }
 
+/** Archive a showing without deleting its reservation or sale links. */
+export async function archiveShowing(
+  id: string,
+  reason?: string,
+): Promise<ApiResult<ShowingRowWithLead>> {
+  const trimmedReason = reason?.trim() || null;
+  const { data, error } = await supabase
+    .from("crm_showings")
+    .update({
+      archived_at: new Date().toISOString(),
+      archive_reason: trimmedReason,
+    })
+    .eq("id", id)
+    .select(SHOWING_WITH_LEAD_SELECT)
+    .single();
+
+  if (error) return apiFail(error.message);
+  return apiOk(data as unknown as ShowingRowWithLead);
+}
+
+/** Restore an archived showing to the active CRM workflow. */
+export async function restoreShowing(
+  id: string,
+): Promise<ApiResult<ShowingRowWithLead>> {
+  const { data, error } = await supabase
+    .from("crm_showings")
+    .update({
+      archived_at: null,
+      archive_reason: null,
+    })
+    .eq("id", id)
+    .select(SHOWING_WITH_LEAD_SELECT)
+    .single();
+
+  if (error) return apiFail(error.message);
+  return apiOk(data as unknown as ShowingRowWithLead);
+}
+
 /** Count business records that would lose showing linkage if a showing were deleted. */
 export async function getShowingDeleteDependencies(
   id: string,
