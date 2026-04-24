@@ -487,7 +487,7 @@ export function UnitDetailDrawer({
                       </div>
                     </div>
 
-                    <div className="min-w-[260px] md:w-[270px]">
+                    <div className="w-full md:w-[270px]">
                       <div className="rounded-[20px] border border-[#dfe6f1] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/30">
                           {primaryPriceLabel}
