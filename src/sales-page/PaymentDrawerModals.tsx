@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import type { Payment } from "../hooks/usePayments";
 import { GREEN, NAVY, RED } from "./shared";
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 /**
  * Generic destructive-confirm modal used for the "Fshi këstin" flow.
  * Kept local to the drawer because its layout (z-index 90, the drawer
@@ -119,7 +121,7 @@ export function MarkPaidModal({
   onClose: () => void;
   onConfirm: (paidDate: string) => Promise<void>;
 }) {
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paidDate, setPaidDate] = useState(() => todayIso());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -137,10 +139,23 @@ export function MarkPaidModal({
   }, [onClose, saving]);
 
   const handleSubmit = async () => {
-    if (!paidDate || saving) return;
+    if (saving) return;
+
+    setError("");
+
+    const today = todayIso();
+
+    if (!paidDate) {
+      setError("Plotëso datën e pagesës.");
+      return;
+    }
+
+    if (paidDate > today) {
+      setError("Data e pagesës nuk mund të jetë në të ardhmen.");
+      return;
+    }
 
     setSaving(true);
-    setError("");
 
     try {
       await onConfirm(paidDate);
@@ -188,6 +203,7 @@ export function MarkPaidModal({
           </span>
           <input
             type="date"
+            max={todayIso()}
             value={paidDate}
             onChange={(event) => {
               setPaidDate(event.target.value);
@@ -210,8 +226,8 @@ export function MarkPaidModal({
           <button
             type="button"
             onClick={() => {
-                void handleSubmit();
-              }}
+              void handleSubmit();
+            }}
             disabled={saving}
             className="rounded-[10px] px-3.5 py-2 text-[12px] font-semibold text-white transition hover:opacity-90"
             style={{ backgroundColor: GREEN }}

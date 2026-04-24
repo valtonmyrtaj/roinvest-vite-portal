@@ -8,8 +8,7 @@ import { NAVY } from "./shared";
  * scrap of its own state (show/hide, amount, due date, notes, saving)
  * because the parent drawer has no reason to know about an in-progress
  * draft. The parent only receives the final persisted payload via
- * `onCreate`; validation (`!amount || !dueDate || saving`) and the
- * post-success reset are kept exactly as the pre-decomposition flow.
+ * `onCreate`; validation and the post-success reset are kept local.
  */
 export function PaymentDrawerAddForm({
   unitId,
@@ -34,16 +33,30 @@ export function PaymentDrawerAddForm({
   const [error, setError] = useState("");
 
   const handleCreate = async () => {
-    if (!amount || !dueDate || saving) return;
+    if (saving) return;
+
+    setError("");
+
+    const trimmedAmount = amount.trim();
+    const parsedAmount = Number(trimmedAmount);
+
+    if (!trimmedAmount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setError("Shuma duhet të jetë më e madhe se 0.");
+      return;
+    }
+
+    if (!dueDate) {
+      setError("Plotëso datën e skadimit.");
+      return;
+    }
 
     setSaving(true);
-    setError("");
 
     try {
       await onCreate({
         unit_id: unitId,
         installment_number: nextInstallmentNumber,
-        amount: Number(amount),
+        amount: parsedAmount,
         due_date: dueDate,
         notes: notes.trim() ? notes.trim() : null,
       });
@@ -112,9 +125,13 @@ export function PaymentDrawerAddForm({
               </span>
               <input
                 type="number"
-                min={0}
+                min={0.01}
+                step={0.01}
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setError("");
+                }}
                 className="h-10 rounded-[11px] border border-[#e8e8ec] bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
               />
             </label>
@@ -126,7 +143,10 @@ export function PaymentDrawerAddForm({
               <input
                 type="date"
                 value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
+                onChange={(event) => {
+                  setDueDate(event.target.value);
+                  setError("");
+                }}
                 className="h-10 rounded-[11px] border border-[#e8e8ec] bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
               />
             </label>
