@@ -62,6 +62,7 @@ export default function SalesPage({
   const [paymentsSectionPulse, setPaymentsSectionPulse] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
   const upcomingPaymentsSectionRef = useRef<HTMLDivElement | null>(null);
+  const consumedFocusSearchRef = useRef<string | null>(null);
 
   const {
     stockCounts,
@@ -93,6 +94,7 @@ export default function SalesPage({
     metrics: financialMetrics,
     loading: financialMetricsLoading,
     error: financialMetricsError,
+    refresh: refreshFinancialMetrics,
   } = useSaleReporting({
     ownerScope,
     year: selectedYear,
@@ -256,12 +258,20 @@ export default function SalesPage({
       return undefined;
     }
 
-    const searchParams = new URLSearchParams(navigationSearch ?? window.location.search);
+    const focusSearch = navigationSearch ?? window.location.search;
+    const searchParams = new URLSearchParams(focusSearch);
     const focusUnitId = searchParams.get("focusUnitId");
 
     if (!focusUnitId) {
+      consumedFocusSearchRef.current = null;
       return undefined;
     }
+
+    if (consumedFocusSearchRef.current === focusSearch) {
+      return undefined;
+    }
+
+    consumedFocusSearchRef.current = focusSearch;
 
     const url = new URL(window.location.href);
     url.searchParams.delete("focusUnitId");
@@ -319,10 +329,13 @@ export default function SalesPage({
 
   const refreshPayments = useCallback(
     async (unitId: string) => {
-      await fetchPayments(unitId);
-      await refreshUpcomingPayments();
+      await Promise.all([
+        fetchPayments(unitId),
+        refreshUpcomingPayments(),
+        refreshFinancialMetrics(),
+      ]);
     },
-    [fetchPayments, refreshUpcomingPayments],
+    [fetchPayments, refreshFinancialMetrics, refreshUpcomingPayments],
   );
 
   const handleCreatePayment = async (data: {
@@ -359,7 +372,7 @@ export default function SalesPage({
     if (target) {
       await refreshPayments(target.unit_id);
     } else {
-      await refreshUpcomingPayments();
+      await Promise.all([refreshUpcomingPayments(), refreshFinancialMetrics()]);
     }
   };
 

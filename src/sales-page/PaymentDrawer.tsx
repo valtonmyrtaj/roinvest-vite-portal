@@ -73,6 +73,18 @@ export function PaymentDrawer({
   const finalPrice = getUnitContractValue(unit);
 
   useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || markPaidTarget || deleteTarget) return;
+      onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [deleteTarget, markPaidTarget, onClose]);
+
+  useEffect(() => {
     if (!feedback) return undefined;
 
     const timeoutId = window.setTimeout(() => {
