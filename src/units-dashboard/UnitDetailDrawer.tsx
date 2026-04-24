@@ -22,6 +22,9 @@ const HIDDEN_HISTORY_FIELDS = new Set([
   "active_reservation_id",
   "active_reservation_showing_id",
   "has_active_reservation",
+  "id",
+  "created_at",
+  "updated_at",
 ]);
 
 const OWNER_CATEGORY_STYLE = {
@@ -268,6 +271,7 @@ export function UnitDetailDrawer({
 
   const formatFieldValue = (val: unknown, field?: string, snapshot?: Partial<Unit>): string => {
     if (val === null || val === undefined) return "—";
+    if (typeof val === "string" && val.trim() === "") return "—";
     const s = String(val);
     if (field === "type") {
       return getUnitTypeDisplay(s, snapshot?.level);
@@ -343,11 +347,14 @@ export function UnitDetailDrawer({
         .map((entry) => {
           const prev = entry.previous_data as Partial<Unit>;
           const next = entry.new_data as Partial<Unit>;
-          const changedFields = Object.keys(next).filter(
-            (field) =>
-              !HIDDEN_HISTORY_FIELDS.has(field) &&
-              JSON.stringify(prev[field as keyof Unit]) !== JSON.stringify(next[field as keyof Unit]),
-          );
+          const changedFields = Object.keys(next).filter((field) => {
+            if (HIDDEN_HISTORY_FIELDS.has(field)) return false;
+
+            return (
+              formatFieldValue(prev[field as keyof Unit], field, prev) !==
+              formatFieldValue(next[field as keyof Unit], field, next)
+            );
+          });
 
           return { entry, prev, next, changedFields };
         })
