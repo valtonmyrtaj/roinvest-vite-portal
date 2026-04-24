@@ -18,7 +18,7 @@ import {
 import { CustomSelect } from "./components/CustomSelect";
 import { CardSectionHeader } from "./components/ui/CardSectionHeader";
 import { PageHeader } from "./components/ui/PageHeader";
-import { useMarketing, type MarketingInput, type OfflineInput } from "./hooks/useMarketing";
+import { useMarketing, type MarketingInput, type MarketingRow, type OfflineInput } from "./hooks/useMarketing";
 
 const NAVY = "#003883";
 const FB_COLOR = "#003883";
@@ -272,13 +272,52 @@ function ModalDateField({
   );
 }
 
+function parseOptionalNonNegative(value: string): { value: number; error: string | null } {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: 0, error: null };
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return {
+      value: 0,
+      error: "Vlerat duhet të jenë 0 ose më shumë.",
+    };
+  }
+
+  return { value: parsed, error: null };
+}
+
+function parseRequiredPositive(value: string): { value: number; error: string | null } {
+  const parsed = Number(value.trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return {
+      value: 0,
+      error: "Shuma duhet të jetë më e madhe se 0.",
+    };
+  }
+
+  return { value: parsed, error: null };
+}
+
+function digitalFormValuesFromRow(row?: MarketingRow | null) {
+  return {
+    spendFB: row ? String(row.spend_facebook ?? 0) : "",
+    viewsFB: row ? String(row.views_facebook ?? 0) : "",
+    viewsTT: row ? String(row.views_tiktok ?? 0) : "",
+    leadsFB: row ? String(row.leads_facebook ?? 0) : "",
+    leadsIG: row ? String(row.leads_instagram ?? 0) : "",
+    leadsTT: row ? String(row.leads_tiktok ?? 0) : "",
+  };
+}
+
 // ─── DigitalModal ──────────────────────────────────────────────────────────────
 
 function DigitalModal({
-  defaultYear, defaultMonth, onClose, onSave,
+  defaultYear, defaultMonth, existingData, onClose, onSave,
 }: {
   defaultYear: number;
   defaultMonth: number;
+  existingData: Record<number, Record<number, MarketingRow>>;
   onClose: () => void;
   onSave: (input: MarketingInput) => Promise<{ error: Error | null }>;
 }) {
@@ -294,23 +333,48 @@ function DigitalModal({
   const [saving, setSaving]       = useState(false);
   const [errMsg, setErrMsg]       = useState<string | null>(null);
 
-  const canSubmit = year && monthName && !saving;
+  const selectedMonthNumber = SQ_MONTHS.indexOf(monthName) + 1;
+  const selectedExistingRow = existingData[Number(year)]?.[selectedMonthNumber] ?? null;
+  const canSubmit = year && selectedMonthNumber >= 1 && !saving;
+
+  useEffect(() => {
+    const next = digitalFormValuesFromRow(selectedExistingRow);
+    setSpendFB(next.spendFB);
+    setViewsFB(next.viewsFB);
+    setViewsTT(next.viewsTT);
+    setLeadsFB(next.leadsFB);
+    setLeadsIG(next.leadsIG);
+    setLeadsTT(next.leadsTT);
+  }, [selectedExistingRow]);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSaving(true);
     setErrMsg(null);
     try {
-      const monthNumber = SQ_MONTHS.indexOf(monthName) + 1; // 1–12
+      const values = [
+        parseOptionalNonNegative(spendFB),
+        parseOptionalNonNegative(viewsFB),
+        parseOptionalNonNegative(viewsTT),
+        parseOptionalNonNegative(leadsFB),
+        parseOptionalNonNegative(leadsIG),
+        parseOptionalNonNegative(leadsTT),
+      ];
+      const firstError = values.find((result) => result.error)?.error;
+      if (firstError) {
+        setErrMsg(firstError);
+        return;
+      }
+
       const payload = {
         year:            Number(year),
-        month:           monthNumber,
-        spend_facebook:  Number(spendFB)  || 0,
-        views_facebook:  Number(viewsFB)  || 0,
-        views_tiktok:    Number(viewsTT)  || 0,
-        leads_facebook:  Number(leadsFB)  || 0,
-        leads_instagram: Number(leadsIG)  || 0,
-        leads_tiktok:    Number(leadsTT)  || 0,
+        month:           selectedMonthNumber,
+        spend_facebook:  values[0].value,
+        views_facebook:  values[1].value,
+        views_tiktok:    values[2].value,
+        leads_facebook:  values[3].value,
+        leads_instagram: values[4].value,
+        leads_tiktok:    values[5].value,
       };
       const { error } = await onSave(payload);
       if (error) { setErrMsg(error.message); return; }
@@ -343,7 +407,7 @@ function DigitalModal({
       >
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
-            Shto të dhëna digjitale
+            {selectedExistingRow ? "Përditëso të dhënat digjitale" : "Shto të dhëna digjitale"}
           </h2>
           <button
             onClick={onClose}
@@ -400,7 +464,7 @@ function DigitalModal({
             className="h-[38px] rounded-[10px] px-5 text-[13px] text-white transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: NAVY, fontWeight: 600 }}
           >
-            {saving ? "Duke ruajtur..." : "Shto të dhënat"}
+            {saving ? "Duke ruajtur..." : selectedExistingRow ? "Përditëso të dhënat" : "Shto të dhënat"}
           </button>
         </div>
       </motion.div>
@@ -438,10 +502,16 @@ function OfflineModal({
     setSaving(true);
     setErrMsg(null);
     try {
+      const parsedAmount = parseRequiredPositive(amount);
+      if (parsedAmount.error) {
+        setErrMsg(parsedAmount.error);
+        return;
+      }
+
       const { error } = await onSave({
         channel,
         description: description || null,
-        amount:      Number(amount),
+        amount:      parsedAmount.value,
         period_type: periodType,
         year:        Number(year),
         month:       periodType === "Mujore" ? Number(month) : null,
@@ -576,11 +646,12 @@ function OfflineModal({
 // ─── DeleteConfirmModal ────────────────────────────────────────────────────────
 
 function DeleteConfirmModal({
-  onCancel, onConfirm, loading,
+  onCancel, onConfirm, loading, error,
 }: {
   onCancel: () => void;
   onConfirm: () => void;
   loading: boolean;
+  error?: string | null;
 }) {
   return (
     <motion.div
@@ -603,8 +674,14 @@ function DeleteConfirmModal({
           Fshi hyrjen offline
         </h2>
         <p className="mt-1.5 text-[13px] text-black/45">
-          Jeni i sigurt? Kjo veprim nuk mund të zhbëhet.
+          Jeni i sigurt? Ky veprim nuk mund të zhbëhet.
         </p>
+        {error && (
+          <div className="mt-3 flex items-center gap-2 rounded-[10px] bg-[#fdf3f3] px-3 py-2.5">
+            <AlertTriangle size={13} style={{ color: "#b14b4b" }} strokeWidth={2} />
+            <p className="text-[12px]" style={{ color: "#b14b4b" }}>{error}</p>
+          </div>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onCancel}
@@ -650,6 +727,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId]     = useState<string | null>(null);
   const [deleting, setDeleting]                 = useState(false);
+  const [deleteError, setDeleteError]           = useState<string | null>(null);
   const [logFilter, setLogFilter]               = useState<"E gjitha" | "Mujore" | "Vjetore">("E gjitha");
 
   useEffect(() => {
@@ -752,9 +830,14 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
 
   const handleDeleteConfirm = async () => {
     if (!deleteTargetId) return;
+    setDeleteError(null);
     setDeleting(true);
-    await deleteOfflineEntry(deleteTargetId);
+    const { error } = await deleteOfflineEntry(deleteTargetId);
     setDeleting(false);
+    if (error) {
+      setDeleteError(error.message);
+      return;
+    }
     setDeleteTargetId(null);
   };
 
@@ -1022,7 +1105,10 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
                       </td>
                       <td className="py-3 text-right">
                         <button
-                          onClick={() => setDeleteTargetId(entry.id)}
+                          onClick={() => {
+                            setDeleteTargetId(entry.id);
+                            setDeleteError(null);
+                          }}
                           className="flex h-7 w-7 items-center justify-center rounded-[7px] text-black/25 transition hover:bg-[#fdf3f3] hover:text-[#b14b4b]"
                         >
                           <Trash2 size={13} strokeWidth={2} />
@@ -1044,6 +1130,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           <DigitalModal
             defaultYear={filterYear}
             defaultMonth={defaultModalMonth}
+            existingData={existingData}
             onClose={() => setShowDigitalModal(false)}
             onSave={saveMonthlyData}
           />
@@ -1059,7 +1146,11 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
         {deleteTargetId && (
           <DeleteConfirmModal
             loading={deleting}
-            onCancel={() => setDeleteTargetId(null)}
+            error={deleteError}
+            onCancel={() => {
+              setDeleteTargetId(null);
+              setDeleteError(null);
+            }}
             onConfirm={handleDeleteConfirm}
           />
         )}
