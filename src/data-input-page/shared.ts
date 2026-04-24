@@ -163,6 +163,10 @@ export function roomCategory(
   return "none";
 }
 
+export function normalizeOptionalArea(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export function emptyDraft(
   ownerCategory: OwnerCategory,
   ownerNameOptions: string[] = [],
@@ -183,8 +187,8 @@ export function emptyDraft(
     bedrooms: undefined,
     bathrooms: undefined,
     toilets: undefined,
-    orientation: null,
-    floorplan_code: "",
+    orientation: undefined,
+    floorplan_code: undefined,
     balcony_area: undefined,
     terrace_area: undefined,
   };

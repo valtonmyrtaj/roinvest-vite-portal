@@ -17,6 +17,7 @@ import {
   getOwnerNameOptions,
   LEVELS,
   MANUAL_UNIT_STATUSES,
+  normalizeOptionalArea,
   ORIENTATION_OPTIONS,
   OWNER_CATEGORIES,
   roomCategory,
@@ -189,13 +190,18 @@ export function EditModal({
     const normalizedNotes = typeof form.notes === "string" ? form.notes : null;
     const normalizedFloorplanCode =
       typeof form.floorplan_code === "string" ? form.floorplan_code.trim() || null : null;
+    const isApartment = architectureCategory === "apartment";
+    const isLokal = architectureCategory === "lokal";
     const baseChanges: Partial<CreateUnitInput> = {
       ...form,
       notes: normalizedNotes,
+      bedrooms: isApartment ? (form.bedrooms ?? null) : null,
+      bathrooms: isApartment ? (form.bathrooms ?? null) : null,
+      toilets: isLokal ? (form.toilets ?? null) : null,
       orientation: form.orientation ?? null,
       floorplan_code: normalizedFloorplanCode,
-      balcony_area: form.balcony_area ?? null,
-      terrace_area: form.terrace_area ?? null,
+      balcony_area: isApartment ? normalizeOptionalArea(form.balcony_area) : null,
+      terrace_area: isApartment ? normalizeOptionalArea(form.terrace_area) : null,
       reservation_expires_at:
         form.status === "E rezervuar" ? form.reservation_expires_at ?? null : null,
     };

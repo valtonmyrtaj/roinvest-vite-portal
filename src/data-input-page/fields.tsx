@@ -88,7 +88,7 @@ export function OptionalNumberField({
       </span>
       <input
         type="number"
-        min={0}
+        min={0.01}
         step="0.01"
         value={value != null ? value : ""}
         onChange={(e) =>

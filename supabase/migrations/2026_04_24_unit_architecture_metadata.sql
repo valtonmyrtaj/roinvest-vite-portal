@@ -36,26 +36,46 @@ begin
       );
   end if;
 
-  if not exists (
+  if exists (
     select 1
     from pg_constraint
     where conrelid = 'public.units'::regclass
       and conname = 'units_balcony_area_non_negative_check'
   ) then
     alter table public.units
-      add constraint units_balcony_area_non_negative_check
-      check (balcony_area is null or balcony_area >= 0);
+      drop constraint units_balcony_area_non_negative_check;
   end if;
 
   if not exists (
     select 1
     from pg_constraint
     where conrelid = 'public.units'::regclass
+      and conname = 'units_balcony_area_positive_check'
+  ) then
+    alter table public.units
+      add constraint units_balcony_area_positive_check
+      check (balcony_area is null or balcony_area > 0);
+  end if;
+
+  if exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.units'::regclass
       and conname = 'units_terrace_area_non_negative_check'
   ) then
     alter table public.units
-      add constraint units_terrace_area_non_negative_check
-      check (terrace_area is null or terrace_area >= 0);
+      drop constraint units_terrace_area_non_negative_check;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.units'::regclass
+      and conname = 'units_terrace_area_positive_check'
+  ) then
+    alter table public.units
+      add constraint units_terrace_area_positive_check
+      check (terrace_area is null or terrace_area > 0);
   end if;
 end $$;
 
