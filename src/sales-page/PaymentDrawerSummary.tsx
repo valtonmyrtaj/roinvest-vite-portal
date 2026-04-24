@@ -83,7 +83,7 @@ export function PaymentDrawerSummary({
         </div>
       </div>
 
-      <div className={`mt-5 grid gap-3 ${saleMeta.length > 0 ? "lg:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.9fr)]" : ""}`}>
+      <div className={`mt-5 grid gap-3 ${saleMeta.length > 0 ? "md:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.9fr)]" : ""}`}>
         <div className="rounded-[20px] border border-[#e7ebf2] bg-white/92 px-4 py-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
             Detajet e njësisë

@@ -137,14 +137,17 @@ export function PaymentDrawer({
         animate={{ x: 0, opacity: 1, scale: 1 }}
         exit={{ x: 48, opacity: 0, scale: 0.985 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed bottom-3 left-3 right-3 top-3 z-[80] flex flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-[#fbfbfc] shadow-[-12px_28px_80px_rgba(15,23,42,0.18),0_10px_28px_rgba(15,23,42,0.08)] sm:bottom-5 sm:left-auto sm:right-5 sm:top-5 sm:w-[760px] sm:rounded-[32px]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-drawer-title"
+        className="fixed bottom-3 left-3 right-3 top-3 z-[80] flex flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-[#fbfbfc] shadow-[-12px_28px_80px_rgba(15,23,42,0.18),0_10px_28px_rgba(15,23,42,0.08)] sm:bottom-5 sm:left-5 sm:right-5 sm:top-5 sm:rounded-[32px] md:left-auto md:w-[min(760px,calc(100vw-2.5rem))]"
       >
         <div className="flex items-start justify-between border-b border-[#eef0f4] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] px-6 py-5">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/30">
               Pagesat e njësisë
             </p>
-            <p className="mt-2 text-[20px] font-semibold tracking-[-0.03em]" style={{ color: NAVY }}>
+            <p id="payment-drawer-title" className="mt-2 text-[20px] font-semibold tracking-[-0.03em]" style={{ color: NAVY }}>
               {unit.unit_id}
             </p>
             <p className="mt-1 text-[13px] text-black/48">
@@ -155,6 +158,7 @@ export function PaymentDrawer({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Mbyll"
             className="flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.06] bg-white/90 text-black/35 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:bg-white hover:text-black/58"
           >
             <X size={16} />
