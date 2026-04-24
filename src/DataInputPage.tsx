@@ -230,27 +230,20 @@ export default function DataInputPage({
       throw new Error(DIRECT_SALE_ACTIVE_RESERVATION_ERROR);
     }
 
+    if (hasMeaningfulUnitChanges(editUnit, payload.genericChanges)) {
+      const updateResult = await updateUnit(editUnit.id, payload.genericChanges, payload.reason);
+      if (updateResult.error) {
+        throw new Error(updateResult.error);
+      }
+    }
+
     const saleResult = await completeUnitSale(payload.sale);
     if (saleResult.error) {
       throw new Error(saleResult.error);
     }
 
-    let genericUpdateError: string | null = null;
-
-    if (hasMeaningfulUnitChanges(editUnit, payload.genericChanges)) {
-      const updateResult = await updateUnit(editUnit.id, payload.genericChanges, payload.reason);
-      if (updateResult.error) {
-        genericUpdateError =
-          "Shitja u kompletua, por disa përditësime të njësisë nuk u ruajtën. Rihapeni njësinë dhe provoni sërish vetëm korrigjimet e mbetura.";
-      }
-    }
-
     await fetchUnits();
     await fetchAllPayments();
-
-    if (genericUpdateError) {
-      throw new Error(genericUpdateError);
-    }
   };
 
   const handleRegistryEdit = (registryUnit: RegistryUnit) => {
