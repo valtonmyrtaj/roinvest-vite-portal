@@ -7,11 +7,13 @@ import {
   type DraftUnit,
   LEVELS,
   MANUAL_UNIT_STATUSES,
+  ORIENTATION_OPTIONS,
   TYPES,
   roomCategory,
 } from "./shared";
 import {
   NumberField,
+  OptionalNumberField,
   RoomNumberField,
   SelectField,
   TextField,
@@ -38,26 +40,38 @@ export function UnitForm({
   onDuplicate: () => void;
   index: number;
 }) {
-  const [showPlanDetails, setShowPlanDetails] = useState(
-    () => Boolean(draft.bedrooms || draft.bathrooms || draft.toilets),
+  const [showArchitectureDetails, setShowArchitectureDetails] = useState(
+    () =>
+      Boolean(
+        draft.bedrooms ||
+          draft.bathrooms ||
+          draft.toilets ||
+          draft.orientation ||
+          draft.floorplan_code ||
+          draft.balcony_area ||
+          draft.terrace_area,
+      ),
   );
   const set = (field: keyof DraftUnit, value: unknown) =>
     onChange({ ...draft, [field]: value });
   const roomDetailsCategory = roomCategory(draft.type as string | undefined);
-  const supportsPlanDetails =
-    roomDetailsCategory === "apartment" || roomDetailsCategory === "lokal";
   const hasRoomMetadata =
     draft.bedrooms != null || draft.bathrooms != null || draft.toilets != null;
-  const planDetailsSummary =
+  const hasArchitectureMetadata =
+    hasRoomMetadata ||
+    Boolean(draft.orientation || draft.floorplan_code || draft.balcony_area || draft.terrace_area);
+  const architectureDetailsSummary =
     roomDetailsCategory === "apartment"
       ? hasRoomMetadata
         ? `${draft.bedrooms ?? "—"} dhoma gjumi · ${draft.bathrooms ?? "—"} banjo`
-        : "Opsionale për ofertat dhe referencën e planit"
+        : "Orientim, planimetri dhe hapësira të jashtme"
       : roomDetailsCategory === "lokal"
         ? hasRoomMetadata
           ? `${draft.toilets ?? "—"} tualet`
-          : "Opsionale për ofertat dhe referencën e planit"
-        : "";
+          : "Orientim, planimetri dhe tualete"
+        : hasArchitectureMetadata
+          ? "Detaje arkitekturore të plotësuara"
+          : "Orientim dhe referencë planimetrie";
 
   return (
     <motion.div
@@ -144,66 +158,89 @@ export function UnitForm({
           placeholder="Zgjidh statusin"
         />
 
-        {supportsPlanDetails && (
-          <div className="col-span-3 rounded-[12px] border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.02)]">
-            <button
-              type="button"
-              onClick={() => setShowPlanDetails((prev) => !prev)}
-              className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
-            >
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-                  Detaje të planit
-                </p>
-                <p className="mt-1 text-[12px] text-black/42">{planDetailsSummary}</p>
-              </div>
-              <ChevronDown
-                size={15}
-                className={`shrink-0 text-black/35 transition-transform duration-200 ${
-                  showPlanDetails ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+        <div className="col-span-3 rounded-[12px] border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.02)]">
+          <button
+            type="button"
+            onClick={() => setShowArchitectureDetails((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
+                Detaje arkitekturore
+              </p>
+              <p className="mt-1 text-[12px] text-black/42">{architectureDetailsSummary}</p>
+            </div>
+            <ChevronDown
+              size={15}
+              className={`shrink-0 text-black/35 transition-transform duration-200 ${
+                showArchitectureDetails ? "rotate-180" : ""
+              }`}
+            />
+          </button>
 
-            <AnimatePresence initial={false}>
-              {showPlanDetails && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="overflow-hidden border-t border-black/[0.06]"
-                >
-                  <div className="grid grid-cols-3 gap-3 px-3 py-3">
-                    {roomDetailsCategory === "apartment" ? (
-                      <>
-                        <RoomNumberField
-                          label="Dhoma gjumi"
-                          value={draft.bedrooms}
-                          onChange={(v) => set("bedrooms", v)}
-                          placeholder="p.sh. 2"
-                        />
-                        <RoomNumberField
-                          label="Banjo"
-                          value={draft.bathrooms}
-                          onChange={(v) => set("bathrooms", v)}
-                          placeholder="p.sh. 1"
-                        />
-                      </>
-                    ) : (
+          <AnimatePresence initial={false}>
+            {showArchitectureDetails && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden border-t border-black/[0.06]"
+              >
+                <div className="grid grid-cols-3 gap-3 px-3 py-3">
+                  <SelectField
+                    label="Orientimi"
+                    value={draft.orientation ?? ""}
+                    onChange={(v) => set("orientation", v || null)}
+                    options={ORIENTATION_OPTIONS}
+                    placeholder="Zgjidh"
+                  />
+                  <TextField
+                    label="Planimetria"
+                    value={draft.floorplan_code ?? ""}
+                    onChange={(v) => set("floorplan_code", v)}
+                    placeholder="p.sh. A-2.1"
+                  />
+                  {roomDetailsCategory === "apartment" ? (
+                    <>
                       <RoomNumberField
-                        label="Tualet"
-                        value={draft.toilets}
-                        onChange={(v) => set("toilets", v)}
+                        label="Dhoma gjumi"
+                        value={draft.bedrooms}
+                        onChange={(v) => set("bedrooms", v)}
+                        placeholder="p.sh. 2"
+                      />
+                      <RoomNumberField
+                        label="Banjo"
+                        value={draft.bathrooms}
+                        onChange={(v) => set("bathrooms", v)}
                         placeholder="p.sh. 1"
                       />
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
+                      <OptionalNumberField
+                        label="Ballkon (m²)"
+                        value={draft.balcony_area}
+                        onChange={(v) => set("balcony_area", v)}
+                        placeholder="p.sh. 6"
+                      />
+                      <OptionalNumberField
+                        label="Terrasë (m²)"
+                        value={draft.terrace_area}
+                        onChange={(v) => set("terrace_area", v)}
+                        placeholder="p.sh. 12"
+                      />
+                    </>
+                  ) : roomDetailsCategory === "lokal" ? (
+                    <RoomNumberField
+                      label="Tualet"
+                      value={draft.toilets}
+                      onChange={(v) => set("toilets", v)}
+                      placeholder="p.sh. 1"
+                    />
+                  ) : null}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         <label className="col-span-3 flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">

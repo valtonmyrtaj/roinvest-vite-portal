@@ -22,6 +22,7 @@ import {
   getDefaultOwnerName,
   getOwnerNameOptions,
   isDraftValid,
+  normalizeOptionalArea,
   roomCategory,
 } from "./data-input-page/shared";
 import { EditModal } from "./data-input-page/EditModal";
@@ -32,7 +33,10 @@ function normalizeComparableUnitValue(
   key: keyof CreateUnitInput,
   value: unknown,
 ) {
-  if ((key === "notes" || key === "reservation_expires_at") && value === "") {
+  if (
+    (key === "notes" || key === "reservation_expires_at" || key === "floorplan_code") &&
+    value === ""
+  ) {
     return null;
   }
 
@@ -165,11 +169,16 @@ export default function DataInputPage({
       const { _key, ...rawInput } = d;
       void _key;
       const cat = roomCategory(rawInput.type as string | undefined);
+      const isApartment = cat === "apartment";
       const input: CreateUnitInput = {
         ...(rawInput as CreateUnitInput),
-        bedrooms: cat === "apartment" ? (rawInput.bedrooms ?? null) : null,
-        bathrooms: cat === "apartment" ? (rawInput.bathrooms ?? null) : null,
+        bedrooms: isApartment ? (rawInput.bedrooms ?? null) : null,
+        bathrooms: isApartment ? (rawInput.bathrooms ?? null) : null,
         toilets: cat === "lokal" ? (rawInput.toilets ?? null) : null,
+        orientation: rawInput.orientation ?? null,
+        floorplan_code: rawInput.floorplan_code?.trim() || null,
+        balcony_area: isApartment ? normalizeOptionalArea(rawInput.balcony_area) : null,
+        terrace_area: isApartment ? normalizeOptionalArea(rawInput.terrace_area) : null,
       };
       const result = await createUnit(input);
       if (result.error) {

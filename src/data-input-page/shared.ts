@@ -2,6 +2,7 @@ import type {
   Block,
   CreateUnitInput,
   OwnerCategory,
+  UnitOrientation,
   UnitStatus,
 } from "../hooks/useUnits";
 import type { CompleteUnitSaleInput, SalePaymentType } from "../lib/api/sales";
@@ -23,6 +24,16 @@ export const OWNER_CATEGORIES: OwnerCategory[] = [
   "Investitor",
   "Pronarët e tokës",
   "Kompani ndërtimore",
+];
+export const ORIENTATION_OPTIONS: UnitOrientation[] = [
+  "Veri",
+  "Veri-Lindje",
+  "Lindje",
+  "Jug-Lindje",
+  "Jug",
+  "Jug-Perëndim",
+  "Perëndim",
+  "Veri-Perëndim",
 ];
 
 export const OWNER_NAMES: Record<OwnerCategory, string[]> = {
@@ -152,6 +163,10 @@ export function roomCategory(
   return "none";
 }
 
+export function normalizeOptionalArea(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export function emptyDraft(
   ownerCategory: OwnerCategory,
   ownerNameOptions: string[] = [],
@@ -172,6 +187,10 @@ export function emptyDraft(
     bedrooms: undefined,
     bathrooms: undefined,
     toilets: undefined,
+    orientation: undefined,
+    floorplan_code: undefined,
+    balcony_area: undefined,
+    terrace_area: undefined,
   };
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { unitDetail as unitDetailApi } from "../lib/api";
 import type { UnitDetailSnapshot } from "../lib/api/unitDetail";
-import type { Block, Level, OwnerCategory, Unit, UnitStatus } from "./useUnits";
+import type { Block, Level, OwnerCategory, Unit, UnitOrientation, UnitStatus } from "./useUnits";
 
 export function useUnitDetail(unitId: string | null) {
   const [unit, setUnit] = useState<Unit | null>(null);
@@ -100,6 +100,10 @@ function mapUnitDetailSnapshot(snapshot: UnitDetailSnapshot): Unit {
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     toilets: row.toilets,
+    orientation: row.orientation as UnitOrientation | null,
+    floorplan_code: row.floorplan_code,
+    balcony_area: row.balcony_area,
+    terrace_area: row.terrace_area,
     final_price: snapshot.activeSale?.final_price ?? null,
     sale_date: snapshot.activeSale?.sale_date || row.sale_date,
     buyer_name: snapshot.activeSale?.buyer_name ?? row.buyer_name,

@@ -21,6 +21,15 @@ export type OwnerCategory =
   | "Investitor"
   | "Pronarët e tokës"
   | "Kompani ndërtimore";
+export type UnitOrientation =
+  | "Veri"
+  | "Veri-Lindje"
+  | "Lindje"
+  | "Jug-Lindje"
+  | "Jug"
+  | "Jug-Perëndim"
+  | "Perëndim"
+  | "Veri-Perëndim";
 
 export interface Unit {
   // ── units table (always present) ──────────────────────────────────────────
@@ -45,6 +54,10 @@ export interface Unit {
   bedrooms?: number | null;
   bathrooms?: number | null;
   toilets?: number | null;
+  orientation?: UnitOrientation | null;
+  floorplan_code?: string | null;
+  balcony_area?: number | null;
+  terrace_area?: number | null;
 
   // ── sale truth overlay (populated from unit_sales when an active sale exists) ──
   /**
@@ -93,6 +106,10 @@ export interface CreateUnitInput {
   bedrooms?: number | null;
   bathrooms?: number | null;
   toilets?: number | null;
+  orientation?: UnitOrientation | null;
+  floorplan_code?: string | null;
+  balcony_area?: number | null;
+  terrace_area?: number | null;
 }
 
 function toUnitHistorySnapshot(value: Json | null): Partial<Unit> {
@@ -139,6 +156,10 @@ function mapDbUnit(row: UnitRow): Unit {
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     toilets: row.toilets,
+    orientation: row.orientation as UnitOrientation | null,
+    floorplan_code: row.floorplan_code,
+    balcony_area: row.balcony_area,
+    terrace_area: row.terrace_area,
     // Legacy compat fallbacks — overridden by sale truth overlay when active unit_sales exists.
     sale_date: row.sale_date,
     buyer_name: row.buyer_name,

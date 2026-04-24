@@ -534,15 +534,18 @@ export type Database = {
       }
       units: {
         Row: {
+          balcony_area: number | null
           bathrooms: number | null
           bedrooms: number | null
           block: string
           buyer_lead_id: string | null
           buyer_name: string | null
           created_at: string | null
+          floorplan_code: string | null
           id: string
           level: string
           notes: string | null
+          orientation: string | null
           owner_category: string
           owner_name: string
           price: number
@@ -551,21 +554,25 @@ export type Database = {
           sale_price: number | null
           size: number
           status: string
+          terrace_area: number | null
           toilets: number | null
           type: string
           unit_id: string
           updated_at: string | null
         }
         Insert: {
+          balcony_area?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
           block: string
           buyer_lead_id?: string | null
           buyer_name?: string | null
           created_at?: string | null
+          floorplan_code?: string | null
           id?: string
           level: string
           notes?: string | null
+          orientation?: string | null
           owner_category: string
           owner_name: string
           price: number
@@ -574,21 +581,25 @@ export type Database = {
           sale_price?: number | null
           size: number
           status?: string
+          terrace_area?: number | null
           toilets?: number | null
           type: string
           unit_id: string
           updated_at?: string | null
         }
         Update: {
+          balcony_area?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
           block?: string
           buyer_lead_id?: string | null
           buyer_name?: string | null
           created_at?: string | null
+          floorplan_code?: string | null
           id?: string
           level?: string
           notes?: string | null
+          orientation?: string | null
           owner_category?: string
           owner_name?: string
           price?: number
@@ -597,6 +608,7 @@ export type Database = {
           sale_price?: number | null
           size?: number
           status?: string
+          terrace_area?: number | null
           toilets?: number | null
           type?: string
           unit_id?: string
@@ -664,15 +676,18 @@ export type Database = {
           p_unit_ids?: string[]
         }
         Returns: {
+          balcony_area: number | null
           bathrooms: number | null
           bedrooms: number | null
           block: string
           buyer_lead_id: string | null
           buyer_name: string | null
           created_at: string | null
+          floorplan_code: string | null
           id: string
           level: string
           notes: string | null
+          orientation: string | null
           owner_category: string
           owner_name: string
           price: number
@@ -681,6 +696,7 @@ export type Database = {
           sale_price: number | null
           size: number
           status: string
+          terrace_area: number | null
           toilets: number | null
           type: string
           unit_id: string
