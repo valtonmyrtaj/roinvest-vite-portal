@@ -130,6 +130,10 @@ const ACTIVE_RESERVATION_CONFLICT_ERROR =
   "Njësia ka tashmë një rezervim aktiv. Përdorni rezervimin ekzistues ose zgjidhni njësi tjetër.";
 const SHOWING_ACTIVE_RESERVATION_LOCK_ERROR =
   "Kjo shfaqje ka rezervim aktiv të lidhur. Ndryshimet që prekin rezervimin duhet të bëhen nga rrjedha kanonike e rezervimeve.";
+const LEAD_DELETE_LINKED_HISTORY_ERROR =
+  "Kontakti nuk mund të fshihet sepse ka histori të lidhur me shfaqje, rezervime ose shitje.";
+const SHOWING_DELETE_LINKED_HISTORY_ERROR =
+  "Shfaqja nuk mund të fshihet sepse ka histori të lidhur me rezervim ose shitje.";
 const RESERVATION_CREATE_ROLLBACK_ERROR =
   "Rezervimi nuk u krijua dot. Shfaqja u ruajt, por nuk u fshi automatikisht. Verifikojeni manualisht.";
 const RESERVATION_UPDATE_ROLLBACK_ERROR =
@@ -510,6 +514,20 @@ export function useCRM() {
   };
 
   const deleteLead = async (id: string) => {
+    const dependencies = await crmApi.getLeadDeleteDependencies(id);
+    if (dependencies.error) return { error: dependencies.error };
+    if (
+      dependencies.data &&
+      (
+        dependencies.data.showingsCount > 0 ||
+        dependencies.data.reservationsCount > 0 ||
+        dependencies.data.salesCount > 0 ||
+        dependencies.data.buyerUnitsCount > 0
+      )
+    ) {
+      return { error: LEAD_DELETE_LINKED_HISTORY_ERROR };
+    }
+
     const { error } = await crmApi.deleteLead(id);
     if (error) return { error };
     leadsVersionRef.current += 1;
@@ -834,6 +852,18 @@ export function useCRM() {
   };
 
   const deleteShowing = async (id: string) => {
+    const dependencies = await crmApi.getShowingDeleteDependencies(id);
+    if (dependencies.error) return { error: dependencies.error };
+    if (
+      dependencies.data &&
+      (
+        dependencies.data.reservationsCount > 0 ||
+        dependencies.data.salesCount > 0
+      )
+    ) {
+      return { error: SHOWING_DELETE_LINKED_HISTORY_ERROR };
+    }
+
     const { error } = await crmApi.deleteShowing(id);
     if (error) return { error };
     showingsVersionRef.current += 1;

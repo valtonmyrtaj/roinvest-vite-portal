@@ -34,6 +34,36 @@ export type UpdateShowingPatch = TablesUpdate<"crm_showings">;
 export type CreateDailyLogPayload = TablesInsert<"crm_daily_log">;
 export type UpdateDailyLogPatch = TablesUpdate<"crm_daily_log">;
 
+export interface LeadDeleteDependencies {
+  showingsCount: number;
+  reservationsCount: number;
+  salesCount: number;
+  buyerUnitsCount: number;
+}
+
+export interface ShowingDeleteDependencies {
+  reservationsCount: number;
+  salesCount: number;
+}
+
+async function countRows(
+  table:
+    | "crm_showings"
+    | "unit_reservations"
+    | "unit_sales"
+    | "units",
+  column: string,
+  value: string,
+): Promise<ApiResult<number>> {
+  const { count, error } = await supabase
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(column, value);
+
+  if (error) return apiFail(error.message);
+  return apiOk(count ?? 0);
+}
+
 // ─── Leads ───────────────────────────────────────────────────────────────────
 
 /** List every lead, ordered by creation time descending. */
@@ -75,6 +105,38 @@ export async function updateLead(
 
   if (error) return apiFail(error.message);
   return apiOk(data as CRMLeadRow);
+}
+
+/** Count business records that would lose CRM linkage if a lead were deleted. */
+export async function getLeadDeleteDependencies(
+  id: string,
+): Promise<ApiResult<LeadDeleteDependencies>> {
+  const [
+    showingsResult,
+    reservationsResult,
+    salesResult,
+    buyerUnitsResult,
+  ] = await Promise.all([
+    countRows("crm_showings", "contact_id", id),
+    countRows("unit_reservations", "contact_id", id),
+    countRows("unit_sales", "crm_lead_id", id),
+    countRows("units", "buyer_lead_id", id),
+  ]);
+
+  const firstError =
+    showingsResult.error ??
+    reservationsResult.error ??
+    salesResult.error ??
+    buyerUnitsResult.error;
+
+  if (firstError) return apiFail(firstError);
+
+  return apiOk({
+    showingsCount: showingsResult.data ?? 0,
+    reservationsCount: reservationsResult.data ?? 0,
+    salesCount: salesResult.data ?? 0,
+    buyerUnitsCount: buyerUnitsResult.data ?? 0,
+  });
 }
 
 /** Delete a lead by id. */
@@ -141,6 +203,24 @@ export async function updateShowing(
 
   if (error) return apiFail(error.message);
   return apiOk(data as unknown as ShowingRowWithLead);
+}
+
+/** Count business records that would lose showing linkage if a showing were deleted. */
+export async function getShowingDeleteDependencies(
+  id: string,
+): Promise<ApiResult<ShowingDeleteDependencies>> {
+  const [reservationsResult, salesResult] = await Promise.all([
+    countRows("unit_reservations", "showing_id", id),
+    countRows("unit_sales", "showing_id", id),
+  ]);
+
+  const firstError = reservationsResult.error ?? salesResult.error;
+  if (firstError) return apiFail(firstError);
+
+  return apiOk({
+    reservationsCount: reservationsResult.data ?? 0,
+    salesCount: salesResult.data ?? 0,
+  });
 }
 
 /** Delete a showing by id. */
