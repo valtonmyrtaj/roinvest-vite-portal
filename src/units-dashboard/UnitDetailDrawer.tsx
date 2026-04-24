@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight, Clock3, LayoutList, ScrollText, X } from "lucide-react";
 import { EyebrowLabel } from "../components/ui/Eyebrow";
@@ -7,7 +7,7 @@ import { SkeletonRows } from "../components/SkeletonRows";
 import type { Unit, UnitHistory } from "../hooks/useUnits";
 import { getUnitTypeDisplay } from "../lib/unitType";
 import { NAVY } from "../ui/tokens";
-import { fmtDateShort, fmtPrice, getDhomaDisplay, SQ_MONTHS_LONG, statusStyleFor } from "./shared";
+import { fmtDateShort, fmtPrice, SQ_MONTHS_LONG, statusStyleFor } from "./shared";
 
 type UnitDetailTab = "summary" | "history";
 
@@ -71,28 +71,6 @@ function DetailSectionCard({
   );
 }
 
-function SummaryMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: ReactNode;
-}) {
-  return (
-    <div className="rounded-[16px] border border-black/[0.04] bg-white/78 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.025)]">
-      <p className="text-[9.5px] font-semibold uppercase tracking-[0.15em] text-black/28">
-        {label}
-      </p>
-      <div
-        className="mt-1.5 text-[14px] leading-[1.2] tracking-[-0.02em] text-black/76"
-        style={{ fontWeight: 650 }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -122,6 +100,10 @@ function formatOptionalArea(value: number | null | undefined): string | null {
   return `${value.toLocaleString("de-DE")} m²`;
 }
 
+function formatUpdatedFieldsCount(count: number): string {
+  return count === 1 ? "1 fushë e përditësuar" : `${count} fusha të përditësuara`;
+}
+
 export function UnitDetailDrawer({
   unit,
   onClose,
@@ -137,6 +119,7 @@ export function UnitDetailDrawer({
   onExtendReservation?: (unit: Unit) => void;
   onReleaseReservation?: (unit: Unit) => void;
 }) {
+  const drawerTitleId = useId();
   const [activeTab, setActiveTab] = useState<UnitDetailTab>(initialTab);
   const [history, setHistory] = useState<UnitHistory[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -188,10 +171,6 @@ export function UnitDetailDrawer({
         { label: "Lloji", value: typeLabel },
         { label: "Niveli", value: unit.level },
         { label: "Sipërfaqja", value: `${unit.size} m²` },
-        unit.orientation ? { label: "Orientimi", value: unit.orientation } : null,
-        unit.floorplan_code ? { label: "Planimetria", value: unit.floorplan_code } : null,
-        balconyAreaLabel ? { label: "Ballkoni", value: balconyAreaLabel } : null,
-        terraceAreaLabel ? { label: "Terrasa", value: terraceAreaLabel } : null,
         unit.bedrooms && unit.bedrooms > 0
           ? { label: "Dhoma gjumi", value: String(unit.bedrooms) }
           : null,
@@ -203,18 +182,25 @@ export function UnitDetailDrawer({
           : null,
       ].filter(notNull),
     [
-      balconyAreaLabel,
-      terraceAreaLabel,
       typeLabel,
       unit.bathrooms,
       unit.bedrooms,
       unit.block,
-      unit.floorplan_code,
       unit.level,
-      unit.orientation,
       unit.size,
       unit.toilets,
     ],
+  );
+
+  const architectureDetails = useMemo<DetailItem[]>(
+    () =>
+      [
+        unit.orientation ? { label: "Orientimi", value: unit.orientation } : null,
+        unit.floorplan_code ? { label: "Planimetria", value: unit.floorplan_code } : null,
+        balconyAreaLabel ? { label: "Ballkoni", value: balconyAreaLabel } : null,
+        terraceAreaLabel ? { label: "Terrasa", value: terraceAreaLabel } : null,
+      ].filter(notNull),
+    [balconyAreaLabel, terraceAreaLabel, unit.floorplan_code, unit.orientation],
   );
 
   const operationalDetails = useMemo<DetailItem[]>(
@@ -293,7 +279,6 @@ export function UnitDetailDrawer({
 
   const fieldLabels: Record<string, string> = {
     status: "Statusi",
-    updated_at: "Përditësuar më",
     reservation_expires_at: "Skadon më",
     notes: "Shënime",
     block: "Blloku",
@@ -365,17 +350,13 @@ export function UnitDetailDrawer({
   const statusColor = (status: string | undefined) =>
     status === "E rezervuar" ? "#b0892f" : status === "E shitur" ? "#b14b4b" : "#3c7a57";
 
-  const newStatusColor = (next: Partial<Unit>, field: string) => {
+  const changedValueColor = (next: Partial<Unit>, field: string) => {
     if (field === "status") return statusColor(next.status);
-    if (field === "reservation_expires_at") return statusColor(next.status);
-    if (field === "updated_at" && next.status !== undefined) return statusColor(next.status);
-    return "#3c7a57";
+    return "rgba(15,23,42,0.72)";
   };
 
   const primaryPriceLabel = unit.final_price != null ? "Çmimi final" : "Çmimi";
   const primaryPriceValue = unit.final_price ?? unit.price;
-  const roomSummary = getDhomaDisplay(unit);
-  const roomSummaryLabel = roomSummary === "—" ? "—" : roomSummary;
   const priceDelta =
     unit.final_price != null && Number.isFinite(unit.price) ? unit.final_price - unit.price : null;
   const priceDeltaLabel =
@@ -402,11 +383,14 @@ export function UnitDetailDrawer({
       />
 
       <motion.aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={drawerTitleId}
         initial={{ x: 48, opacity: 0, scale: 0.985 }}
         animate={{ x: 0, opacity: 1, scale: 1 }}
         exit={{ x: 48, opacity: 0, scale: 0.985 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed bottom-3 left-3 right-3 top-3 z-[80] flex flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-[#fbfbfc] shadow-[-12px_28px_80px_rgba(15,23,42,0.18),0_10px_28px_rgba(15,23,42,0.08)] sm:bottom-5 sm:left-auto sm:right-5 sm:top-5 sm:w-[760px] sm:rounded-[32px]"
+        className="fixed bottom-3 left-3 right-3 top-3 z-[80] flex flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-[#fbfbfc] shadow-[-12px_28px_80px_rgba(15,23,42,0.18),0_10px_28px_rgba(15,23,42,0.08)] sm:bottom-5 sm:left-5 sm:right-5 sm:top-5 sm:rounded-[32px] md:left-auto md:w-[min(760px,calc(100vw-2.5rem))]"
       >
         <div className="flex items-start justify-between border-b border-[#eef0f4] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] px-6 py-5">
           <div>
@@ -414,6 +398,7 @@ export function UnitDetailDrawer({
               Detajet e njësisë
             </p>
             <p
+              id={drawerTitleId}
               className="mt-2 text-[20px] font-semibold tracking-[-0.03em]"
               style={{ color: NAVY }}
             >
@@ -424,6 +409,7 @@ export function UnitDetailDrawer({
 
           <button
             type="button"
+            aria-label="Mbyll"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.06] bg-white/90 text-black/35 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:bg-white hover:text-black/58"
           >
@@ -517,7 +503,7 @@ export function UnitDetailDrawer({
                           <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-1">
                             <div className="rounded-[14px] bg-[#f5f7fb] px-3 py-2.5">
                               <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/28">
-                                Lista
+                                Çmimi i listës
                               </p>
                               <p className="mt-1 text-[13px] leading-none tracking-[-0.03em] text-black/66">
                                 {fmtPrice(unit.price)}
@@ -568,26 +554,20 @@ export function UnitDetailDrawer({
                     </div>
                   </div>
 
-                  <div className="grid gap-2.5 border-t border-[#edf0f5] bg-white/56 p-3 sm:grid-cols-2 md:grid-cols-5">
-                    <SummaryMetric label="Lloji" value={typeLabel} />
-                    <SummaryMetric label="Niveli" value={unit.level} />
-                    <SummaryMetric label="Sipërfaqja" value={`${unit.size} m²`} />
-                    <SummaryMetric label="Orientimi" value={unit.orientation ?? "—"} />
-                    <SummaryMetric label="Konfigurimi" value={roomSummaryLabel} />
-                  </div>
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+                <div className="grid gap-3 lg:grid-cols-2">
                   <DetailSectionCard title="Detajet e njësisë" items={unitDetails} />
-                  <DetailSectionCard title="Konteksti operativ" items={operationalDetails} />
+                  <DetailSectionCard title="Arkitektura" items={architectureDetails} />
+                  <DetailSectionCard title="Gjendja operative" items={operationalDetails} />
                 </div>
 
                 {saleDetails.length > 0 && (
-                  <DetailSectionCard title="Konteksti i shitjes" items={saleDetails} />
+                  <DetailSectionCard title="Detajet e shitjes" items={saleDetails} />
                 )}
 
                 {saleDetails.length === 0 && reservationDetails.length > 0 && (
-                  <DetailSectionCard title="Konteksti i rezervimit" items={reservationDetails} />
+                  <DetailSectionCard title="Detajet e rezervimit" items={reservationDetails} />
                 )}
 
                 {noteText && (
@@ -618,35 +598,6 @@ export function UnitDetailDrawer({
                   </span>
                 </div>
 
-                <div className="mb-5 grid gap-2.5 rounded-[20px] border border-black/[0.05] bg-white/86 p-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] sm:grid-cols-3">
-                  <div className="rounded-[16px] border border-black/[0.04] bg-[#fbfcfe] px-3.5 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                      Statusi aktual
-                    </p>
-                    <div className="mt-2">
-                      <PillBadge weight="medium" style={statusStyleFor(unit.status)}>
-                        {unit.status}
-                      </PillBadge>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[16px] border border-black/[0.04] bg-[#fbfcfe] px-3.5 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                      Lloji
-                    </p>
-                    <p className="mt-2 text-[12.5px] font-medium text-[#003883]">{typeLabel}</p>
-                  </div>
-
-                  <div className="rounded-[16px] border border-black/[0.04] bg-[#fbfcfe] px-3.5 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                      Pronari
-                    </p>
-                    <p className="mt-2 truncate text-[12.5px] font-medium text-[#003883]">
-                      {unit.owner_name || "—"}
-                    </p>
-                  </div>
-                </div>
-
                 {loadingHistory ? (
                   <SkeletonRows rows={4} />
                 ) : visibleHistory.length === 0 ? (
@@ -656,11 +607,10 @@ export function UnitDetailDrawer({
                         <Clock3 size={18} className="text-black/34" />
                       </div>
                       <p className="mt-4 text-[15px] font-medium tracking-[-0.02em] text-black/50">
-                        Ende pa histori
+                        Pa histori ndryshimesh
                       </p>
                       <p className="mt-1.5 text-[12.5px] leading-6 text-black/32">
-                        Nuk ka ndryshime të regjistruara ende për këtë njësi. Sapo të ruhen
-                        përditësime, ato do të shfaqen këtu.
+                        Ndryshimet do të shfaqen këtu sapo të ruhen përditësime.
                       </p>
                     </div>
                   </div>
@@ -677,7 +627,7 @@ export function UnitDetailDrawer({
                               {formatDateTime(h.changed_at)}
                             </p>
                             <p className="mt-1 text-[11.5px] text-black/32">
-                              {changedFields.length} fusha të përditësuara
+                              {formatUpdatedFieldsCount(changedFields.length)}
                             </p>
                           </div>
                           {h.change_reason && (
@@ -699,13 +649,13 @@ export function UnitDetailDrawer({
                               <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/34 sm:pt-3">
                                 {fieldLabels[field] ?? field.replace(/_/g, " ")}:
                               </span>
-                              <span className="break-words rounded-[14px] border border-[#f3dfdf] bg-[#fff8f8] px-3 py-2.5 text-[#b14b4b] line-through">
+                              <span className="break-words rounded-[14px] border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2.5 text-black/42 line-through decoration-black/24">
                                 {formatFieldValue(prev[field as keyof Unit], field, prev)}
                               </span>
                               <ChevronRight size={12} className="mt-3 hidden text-black/24 sm:block" />
                               <span
-                                className="break-words rounded-[14px] border border-[#e4ece7] bg-[#f7fbf8] px-3 py-2.5"
-                                style={{ color: newStatusColor(next, field) }}
+                                className="break-words rounded-[14px] border border-[#e3e8ef] bg-[#fbfcfe] px-3 py-2.5"
+                                style={{ color: changedValueColor(next, field) }}
                               >
                                 {formatFieldValue(next[field as keyof Unit], field, next)}
                               </span>
