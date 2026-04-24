@@ -137,6 +137,8 @@ export type Database = {
       }
       crm_showings: {
         Row: {
+          archive_reason: string | null
+          archived_at: string | null
           contact_id: string | null
           created_at: string
           date: string
@@ -149,6 +151,8 @@ export type Database = {
           unit_record_id: string | null
         }
         Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
           contact_id?: string | null
           created_at?: string
           date: string
@@ -161,6 +165,8 @@ export type Database = {
           unit_record_id?: string | null
         }
         Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
           contact_id?: string | null
           created_at?: string
           date?: string

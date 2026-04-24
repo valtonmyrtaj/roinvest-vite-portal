@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
+import { Archive, CheckCircle2, Plus, RotateCcw, Trash2, XCircle } from "lucide-react";
 import type { CRMShowing, ShowingStatus } from "../hooks/useCRM";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { Card } from "./primitives";
@@ -17,12 +17,14 @@ export type {
   ShowingSaveResult,
 } from "./showings/shared";
 
-type ReservationActivityFilter = "all" | "active" | "closed";
+type ReservationActivityFilter = "all" | "active" | "closed" | "archive";
 
 export function ShowingsSection({
   showings,
   onAdd,
   onUpdateStatus,
+  onArchive,
+  onRestore,
   onDelete,
   onEdit,
   onExtendReservation,
@@ -31,6 +33,8 @@ export function ShowingsSection({
   showings: CRMShowing[];
   onAdd: () => void;
   onUpdateStatus: (id: string, status: ShowingStatus) => void;
+  onArchive: (id: string) => void;
+  onRestore: (id: string) => Promise<{ error?: string }>;
   onDelete: (id: string) => void;
   onEdit: (showing: CRMShowing) => void;
   onExtendReservation?: (showing: CRMShowing) => void;
@@ -39,8 +43,17 @@ export function ShowingsSection({
   const [reservationFilter, setReservationFilter] =
     useState<ReservationActivityFilter>("all");
   const now = new Date();
-  const activeReservationCount = showings.filter((showing) => showing.active_reservation).length;
-  const expiringSoonCount = showings.filter((showing) => {
+  const activeShowings = showings.filter((showing) => !showing.archived_at);
+  const archivedShowings = showings
+    .filter((showing) => showing.archived_at)
+    .sort((a, b) => {
+      const aArchived = a.archived_at ? new Date(a.archived_at).getTime() : 0;
+      const bArchived = b.archived_at ? new Date(b.archived_at).getTime() : 0;
+      return bArchived - aArchived;
+    });
+  const isArchiveView = reservationFilter === "archive";
+  const activeReservationCount = activeShowings.filter((showing) => showing.active_reservation).length;
+  const expiringSoonCount = activeShowings.filter((showing) => {
     const expiresAt = showing.active_reservation?.expires_at;
     if (!expiresAt) return false;
     const daysUntilExpiry = Math.ceil(
@@ -48,12 +61,12 @@ export function ShowingsSection({
     );
     return daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
   }).length;
-  const closedReservationCount = showings.filter(
+  const closedReservationCount = activeShowings.filter(
     (showing) =>
       showing.latest_reservation &&
       showing.latest_reservation.status !== "Aktive",
   ).length;
-  const recentlyClosedCount = showings.filter((showing) => {
+  const recentlyClosedCount = activeShowings.filter((showing) => {
     const reservation = showing.latest_reservation;
     if (!reservation || reservation.status === "Aktive") return false;
     const daysSinceUpdate = Math.floor(
@@ -62,25 +75,28 @@ export function ShowingsSection({
     return daysSinceUpdate >= 0 && daysSinceUpdate <= 14;
   }).length;
   const reservationScopedShowings =
-    reservationFilter === "active"
-      ? showings.filter((showing) => showing.active_reservation)
-      : reservationFilter === "closed"
-        ? showings.filter(
+    reservationFilter === "archive"
+      ? archivedShowings
+      : reservationFilter === "active"
+        ? activeShowings.filter((showing) => showing.active_reservation)
+        : reservationFilter === "closed"
+        ? activeShowings.filter(
             (showing) =>
               showing.latest_reservation &&
               showing.latest_reservation.status !== "Aktive",
           )
-        : showings;
-  const upcoming = reservationScopedShowings
+        : activeShowings;
+  const upcoming = isArchiveView ? [] : reservationScopedShowings
     .filter(
       (showing) =>
         showing.status === "E planifikuar" &&
         new Date(showing.scheduled_at) >= now,
     )
     .sort((a, b) => compareShowingsForReservationView(a, b, reservationFilter));
-  const past = reservationScopedShowings
+  const past = isArchiveView ? archivedShowings : reservationScopedShowings
     .filter(
       (showing) =>
+        isArchiveView ||
         showing.status !== "E planifikuar" ||
         new Date(showing.scheduled_at) < now,
     )
@@ -88,10 +104,24 @@ export function ShowingsSection({
   const reservationFilterMeta = getReservationFilterMeta(reservationFilter);
 
   function ShowingRow({ showing }: { showing: CRMShowing }) {
+    const [actionError, setActionError] = useState("");
     const statusStyle = SHOWING_STYLE[showing.status];
     const reservationMeta = showing.latest_reservation ?? showing.active_reservation ?? null;
     const isActiveReservation = reservationMeta?.status === "Aktive";
+    const isArchived = Boolean(showing.archived_at);
+    const hasLinkedHistory = Boolean(reservationMeta || showing.outcome === "Bleu");
+    const canArchive =
+      !isArchived &&
+      !isActiveReservation &&
+      (showing.status === "E kryer" || showing.status === "E anuluar");
+    const canDelete = !isArchived && !hasLinkedHistory;
     const reservationTone = getReservationTone(reservationMeta?.status ?? null);
+
+    const handleRestore = async () => {
+      setActionError("");
+      const result = await onRestore(showing.id);
+      if (result.error) setActionError(result.error);
+    };
 
     return (
       <div className="flex items-start justify-between gap-3 border-b border-[#f0f0f2] px-4 py-3.5 last:border-0">
@@ -116,11 +146,27 @@ export function ShowingsSection({
                 Rezervim aktiv
               </span>
             )}
+            {isArchived && (
+              <span className="rounded-full border border-[#dbe5f8] bg-[#f4f7fd] px-2.5 py-0.5 text-[10.5px] font-semibold text-[#003883] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+                Arkivuar
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-[11.5px] text-black/45">
             {showing.unit_id} · {fmtDateTime(showing.scheduled_at)}
           </p>
           {showing.notes && <p className="mt-0.5 text-[11.5px] text-black/35">{showing.notes}</p>}
+          {isArchived && (
+            <p className="mt-1 text-[11.5px] text-black/35">
+              Arkivuar më {fmtDate(showing.archived_at!)}
+              {showing.archive_reason ? ` · ${showing.archive_reason}` : ""}
+            </p>
+          )}
+          {actionError && (
+            <p className="mt-2 rounded-[10px] border border-red-100 bg-red-50 px-2.5 py-1.5 text-[11.5px] text-red-600">
+              {actionError}
+            </p>
+          )}
           {reservationMeta && (
             <div
               className="mt-2.5 rounded-[14px] border px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
@@ -176,52 +222,75 @@ export function ShowingsSection({
           )}
         </div>
         <div className="flex shrink-0 items-start gap-1.5 pt-0.5">
-          {isActiveReservation && onExtendReservation && (
+          {isArchived ? (
             <button
-              onClick={() => onExtendReservation(showing)}
-              className="rounded-[8px] border border-[#dce4f3] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#003883] transition hover:bg-[#f6f8fd]"
+              onClick={handleRestore}
+              className="flex h-7 items-center gap-1.5 rounded-[8px] border border-[#dbe5f8] bg-white px-2.5 text-[11px] font-semibold text-[#003883] transition hover:bg-[#f6f8fd]"
             >
-              Zgjat
+              <RotateCcw size={12} />
+              Rikthe
             </button>
-          )}
-          {isActiveReservation && onReleaseReservation && (
-            <button
-              onClick={() => onReleaseReservation(showing)}
-              className="rounded-[8px] border border-[#ecd6d6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#8e4a4a] transition hover:bg-[#fff8f8]"
-            >
-              Liro
-            </button>
-          )}
-          {showing.status === "E planifikuar" && (
+          ) : (
             <>
+              {isActiveReservation && onExtendReservation && (
+                <button
+                  onClick={() => onExtendReservation(showing)}
+                  className="rounded-[8px] border border-[#dce4f3] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#003883] transition hover:bg-[#f6f8fd]"
+                >
+                  Zgjat
+                </button>
+              )}
+              {isActiveReservation && onReleaseReservation && (
+                <button
+                  onClick={() => onReleaseReservation(showing)}
+                  className="rounded-[8px] border border-[#ecd6d6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#8e4a4a] transition hover:bg-[#fff8f8]"
+                >
+                  Liro
+                </button>
+              )}
+              {showing.status === "E planifikuar" && (
+                <>
+                  <button
+                    onClick={() => onUpdateStatus(showing.id, "E kryer")}
+                    title="Shëno si të kryer"
+                    className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#e8e8ec] bg-white transition hover:border-[#3c7a57] hover:text-[#3c7a57]"
+                  >
+                    <CheckCircle2 size={13} />
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(showing.id, "E anuluar")}
+                    title="Shëno si të anuluar"
+                    className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#e8e8ec] bg-white transition hover:border-[#b14b4b] hover:text-[#b14b4b]"
+                  >
+                    <XCircle size={13} />
+                  </button>
+                </>
+              )}
+              {canArchive && (
+                <button
+                  onClick={() => onArchive(showing.id)}
+                  className="flex h-7 items-center gap-1.5 rounded-[8px] border border-[#dbe5f8] bg-white px-2.5 text-[11px] font-semibold text-[#003883] transition hover:bg-[#f6f8fd]"
+                >
+                  <Archive size={12} />
+                  Arkivo
+                </button>
+              )}
               <button
-                onClick={() => onUpdateStatus(showing.id, "E kryer")}
-                title="Shëno si të kryer"
-                className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#e8e8ec] bg-white transition hover:border-[#3c7a57] hover:text-[#3c7a57]"
+                onClick={() => onEdit(showing)}
+                className="rounded-[8px] border border-[#e8e8ec] bg-white px-2.5 py-1 text-[11px] text-black/40 transition hover:border-[#003883] hover:text-[#003883]"
               >
-                <CheckCircle2 size={13} />
+                Ndrysho
               </button>
-              <button
-                onClick={() => onUpdateStatus(showing.id, "E anuluar")}
-                title="Shëno si të anuluar"
-                className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#e8e8ec] bg-white transition hover:border-[#b14b4b] hover:text-[#b14b4b]"
-              >
-                <XCircle size={13} />
-              </button>
+              {canDelete && (
+                <button
+                  onClick={() => onDelete(showing.id)}
+                  className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-red-100 bg-white text-red-400 transition hover:bg-red-50"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
             </>
           )}
-          <button
-            onClick={() => onEdit(showing)}
-            className="rounded-[8px] border border-[#e8e8ec] bg-white px-2.5 py-1 text-[11px] text-black/40 transition hover:border-[#003883] hover:text-[#003883]"
-          >
-            Ndrysho
-          </button>
-          <button
-            onClick={() => onDelete(showing.id)}
-            className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-red-100 bg-white text-red-400 transition hover:bg-red-50"
-          >
-            <Trash2 size={12} />
-          </button>
         </div>
       </div>
     );
@@ -233,8 +302,8 @@ export function ShowingsSection({
         title="Shfaqjet"
         subtitle={
           activeReservationCount > 0
-            ? `${showings.length} gjithsej · ${activeReservationCount} me rezervim aktiv`
-            : `${showings.length} gjithsej`
+            ? `${activeShowings.length} aktive · ${activeReservationCount} me rezervim aktiv`
+            : `${activeShowings.length} aktive`
         }
         className="mb-5 border-b-0 px-0 py-0"
         right={
@@ -284,7 +353,7 @@ export function ShowingsSection({
             {
               key: "all" as const,
               label: "Të gjitha",
-              count: showings.length,
+              count: activeShowings.length,
             },
             {
               key: "active" as const,
@@ -295,6 +364,11 @@ export function ShowingsSection({
               key: "closed" as const,
               label: "Të mbyllura",
               count: closedReservationCount,
+            },
+            {
+              key: "archive" as const,
+              label: "Arkivi",
+              count: archivedShowings.length,
             },
           ].map((option) => {
             const isActive = reservationFilter === option.key;
@@ -323,6 +397,31 @@ export function ShowingsSection({
         </div>
       </div>
 
+      {isArchiveView ? (
+        <Card className="overflow-hidden p-0">
+          <CardSectionHeader
+            title="Arkivi"
+            subtitle={`${archivedShowings.length} shfaqje`}
+            className="px-4 py-3"
+          />
+          {archivedShowings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+              <p className="text-[12.5px] font-medium text-black/42">
+                Nuk ka shfaqje të arkivuara
+              </p>
+              <p className="mt-1 text-[11.5px] text-black/30">
+                Shfaqjet e arkivuara ruhen këtu pa humbur lidhjet historike.
+              </p>
+            </div>
+          ) : (
+            <div className="flex h-[360px] min-h-[360px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
+              {archivedShowings.map((showing) => (
+                <ShowingRow key={showing.id} showing={showing} />
+              ))}
+            </div>
+          )}
+        </Card>
+      ) : (
       <div className="grid grid-cols-2 gap-4">
         <Card className="overflow-hidden p-0">
           <CardSectionHeader
@@ -372,6 +471,7 @@ export function ShowingsSection({
           )}
         </Card>
       </div>
+      )}
     </div>
   );
 }
@@ -539,6 +639,12 @@ function getReservationFilterMeta(filter: ReservationActivityFilter) {
     return {
       description:
         "Po shfaqen vetëm shfaqjet me rezervim të mbyllur, të renditura sipas përditësimit më të fundit.",
+    };
+  }
+  if (filter === "archive") {
+    return {
+      description:
+        "Po shfaqen shfaqjet e arkivuara. Ato ruhen si histori dhe mund të rikthehen kur duhet.",
     };
   }
   return {

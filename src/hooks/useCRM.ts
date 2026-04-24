@@ -68,6 +68,8 @@ export interface CRMShowing {
   active_reservation?: CRMActiveReservation | null;
   latest_reservation?: CRMActiveReservation | null;
   notes: string | null;
+  archived_at: string | null;
+  archive_reason: string | null;
   created_at: string;
 }
 
@@ -247,6 +249,8 @@ function mapShowingRow(row: Record<string, unknown>): CRMShowing {
     latest_reservation:
       (row.latest_reservation as CRMActiveReservation | null | undefined) ?? activeReservation,
     notes: row.notes as string | null,
+    archived_at: (row.archived_at as string | null) ?? null,
+    archive_reason: (row.archive_reason as string | null) ?? null,
     created_at: (row.created_at as string) ?? "",
   };
 }
@@ -851,6 +855,54 @@ export function useCRM() {
     return { data: mapped };
   };
 
+  const archiveShowing = async (id: string, reason?: string) => {
+    const { data, error } = await crmApi.archiveShowing(id, reason);
+    if (error) return { error };
+
+    const nextShowing = mapShowingRow(data as unknown as Record<string, unknown>);
+    let mapped = nextShowing;
+    showingsVersionRef.current += 1;
+    setShowings((prev) => {
+      const next = prev.map((showing) => {
+        if (showing.id !== id) return showing;
+        mapped = {
+          ...nextShowing,
+          active_reservation: showing.active_reservation ?? null,
+          latest_reservation: showing.latest_reservation ?? null,
+        };
+        return mapped;
+      });
+      crmCache.showings = next;
+      crmCache.hasShowings = true;
+      return next;
+    });
+    return { data: mapped };
+  };
+
+  const restoreShowing = async (id: string) => {
+    const { data, error } = await crmApi.restoreShowing(id);
+    if (error) return { error };
+
+    const nextShowing = mapShowingRow(data as unknown as Record<string, unknown>);
+    let mapped = nextShowing;
+    showingsVersionRef.current += 1;
+    setShowings((prev) => {
+      const next = prev.map((showing) => {
+        if (showing.id !== id) return showing;
+        mapped = {
+          ...nextShowing,
+          active_reservation: showing.active_reservation ?? null,
+          latest_reservation: showing.latest_reservation ?? null,
+        };
+        return mapped;
+      });
+      crmCache.showings = next;
+      crmCache.hasShowings = true;
+      return next;
+    });
+    return { data: mapped };
+  };
+
   const deleteShowing = async (id: string) => {
     const dependencies = await crmApi.getShowingDeleteDependencies(id);
     if (dependencies.error) return { error: dependencies.error };
@@ -934,7 +986,7 @@ export function useCRM() {
     showings, showingsLoading, fetchShowings,
     dailyLog, dailyLogLoading, fetchDailyLog,
     createLead, updateLead, deleteLead,
-    createShowing, updateShowing, deleteShowing,
+    createShowing, updateShowing, archiveShowing, restoreShowing, deleteShowing,
     createDailyEntry, updateDailyEntry, deleteDailyEntry,
   };
 }
