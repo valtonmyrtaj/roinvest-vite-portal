@@ -54,10 +54,13 @@ export function ConfirmDeleteModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-payment-title"
         className="w-full max-w-[420px] rounded-[20px] border border-[#e8e8ec] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="text-[16px] font-semibold tracking-[-0.02em]" style={{ color: NAVY }}>
+        <p id="delete-payment-title" className="text-[16px] font-semibold tracking-[-0.02em]" style={{ color: NAVY }}>
           {title}
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-black/48">{description}</p>
@@ -140,10 +143,13 @@ export function MarkPaidModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mark-paid-title"
         className="w-full max-w-[420px] rounded-[20px] border border-[#e8e8ec] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="text-[16px] font-semibold tracking-[-0.02em]" style={{ color: NAVY }}>
+        <p id="mark-paid-title" className="text-[16px] font-semibold tracking-[-0.02em]" style={{ color: NAVY }}>
           Shëno si të paguar
         </p>
         <p className="mt-2 text-[13px] text-black/48">
