@@ -4,9 +4,9 @@ import { ChevronDown, Copy, Trash2 } from "lucide-react";
 import type { UnitStatus } from "../hooks/useUnits";
 import {
   BLOCKS,
+  DRAFT_UNIT_STATUSES,
   type DraftUnit,
   LEVELS,
-  MANUAL_UNIT_STATUSES,
   ORIENTATION_OPTIONS,
   TYPES,
   roomCategory,
@@ -154,7 +154,7 @@ export function UnitForm({
           label="Statusi"
           value={draft.status ?? ""}
           onChange={(v) => set("status", v as UnitStatus)}
-          options={MANUAL_UNIT_STATUSES}
+          options={DRAFT_UNIT_STATUSES}
           placeholder="Zgjidh statusin"
         />
 
