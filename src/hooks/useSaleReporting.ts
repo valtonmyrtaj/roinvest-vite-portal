@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { reporting } from "../lib/api";
 import type {
   ReportingMetricsRow,
@@ -129,15 +129,13 @@ export function useSaleReporting({
   const [metrics, setMetrics] = useState<SaleReportingMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const latestRequestIdRef = useRef(0);
 
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
+  const fetchMetrics = useCallback(
+    async (isActive: () => boolean = () => true) => {
+      const requestId = latestRequestIdRef.current + 1;
+      latestRequestIdRef.current = requestId;
 
-    let isCancelled = false;
-
-    const run = async () => {
       setLoading(true);
       setError(null);
 
@@ -147,7 +145,7 @@ export function useSaleReporting({
         month,
       });
 
-      if (isCancelled) {
+      if (!isActive() || latestRequestIdRef.current !== requestId) {
         return;
       }
 
@@ -174,19 +172,38 @@ export function useSaleReporting({
             },
       );
       setLoading(false);
-    };
+    },
+    [month, ownerScope, year],
+  );
 
-    void run();
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    Promise.resolve().then(() => {
+      if (!isCancelled) {
+        void fetchMetrics(() => !isCancelled);
+      }
+    });
 
     return () => {
       isCancelled = true;
     };
-  }, [enabled, month, ownerScope, year]);
+  }, [enabled, fetchMetrics]);
+
+  const refresh = useCallback(async () => {
+    if (!enabled) return;
+    await fetchMetrics();
+  }, [enabled, fetchMetrics]);
 
   return {
     metrics,
     loading: enabled ? loading : false,
     error: enabled ? error : null,
+    refresh,
   };
 }
 
