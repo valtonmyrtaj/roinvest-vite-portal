@@ -170,6 +170,62 @@ function mapDbUnit(row: UnitRow): Unit {
   };
 }
 
+function normalizeUpdateComparableValue(
+  key: keyof CreateUnitInput,
+  value: unknown,
+): unknown {
+  if (value === undefined) return null;
+
+  if (key === "reservation_expires_at" || key === "sale_date") {
+    return typeof value === "string" && value ? value.slice(0, 10) : null;
+  }
+
+  if ((key === "notes" || key === "floorplan_code") && typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+
+  return value ?? null;
+}
+
+function buildMeaningfulUnitChanges(
+  existing: Unit,
+  changes: Partial<CreateUnitInput>,
+): Partial<CreateUnitInput> {
+  const meaningfulChanges: Partial<CreateUnitInput> = {};
+  const writableChanges = meaningfulChanges as Record<string, unknown>;
+
+  Object.entries(changes).forEach(([rawKey, nextValue]) => {
+    const key = rawKey as keyof CreateUnitInput;
+    const currentValue = existing[key as keyof Unit];
+
+    if (
+      normalizeUpdateComparableValue(key, currentValue) !==
+      normalizeUpdateComparableValue(key, nextValue)
+    ) {
+      writableChanges[key] = nextValue;
+    }
+  });
+
+  return meaningfulChanges;
+}
+
+function buildUnitHistoryDelta(
+  existing: Unit,
+  nextUnit: Unit,
+  changedKeys: Array<keyof CreateUnitInput>,
+) {
+  const previousData: Record<string, unknown> = {};
+  const newData: Record<string, unknown> = {};
+
+  changedKeys.forEach((key) => {
+    previousData[key] = existing[key as keyof Unit] ?? null;
+    newData[key] = nextUnit[key as keyof Unit] ?? null;
+  });
+
+  return { previousData, newData };
+}
+
 /**
  * Canonical sale truth sourced from `unit_sales`.
  * All financial and buyer identity fields should be read from here, not from
@@ -509,8 +565,15 @@ export function useUnits(options: UseUnitsOptions = {}) {
       };
     }
 
+    const meaningfulChanges = buildMeaningfulUnitChanges(existing, changes);
+    const changedKeys = Object.keys(meaningfulChanges) as Array<keyof CreateUnitInput>;
+
+    if (changedKeys.length === 0) {
+      return { data: existing };
+    }
+
     const payload: UpdateUnitPayload = {
-      ...changes,
+      ...meaningfulChanges,
       updated_at: new Date().toISOString(),
     };
 
@@ -519,12 +582,13 @@ export function useUnits(options: UseUnitsOptions = {}) {
     if (result.error !== null) return { error: result.error };
 
     const nextUnit = mapDbUnit(result.data);
+    const { previousData, newData } = buildUnitHistoryDelta(existing, nextUnit, changedKeys);
 
     const historyRow: InsertUnitHistoryPayload = {
       unit_id: id,
       change_reason: changeReason,
-      previous_data: existing as unknown as Json,
-      new_data: nextUnit as unknown as Json,
+      previous_data: previousData as Json,
+      new_data: newData as Json,
     };
 
     // History write is non-blocking: the primary update has already
