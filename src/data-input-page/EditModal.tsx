@@ -17,12 +17,21 @@ import {
   getOwnerNameOptions,
   LEVELS,
   MANUAL_UNIT_STATUSES,
+  ORIENTATION_OPTIONS,
   OWNER_CATEGORIES,
+  roomCategory,
   type SaleInstallmentDraft,
   TYPES,
   todayIso,
 } from "./shared";
-import { DateField, NumberField, SelectField, TextField } from "./fields";
+import {
+  DateField,
+  NumberField,
+  OptionalNumberField,
+  RoomNumberField,
+  SelectField,
+  TextField,
+} from "./fields";
 import {
   EditModalSaleSuccess,
   type SaleSuccessSnapshot,
@@ -79,6 +88,13 @@ export function EditModal({
     owner_name: unit.owner_name,
     reservation_expires_at: unit.reservation_expires_at,
     notes: unit.notes ?? "",
+    bedrooms: unit.bedrooms,
+    bathrooms: unit.bathrooms,
+    toilets: unit.toilets,
+    orientation: unit.orientation ?? null,
+    floorplan_code: unit.floorplan_code ?? "",
+    balcony_area: unit.balcony_area,
+    terrace_area: unit.terrace_area,
   });
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,6 +119,7 @@ export function EditModal({
   const isSaleTransition = unit.status !== "E shitur" && form.status === "E shitur";
   const reservationManagedUnit = unit.status === "E rezervuar" || Boolean(unit.active_reservation_id);
   const ownerCategory = form.owner_category ?? "Investitor";
+  const architectureCategory = roomCategory(form.type as string | undefined);
   const ownerNameOptions = getOwnerNameOptions(
     ownerCategory,
     ownerNameOptionsByCategory[ownerCategory],
@@ -170,9 +187,15 @@ export function EditModal({
     }
 
     const normalizedNotes = typeof form.notes === "string" ? form.notes : null;
+    const normalizedFloorplanCode =
+      typeof form.floorplan_code === "string" ? form.floorplan_code.trim() || null : null;
     const baseChanges: Partial<CreateUnitInput> = {
       ...form,
       notes: normalizedNotes,
+      orientation: form.orientation ?? null,
+      floorplan_code: normalizedFloorplanCode,
+      balcony_area: form.balcony_area ?? null,
+      terrace_area: form.terrace_area ?? null,
       reservation_expires_at:
         form.status === "E rezervuar" ? form.reservation_expires_at ?? null : null,
     };
@@ -416,6 +439,55 @@ export function EditModal({
                 <p className="col-span-3 -mt-1 text-[11.5px] text-black/40">
                   Rezervimi administrohet nga rrjedha kanonike e rezervimeve. Kjo dritare nuk e ndryshon statusin ose afatin e rezervimit.
                 </p>
+              )}
+              <SelectField
+                label="Orientimi"
+                value={form.orientation ?? ""}
+                onChange={(v) => set("orientation", v || null)}
+                options={ORIENTATION_OPTIONS}
+                placeholder="Zgjidh"
+              />
+              <TextField
+                label="Planimetria"
+                value={form.floorplan_code ?? ""}
+                onChange={(v) => set("floorplan_code", v)}
+                placeholder="p.sh. A-2.1"
+              />
+              {architectureCategory === "apartment" && (
+                <>
+                  <RoomNumberField
+                    label="Dhoma gjumi"
+                    value={form.bedrooms}
+                    onChange={(v) => set("bedrooms", v)}
+                    placeholder="p.sh. 2"
+                  />
+                  <RoomNumberField
+                    label="Banjo"
+                    value={form.bathrooms}
+                    onChange={(v) => set("bathrooms", v)}
+                    placeholder="p.sh. 1"
+                  />
+                  <OptionalNumberField
+                    label="Ballkon (m²)"
+                    value={form.balcony_area}
+                    onChange={(v) => set("balcony_area", v)}
+                    placeholder="p.sh. 6"
+                  />
+                  <OptionalNumberField
+                    label="Terrasë (m²)"
+                    value={form.terrace_area}
+                    onChange={(v) => set("terrace_area", v)}
+                    placeholder="p.sh. 12"
+                  />
+                </>
+              )}
+              {architectureCategory === "lokal" && (
+                <RoomNumberField
+                  label="Tualet"
+                  value={form.toilets}
+                  onChange={(v) => set("toilets", v)}
+                  placeholder="p.sh. 1"
+                />
               )}
               <label className="col-span-3 flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">

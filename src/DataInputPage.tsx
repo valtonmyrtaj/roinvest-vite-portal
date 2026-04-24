@@ -32,7 +32,10 @@ function normalizeComparableUnitValue(
   key: keyof CreateUnitInput,
   value: unknown,
 ) {
-  if ((key === "notes" || key === "reservation_expires_at") && value === "") {
+  if (
+    (key === "notes" || key === "reservation_expires_at" || key === "floorplan_code") &&
+    value === ""
+  ) {
     return null;
   }
 
@@ -170,6 +173,10 @@ export default function DataInputPage({
         bedrooms: cat === "apartment" ? (rawInput.bedrooms ?? null) : null,
         bathrooms: cat === "apartment" ? (rawInput.bathrooms ?? null) : null,
         toilets: cat === "lokal" ? (rawInput.toilets ?? null) : null,
+        orientation: rawInput.orientation ?? null,
+        floorplan_code: rawInput.floorplan_code?.trim() || null,
+        balcony_area: rawInput.balcony_area ?? null,
+        terrace_area: rawInput.terrace_area ?? null,
       };
       const result = await createUnit(input);
       if (result.error) {

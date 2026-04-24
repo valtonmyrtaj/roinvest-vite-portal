@@ -70,6 +70,37 @@ export function NumberField({
   );
 }
 
+export function OptionalNumberField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: number | null | undefined;
+  onChange: (v: number | undefined) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
+        {label}
+      </span>
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        value={value != null ? value : ""}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? undefined : Number(e.target.value))
+        }
+        placeholder={placeholder ?? ""}
+        className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+      />
+    </label>
+  );
+}
+
 export function TextField({
   label,
   value,

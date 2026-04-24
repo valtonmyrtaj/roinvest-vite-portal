@@ -114,6 +114,11 @@ function isNumericValue(val: string) {
   return val.trim() !== "" && !Number.isNaN(Number(val));
 }
 
+function formatOptionalArea(value: number | null | undefined): string | null {
+  if (value == null || value <= 0) return null;
+  return `${value.toLocaleString("de-DE")} m²`;
+}
+
 export function UnitDetailDrawer({
   unit,
   onClose,
@@ -170,6 +175,8 @@ export function UnitDetailDrawer({
   const typeLabel = getUnitTypeDisplay(unit.type, unit.level);
   const headerMeta = `${unit.block} · ${typeLabel} · ${unit.level} · ${unit.size} m²`;
   const noteText = unit.notes?.trim() ?? "";
+  const balconyAreaLabel = formatOptionalArea(unit.balcony_area);
+  const terraceAreaLabel = formatOptionalArea(unit.terrace_area);
 
   const unitDetails = useMemo<DetailItem[]>(
     () =>
@@ -178,6 +185,10 @@ export function UnitDetailDrawer({
         { label: "Lloji", value: typeLabel },
         { label: "Niveli", value: unit.level },
         { label: "Sipërfaqja", value: `${unit.size} m²` },
+        unit.orientation ? { label: "Orientimi", value: unit.orientation } : null,
+        unit.floorplan_code ? { label: "Planimetria", value: unit.floorplan_code } : null,
+        balconyAreaLabel ? { label: "Ballkoni", value: balconyAreaLabel } : null,
+        terraceAreaLabel ? { label: "Terrasa", value: terraceAreaLabel } : null,
         unit.bedrooms && unit.bedrooms > 0
           ? { label: "Dhoma gjumi", value: String(unit.bedrooms) }
           : null,
@@ -188,7 +199,19 @@ export function UnitDetailDrawer({
           ? { label: "Tualete", value: String(unit.toilets) }
           : null,
       ].filter(notNull),
-    [typeLabel, unit.bathrooms, unit.bedrooms, unit.block, unit.level, unit.size, unit.toilets],
+    [
+      balconyAreaLabel,
+      terraceAreaLabel,
+      typeLabel,
+      unit.bathrooms,
+      unit.bedrooms,
+      unit.block,
+      unit.floorplan_code,
+      unit.level,
+      unit.orientation,
+      unit.size,
+      unit.toilets,
+    ],
   );
 
   const operationalDetails = useMemo<DetailItem[]>(
@@ -254,6 +277,9 @@ export function UnitDetailDrawer({
       if (isTimestamp(s)) return fmtDateShort(s);
     }
     if (field === "size" && isNumericValue(s)) return `${Number(s).toLocaleString("de-DE")} m²`;
+    if ((field === "balcony_area" || field === "terrace_area") && isNumericValue(s)) {
+      return `${Number(s).toLocaleString("de-DE")} m²`;
+    }
     if (field === "price" || field === "final_price" || field === "sale_price") {
       if (isNumericValue(s)) return fmtPrice(Number(s));
     }
@@ -282,6 +308,10 @@ export function UnitDetailDrawer({
     bedrooms: "Dhoma gjumi",
     bathrooms: "Banjo",
     toilets: "Tualete",
+    orientation: "Orientimi",
+    floorplan_code: "Planimetria",
+    balcony_area: "Ballkoni",
+    terrace_area: "Terrasa",
   };
 
   const formatChangeReason = (reason: string) => {
@@ -531,10 +561,11 @@ export function UnitDetailDrawer({
                     </div>
                   </div>
 
-                  <div className="grid gap-2.5 border-t border-[#edf0f5] bg-white/56 p-3 sm:grid-cols-2 md:grid-cols-4">
+                  <div className="grid gap-2.5 border-t border-[#edf0f5] bg-white/56 p-3 sm:grid-cols-2 md:grid-cols-5">
                     <SummaryMetric label="Lloji" value={typeLabel} />
                     <SummaryMetric label="Niveli" value={unit.level} />
                     <SummaryMetric label="Sipërfaqja" value={`${unit.size} m²`} />
+                    <SummaryMetric label="Orientimi" value={unit.orientation ?? "—"} />
                     <SummaryMetric label="Konfigurimi" value={roomSummaryLabel} />
                   </div>
                 </div>
