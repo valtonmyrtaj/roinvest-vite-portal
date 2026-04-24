@@ -54,6 +54,62 @@ export interface OfflineInput {
   date: string;
 }
 
+const DIGITAL_VALUE_FIELDS: Array<keyof Pick<
+  MarketingInput,
+  | "spend_facebook"
+  | "views_facebook"
+  | "views_tiktok"
+  | "leads_facebook"
+  | "leads_instagram"
+  | "leads_tiktok"
+>> = [
+  "spend_facebook",
+  "views_facebook",
+  "views_tiktok",
+  "leads_facebook",
+  "leads_instagram",
+  "leads_tiktok",
+];
+
+function isValidMonth(month: number): boolean {
+  return Number.isInteger(month) && month >= 1 && month <= 12;
+}
+
+function isValidYear(year: number): boolean {
+  return Number.isInteger(year) && year > 0;
+}
+
+function validateDigitalInput(input: MarketingInput): string | null {
+  if (!isValidYear(input.year)) return "Zgjidh vitin.";
+  if (!isValidMonth(input.month)) return "Zgjidh muajin.";
+
+  for (const field of DIGITAL_VALUE_FIELDS) {
+    const value = input[field];
+    if (!Number.isFinite(value) || value < 0) {
+      return "Vlerat e marketingut digjital duhet të jenë 0 ose më shumë.";
+    }
+  }
+
+  return null;
+}
+
+function validateOfflineInput(input: OfflineInput): string | null {
+  if (!input.channel.trim()) return "Zgjidh kanalin.";
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    return "Shuma duhet të jetë më e madhe se 0.";
+  }
+  if (input.period_type !== "Mujore" && input.period_type !== "Vjetore") {
+    return "Zgjidh periudhën.";
+  }
+  if (!isValidYear(input.year)) return "Zgjidh vitin.";
+  if (input.period_type === "Mujore" && !isValidMonth(input.month ?? 0)) {
+    return "Zgjidh muajin.";
+  }
+  if (!input.date) return "Zgjidh datën.";
+
+  return null;
+}
+
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 export interface MarketingBundle {
@@ -91,6 +147,9 @@ export async function listMarketing(): Promise<ApiResult<MarketingBundle>> {
  * inserts otherwise.
  */
 export async function saveMonthlyData(input: MarketingInput): Promise<ApiResult<null>> {
+  const validationError = validateDigitalInput(input);
+  if (validationError) return apiFail(validationError);
+
   const { data: existing, error: lookupError } = await supabase
     .from("marketing_data")
     .select("id")
@@ -129,6 +188,9 @@ export async function updateDigitalEntry(
   id: string,
   input: MarketingInput,
 ): Promise<ApiResult<null>> {
+  const validationError = validateDigitalInput(input);
+  if (validationError) return apiFail(validationError);
+
   const { data: duplicate, error: duplicateError } = await supabase
     .from("marketing_data")
     .select("id")
@@ -172,6 +234,9 @@ export async function deleteDigitalEntry(id: string): Promise<ApiResult<null>> {
 
 /** Insert a new offline entry. */
 export async function createOfflineEntry(input: OfflineInput): Promise<ApiResult<null>> {
+  const validationError = validateOfflineInput(input);
+  if (validationError) return apiFail(validationError);
+
   const { error } = await supabase.from("marketing_offline").insert(input);
   if (error) return apiFail(error.message);
   return apiOk(null);
@@ -182,6 +247,9 @@ export async function updateOfflineEntry(
   id: string,
   input: OfflineInput,
 ): Promise<ApiResult<null>> {
+  const validationError = validateOfflineInput(input);
+  if (validationError) return apiFail(validationError);
+
   const { error } = await supabase
     .from("marketing_offline")
     .update({
