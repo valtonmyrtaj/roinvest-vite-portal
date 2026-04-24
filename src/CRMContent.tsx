@@ -51,6 +51,7 @@ export default function CRMContent() {
   const [showAddShowing, setShowAddShowing] = useState(false);
   const [editShowing, setEditShowing] = useState<CRMShowing | null>(null);
   const [deletingShowingId, setDeletingShowingId] = useState<string | null>(null);
+  const [deleteShowingError, setDeleteShowingError] = useState("");
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
   const [saleToast, setSaleToast] = useState<ShowingSaleToast | null>(null);
   const [reservationAction, setReservationAction] = useState<{
@@ -215,7 +216,12 @@ export default function CRMContent() {
 
   const handleDeleteShowing = async () => {
     if (!deletingShowingId) return;
-    await deleteShowing(deletingShowingId);
+    setDeleteShowingError("");
+    const result = await deleteShowing(deletingShowingId);
+    if (result.error) {
+      setDeleteShowingError(result.error);
+      return;
+    }
     setDeletingShowingId(null);
   };
 
@@ -302,7 +308,11 @@ export default function CRMContent() {
         {deletingShowingId && (
           <ConfirmDeleteModal
             label="këtë shfaqje"
-            onClose={() => setDeletingShowingId(null)}
+            error={deleteShowingError}
+            onClose={() => {
+              setDeletingShowingId(null);
+              setDeleteShowingError("");
+            }}
             onConfirm={handleDeleteShowing}
           />
         )}
@@ -338,7 +348,10 @@ export default function CRMContent() {
               showings={showings}
               onAdd={() => setShowAddShowing(true)}
               onUpdateStatus={handleUpdateShowingStatus}
-              onDelete={(id) => setDeletingShowingId(id)}
+              onDelete={(id) => {
+                setDeletingShowingId(id);
+                setDeleteShowingError("");
+              }}
               onEdit={(showing) => setEditShowing(showing)}
               onExtendReservation={(showing) => openReservationAction(showing.id, "extend")}
               onReleaseReservation={(showing) => openReservationAction(showing.id, "release")}
