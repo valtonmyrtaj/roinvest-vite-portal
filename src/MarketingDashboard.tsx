@@ -60,6 +60,10 @@ function fmtNum(n: number) {
   return n.toLocaleString("de-DE");
 }
 
+function fmtFullNum(n: number) {
+  return n.toLocaleString("de-DE");
+}
+
 function fmtDate(iso: string) {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
@@ -1295,6 +1299,8 @@ export default function MarketingDashboard() {
         <PageHeader
           tone="brand"
           className="mb-5 items-start"
+          titleClassName="leading-none"
+          subtitleClassName="!mt-0"
           title={
             <motion.span {...fadeUp(0)} className="block">
               Marketingu
@@ -1308,7 +1314,7 @@ export default function MarketingDashboard() {
         />
 
         {/* Period selectors + quick actions */}
-        <motion.div {...fadeUp(0.08)} className="mb-5 flex items-center justify-between gap-4">
+        <motion.div {...fadeUp(0.08)} className="mb-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <CustomSelect
               size="sm"
@@ -1392,7 +1398,7 @@ export default function MarketingDashboard() {
             label="Shikimet totale"
             value={currentDigital.views}
             prevValue={prevDigitalRows.length > 0 ? prevDigital.views : null}
-            format={fmtNum}
+            format={fmtFullNum}
             icon={Eye}
             comparisonLabel={comparisonLabel}
             delay={0.17}
