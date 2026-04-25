@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import { DatePickerField } from "../components/ui/DatePickerField";
 
 export function SelectField({
   label,
@@ -140,18 +141,13 @@ export function DateField({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {label}
-      </span>
-      <input
-        type="date"
-        value={value ? value.slice(0, 10) : ""}
-        onChange={(e) => onChange(e.target.value || null)}
-        disabled={disabled}
-        className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/45 disabled:shadow-none"
-      />
-    </label>
+    <DatePickerField
+      label={label}
+      value={value ? value.slice(0, 10) : null}
+      onChange={onChange}
+      disabled={disabled}
+      labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-black/35"
+    />
   );
 }
 

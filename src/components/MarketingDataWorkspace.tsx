@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { CustomSelect } from "./CustomSelect";
+import { DatePickerField } from "./ui/DatePickerField";
 import { CenteredEyebrowDivider, EyebrowLabel } from "./ui/Eyebrow";
 import { useMarketing } from "../hooks/useMarketing";
 import { SkeletonRows } from "./SkeletonRows";
@@ -96,26 +97,6 @@ function ModalTextField({ label, value, onChange, placeholder }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? ""}
-        className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-      />
-    </label>
-  );
-}
-
-function ModalDateField({ label, value, onChange }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <EyebrowLabel as="span" className="text-black/35">
-        {label}
-      </EyebrowLabel>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
         className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
       />
     </label>
@@ -536,7 +517,12 @@ function OfflineModal({
                 )}
               </div>
 
-              <ModalDateField label="Data" value={form.date} onChange={set("date")} />
+              <DatePickerField
+                label="Data"
+                value={form.date}
+                onChange={(next) => set("date")(next ?? "")}
+                labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35"
+              />
             </div>
 
             {err && <p className="mt-4 text-[12px] text-[#b14b4b]">{err}</p>}

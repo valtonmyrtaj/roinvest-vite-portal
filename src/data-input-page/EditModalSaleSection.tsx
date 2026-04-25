@@ -10,6 +10,7 @@ import {
   SALE_PAYMENT_OPTIONS,
   type SaleInstallmentDraft,
 } from "./shared";
+import { DatePickerField } from "../components/ui/DatePickerField";
 import { DateField, SelectField, TextField } from "./fields";
 
 /**
@@ -313,13 +314,10 @@ export function EditModalSaleSection({
                 key={`${installment.due_date}-${index}`}
                 className="grid grid-cols-[1fr_1fr_auto] gap-2"
               >
-                <input
-                  type="date"
+                <DatePickerField
                   value={installment.due_date}
-                  onChange={(event) =>
-                    onUpdateInstallment(index, "due_date", event.target.value)
-                  }
-                  className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+                  onChange={(next) => onUpdateInstallment(index, "due_date", next ?? "")}
+                  required
                 />
                 <input
                   type="number"

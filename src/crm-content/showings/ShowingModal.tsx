@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { CustomSelect } from "../../components/CustomSelect";
+import { DatePickerField } from "../../components/ui/DatePickerField";
 import type {
   CRMLead,
   CRMShowing,
@@ -285,17 +286,13 @@ export function ShowingModal({
               size="md"
             />
           </div>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-              Data <span className="text-red-400">*</span>
-            </span>
-            <input
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-            />
-          </label>
+          <DatePickerField
+            label="Data"
+            value={date}
+            onChange={(next) => setDate(next ?? "")}
+            required
+            labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-black/35"
+          />
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
               Ora
@@ -308,17 +305,13 @@ export function ShowingModal({
             />
           </label>
           {needsReservationExpiry && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-                Skadon më <span className="text-red-400">*</span>
-              </span>
-              <input
-                type="date"
-                value={reservationExpiresAt}
-                onChange={(event) => setReservationExpiresAt(event.target.value)}
-                className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-              />
-            </label>
+            <DatePickerField
+              label="Skadon më"
+              value={reservationExpiresAt}
+              onChange={(next) => setReservationExpiresAt(next ?? "")}
+              required
+              labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-black/35"
+            />
           )}
           {needsReservationExpiry && (
             <p className="col-span-2 -mt-1 text-[11.5px] text-black/40">

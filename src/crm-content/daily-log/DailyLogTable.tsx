@@ -9,6 +9,7 @@ import {
   TABULAR_HEADER_LABEL_CLASS,
   TABULAR_HEADER_ROW_CLASS,
 } from "../../components/ui/tabularHeader";
+import { DatePickerField } from "../../components/ui/DatePickerField";
 import { MONTH_LABELS, NAVY, SOFT_EASE, TODAY_ISO, fmtDate, toDateOnly } from "../shared";
 import { SkeletonRows } from "../../components/SkeletonRows";
 
@@ -224,11 +225,11 @@ export function DailyLogTable({
                         className="border-t border-[#f0f0f2] bg-[#EAF0FA]/40"
                       >
                         <td className="py-2 pl-5 pr-2">
-                          <input
-                            type="date"
+                          <DatePickerField
                             value={draft.date}
-                            onChange={(event) => setDraft((prev) => ({ ...prev, date: event.target.value }))}
-                            className="h-9 rounded-[9px] border border-black/10 bg-white px-2 text-[12px] text-black/70 outline-none focus:border-[#003883]/30"
+                            onChange={(next) => setDraft((prev) => ({ ...prev, date: next ?? "" }))}
+                            size="sm"
+                            required
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -330,11 +331,11 @@ export function DailyLogTable({
                             {isEditing ? (
                               <>
                                 <td className="py-2 pl-5 pr-2">
-                                  <input
-                                    type="date"
+                                  <DatePickerField
                                     value={editDraft.date}
-                                    onChange={(event) => setEditDraft((prev) => ({ ...prev, date: event.target.value }))}
-                                    className="h-9 rounded-[9px] border border-black/10 bg-white px-2 text-[12px] text-black/70 outline-none focus:border-[#003883]/30"
+                                    onChange={(next) => setEditDraft((prev) => ({ ...prev, date: next ?? "" }))}
+                                    size="sm"
+                                    required
                                   />
                                 </td>
                                 <td className="px-2 py-2">
