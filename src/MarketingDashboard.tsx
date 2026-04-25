@@ -1,24 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  TrendingUp, TrendingDown, Eye, Users, Database,
+  TrendingUp, TrendingDown, Eye, Users,
   Plus, X, Trash2, AlertTriangle,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
 import { CustomSelect } from "./components/CustomSelect";
 import { CardSectionHeader } from "./components/ui/CardSectionHeader";
+import { DatePickerField } from "./components/ui/DatePickerField";
 import { PageHeader } from "./components/ui/PageHeader";
-import { useMarketing, type MarketingInput, type MarketingRow, type OfflineInput } from "./hooks/useMarketing";
+import { useMarketing, type MarketingInput, type MarketingRow, type OfflineEntry, type OfflineInput } from "./hooks/useMarketing";
 
 const NAVY = "#003883";
 const FB_COLOR = "#003883";
@@ -29,18 +19,35 @@ const SQ_MONTHS = [
   "Janar", "Shkurt", "Mars", "Prill", "Maj", "Qershor",
   "Korrik", "Gusht", "Shtator", "Tetor", "Nëntor", "Dhjetor",
 ];
-const SQ_MONTHS_SHORT = ["Jan", "Shk", "Mar", "Pri", "Maj", "Qer", "Kor", "Gus", "Sht", "Tet", "Nën", "Dhj"];
 const YEAR_OPTIONS = ["2026", "2027", "2028", "2029", "2030"] as const;
 const YEARS = YEAR_OPTIONS.map(Number);
 const CHANNELS = ["Billboard", "Fletushka", "Radio", "Evente", "Tjetër"] as const;
-const OFFLINE_FILTERS = ["E gjitha", "Mujore", "Vjetore"] as const;
 
-const CHANNEL_COLOR: Record<string, string> = {
-  Billboard: "#003883",
-  Fletushka: "#3c7a57",
-  Radio:     "#b0892f",
-  Evente:    "#7b4bb0",
-  Tjetër:    "#6b7280",
+const SECTION_HEADER_TITLE_STYLE = {
+  fontSize: 17,
+  fontWeight: 700,
+  letterSpacing: "0em",
+  lineHeight: 1.18,
+};
+
+const CHART_HEADER_TITLE_STYLE = {
+  fontSize: 16,
+  fontWeight: 700,
+  letterSpacing: "0em",
+  lineHeight: 1.18,
+};
+
+const CHART_HEADER_SUBTITLE_STYLE = {
+  fontSize: 11.75,
+  fontWeight: 500,
+  lineHeight: 1.35,
+};
+
+const OFFLINE_LOG_MOTION = {
+  initial: { opacity: 0, y: 6, filter: "blur(1.5px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -4, filter: "blur(1px)" },
+  transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] as const },
 };
 
 function fmtEur(n: number) {
@@ -56,6 +63,39 @@ function fmtNum(n: number) {
 function fmtDate(iso: string) {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
+function getIsoMonth(iso: string) {
+  const month = Number(iso.slice(5, 7));
+  return Number.isFinite(month) ? month : null;
+}
+
+function offlineEntryMatchesPeriod(entry: OfflineEntry, year: number, month: number | "all") {
+  if (entry.year !== year) return false;
+  if (month === "all") return true;
+
+  if (entry.period_type === "Vjetore") {
+    return getIsoMonth(entry.date) === month;
+  }
+
+  return entry.month === month;
+}
+
+function offlineEntryMatchesKpiScope(entry: OfflineEntry, year: number, month: number | "all", scope: KpiScope) {
+  if (scope === "month" || month === "all") {
+    return offlineEntryMatchesPeriod(entry, year, month);
+  }
+
+  if (entry.year !== year) return false;
+  const entryMonth = entry.period_type === "Vjetore" ? getIsoMonth(entry.date) : entry.month;
+  return entryMonth !== null && entryMonth >= 1 && entryMonth <= month;
+}
+
+function getKpiPeriodLabel(year: number, month: number | "all", scope: KpiScope) {
+  if (month === "all") return `${year}`;
+  const monthLabel = SQ_MONTHS[month - 1];
+  if (scope === "ytd" && month > 1) return `Janar - ${monthLabel} ${year}`;
+  return `${monthLabel} ${year}`;
 }
 
 const fadeUp = (delay = 0) => ({
@@ -92,33 +132,290 @@ interface HeroCardProps {
   prevValue: number | null;
   format: (n: number) => string;
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties; strokeWidth?: number }>;
+  comparisonLabel: string;
   delay: number;
   active: boolean;
 }
 
-type SpendTooltipPayloadItem = {
-  value?: number | string;
+type MarketingChartPoint = {
+  label: string;
+  spend: number;
+  views: number;
+  leads: number;
 };
 
-type SpendTooltipProps = {
-  active?: boolean;
-  payload?: SpendTooltipPayloadItem[];
-  label?: string;
-};
+type KpiScope = "month" | "ytd";
 
-type LineTooltipPayloadItem = {
-  name?: string;
-  stroke?: string;
-  value?: number | string;
-};
+type EngagementMetricKey = "views" | "leads";
 
-type LineTooltipProps = {
-  active?: boolean;
-  payload?: LineTooltipPayloadItem[];
-  label?: string;
-};
+function EngagementMetricRow({
+  label,
+  metricKey,
+  color,
+  data,
+  maxValue,
+  selectedMonthLabel,
+  onHover,
+}: {
+  label: string;
+  metricKey: EngagementMetricKey;
+  color: string;
+  data: MarketingChartPoint[];
+  maxValue: number;
+  selectedMonthLabel: string | null;
+  onHover: (index: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-[62px_1fr] items-end gap-3">
+      <div className="flex h-[106px] items-end pb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+          <span className="text-[11px] font-semibold text-black/42">{label}</span>
+        </div>
+      </div>
+      <div className="grid h-[106px] grid-cols-12 items-end gap-2 border-b border-[#eef0f4]">
+        {data.map((point, index) => {
+          const value = point[metricKey];
+          const isSelected = point.label === selectedMonthLabel;
+          const height = value > 0 ? Math.max(8, Math.round((value / maxValue) * 90)) : 2;
 
-function HeroCard({ label, value, prevValue, format, icon: Icon, delay, active }: HeroCardProps) {
+          return (
+            <div
+              key={`${metricKey}-${point.label}`}
+              className="flex h-full items-end justify-center"
+              onMouseEnter={() => onHover(index)}
+              aria-label={`${label}, ${point.label}: ${fmtNum(value)}`}
+            >
+              <motion.span
+                className="w-[22px] rounded-t-[6px]"
+                initial={false}
+                animate={{ height }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                style={{
+                  backgroundColor: value > 0 ? color : "rgba(0,0,0,0.08)",
+                  opacity: value > 0 ? (isSelected ? 1 : 0.82) : 0.45,
+                  boxShadow: isSelected && value > 0 ? `0 7px 18px ${color}24` : "none",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SpendMiniBars({
+  data,
+  selectedMonthLabel,
+}: {
+  data: MarketingChartPoint[];
+  selectedMonthLabel: string | null;
+}) {
+  const selectedIndex = selectedMonthLabel
+    ? data.findIndex((point) => point.label === selectedMonthLabel)
+    : -1;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const activeIndex = hoveredIndex ?? (selectedIndex >= 0 ? selectedIndex : null);
+  const activePoint = activeIndex === null ? null : data[activeIndex];
+  const maxSpend = Math.max(1, ...data.map((point) => point.spend));
+
+  return (
+    <div
+      className="rounded-[16px] border border-[#edf0f5] bg-[#fbfcfe] px-5 py-3.5"
+      onMouseLeave={() => setHoveredIndex(null)}
+    >
+      <div className="mb-3 flex min-h-[32px] items-center justify-between gap-3">
+        <p className="text-[11px] font-medium text-black/35">
+          Shpenzime mujore të Facebook Ads
+        </p>
+        <AnimatePresence mode="wait">
+          {activePoint ? (
+            <motion.div
+              key={activePoint.label}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
+              className="flex items-center gap-3 rounded-[12px] border border-[#e8e8ec] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(16,24,40,0.05)]"
+            >
+              <span className="text-[11px] font-semibold" style={{ color: NAVY }}>
+                {activePoint.label}
+              </span>
+              <span className="text-[11px] text-black/35">|</span>
+              <span className="text-[11px] font-semibold" style={{ color: FB_COLOR }}>
+                {fmtEur(activePoint.spend)} Facebook Ads
+              </span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      <div className="grid grid-cols-[62px_1fr] items-end gap-3">
+        <div className="flex h-[190px] items-end pb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: FB_COLOR }} />
+            <span className="text-[11px] font-semibold text-black/42">Facebook</span>
+          </div>
+        </div>
+        <div className="grid h-[190px] grid-cols-12 items-end gap-2 border-b border-[#eef0f4]">
+          {data.map((point, index) => {
+            const isSelected = point.label === selectedMonthLabel;
+            const height = point.spend > 0 ? Math.max(8, Math.round((point.spend / maxSpend) * 158)) : 2;
+
+            return (
+              <div
+                key={`spend-${point.label}`}
+                className="flex h-full items-end justify-center"
+                onMouseEnter={() => setHoveredIndex(index)}
+                aria-label={`Facebook Ads, ${point.label}: ${fmtEur(point.spend)}`}
+              >
+                <motion.span
+                  className="w-[24px] rounded-t-[7px]"
+                  initial={false}
+                  animate={{ height }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  style={{
+                    backgroundColor: point.spend > 0 ? FB_COLOR : "rgba(0,0,0,0.08)",
+                    opacity: point.spend > 0 ? (isSelected ? 1 : 0.84) : 0.45,
+                    boxShadow: isSelected && point.spend > 0 ? `0 7px 18px ${FB_COLOR}24` : "none",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-[62px_1fr] gap-3">
+        <div />
+        <div className="grid grid-cols-12 gap-2">
+          {data.map((point) => {
+            const isSelected = point.label === selectedMonthLabel;
+            return (
+              <span
+                key={point.label}
+                className="text-center text-[9px] tracking-[-0.025em]"
+                style={{
+                  color: isSelected ? NAVY : "rgba(0,0,0,0.36)",
+                  fontWeight: isSelected ? 800 : 600,
+                }}
+              >
+                {point.label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EngagementMiniBars({
+  data,
+  selectedMonthLabel,
+}: {
+  data: MarketingChartPoint[];
+  selectedMonthLabel: string | null;
+}) {
+  const selectedIndex = selectedMonthLabel
+    ? data.findIndex((point) => point.label === selectedMonthLabel)
+    : -1;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const activeIndex = hoveredIndex ?? (selectedIndex >= 0 ? selectedIndex : null);
+  const activePoint = activeIndex === null ? null : data[activeIndex];
+  const maxViews = Math.max(1, ...data.map((point) => point.views));
+  const maxLeads = Math.max(1, ...data.map((point) => point.leads));
+
+  return (
+    <div
+      className="rounded-[16px] border border-[#edf0f5] bg-[#fbfcfe] px-5 py-3.5"
+      onMouseLeave={() => setHoveredIndex(null)}
+    >
+      <div className="mb-3 flex min-h-[32px] items-center justify-between gap-3">
+        <p className="text-[11px] font-medium text-black/35">
+          Shkallë e ndarë për secilin tregues
+        </p>
+        <AnimatePresence mode="wait">
+          {activePoint ? (
+            <motion.div
+              key={activePoint.label}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
+              className="flex items-center gap-3 rounded-[12px] border border-[#e8e8ec] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(16,24,40,0.05)]"
+            >
+              <span className="text-[11px] font-semibold" style={{ color: NAVY }}>
+                {activePoint.label}
+              </span>
+              <span className="text-[11px] text-black/35">|</span>
+              <span className="text-[11px] font-semibold" style={{ color: VIEWS_COLOR }}>
+                {fmtNum(activePoint.views)} shikime
+              </span>
+              <span className="text-[11px] font-semibold" style={{ color: LEADS_COLOR }}>
+                {fmtNum(activePoint.leads)} kontakte
+              </span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      <div className="space-y-3">
+        <EngagementMetricRow
+          label="Shikime"
+          metricKey="views"
+          color={VIEWS_COLOR}
+          data={data}
+          maxValue={maxViews}
+          selectedMonthLabel={selectedMonthLabel}
+          onHover={setHoveredIndex}
+        />
+        <EngagementMetricRow
+          label="Kontakte"
+          metricKey="leads"
+          color={LEADS_COLOR}
+          data={data}
+          maxValue={maxLeads}
+          selectedMonthLabel={selectedMonthLabel}
+          onHover={setHoveredIndex}
+        />
+      </div>
+
+      <div className="mt-2 grid grid-cols-[62px_1fr] gap-3">
+        <div />
+        <div className="grid grid-cols-12 gap-2">
+          {data.map((point) => {
+            const isSelected = point.label === selectedMonthLabel;
+            return (
+              <span
+                key={point.label}
+                className="text-center text-[9px] tracking-[-0.025em]"
+                style={{
+                  color: isSelected ? NAVY : "rgba(0,0,0,0.36)",
+                  fontWeight: isSelected ? 800 : 600,
+                }}
+              >
+                {point.label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroCard({
+  label,
+  value,
+  prevValue,
+  format,
+  icon: Icon,
+  comparisonLabel,
+  delay,
+  active,
+}: HeroCardProps) {
   const animated = useCountUp(value, active, 1400);
   const delta = prevValue !== null && prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : null;
   const deltaPos = delta !== null && delta >= 0;
@@ -126,82 +423,149 @@ function HeroCard({ label, value, prevValue, format, icon: Icon, delay, active }
   return (
     <motion.div
       {...fadeUp(delay)}
-      whileHover={{ y: -4, boxShadow: "0 12px 28px rgba(0,0,0,0.09)" }}
+      whileHover={{ y: -3, boxShadow: "0 12px 24px rgba(16,24,40,0.07)" }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="flex-1 rounded-[20px] border border-[#E8E8EC] bg-white px-6 py-6"
-      style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.06)" }}
+      className="flex-1 rounded-[18px] border border-[#e8e8ec] bg-white px-5 py-4"
+      style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.05)" }}
     >
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#eaf0fa]">
-          <Icon size={16} style={{ color: NAVY }} strokeWidth={1.8} />
-        </div>
-        {delta !== null && (
-          <div className="flex items-center gap-1">
-            {deltaPos ? (
-              <TrendingUp size={12} style={{ color: "#3c7a57" }} strokeWidth={2} />
-            ) : (
-              <TrendingDown size={12} style={{ color: "#b14b4b" }} strokeWidth={2} />
-            )}
-            <span className="text-[12px]" style={{ color: deltaPos ? "#3c7a57" : "#b14b4b", fontWeight: 600 }}>
-              {deltaPos ? "+" : ""}
-              {delta.toFixed(1)}%
-            </span>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[#eef3fb]">
+              <Icon size={15} style={{ color: NAVY }} strokeWidth={1.9} />
+            </div>
           </div>
-        )}
+          <p className="text-[30px] leading-none tracking-[-1.7px]" style={{ fontWeight: 750, color: NAVY }}>
+            {format(animated)}
+          </p>
+          <p className="mt-2 text-[12.5px] text-black/48" style={{ fontWeight: 600 }}>{label}</p>
+        </div>
+
+        <div className="flex min-w-[84px] flex-col items-end gap-2 pt-1 text-right">
+          {delta !== null && (
+            <div
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1"
+              style={{ backgroundColor: deltaPos ? "#f0f7f3" : "#fdf3f3" }}
+            >
+              {deltaPos ? (
+                <TrendingUp size={11} style={{ color: "#3c7a57" }} strokeWidth={2} />
+              ) : (
+                <TrendingDown size={11} style={{ color: "#b14b4b" }} strokeWidth={2} />
+              )}
+              <span className="text-[11px]" style={{ color: deltaPos ? "#3c7a57" : "#b14b4b", fontWeight: 700 }}>
+                {deltaPos ? "+" : ""}
+                {delta.toFixed(1)}%
+              </span>
+            </div>
+          )}
+          {prevValue !== null && prevValue > 0 && (
+            <div className="text-right leading-snug">
+              <p className="text-[10.5px] font-semibold text-black/32">{format(prevValue)}</p>
+              <p className="text-[10px] text-black/28">{comparisonLabel}</p>
+            </div>
+          )}
+        </div>
       </div>
-      <p className="text-[36px] leading-none tracking-[-2px]" style={{ fontWeight: 700, color: NAVY }}>
-        {format(animated)}
-      </p>
-      <p className="mt-2 text-[12.5px] text-black/45" style={{ fontWeight: 500 }}>{label}</p>
-      {prevValue !== null && prevValue > 0 && (
-        <p className="mt-0.5 text-[11.5px] text-black/28">{format(prevValue)} muaji i kaluar</p>
-      )}
     </motion.div>
   );
 }
 
-function SpendTooltip({ active, payload, label }: SpendTooltipProps) {
-  if (!active || !payload?.length) return null;
+function KpiScopeSwitch({
+  value,
+  onChange,
+}: {
+  value: KpiScope;
+  onChange: (scope: KpiScope) => void;
+}) {
+  const options: Array<{ value: KpiScope; label: string }> = [
+    { value: "month", label: "Muaji" },
+    { value: "ytd", label: "Viti deri tani" },
+  ];
+
   return (
-    <div className="rounded-[10px] border border-[#e8e8ec] bg-white px-3 py-2" style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.10)" }}>
-      <p className="mb-1 text-[11px] text-black/40">{label}</p>
-      <p className="text-[13px]" style={{ color: NAVY, fontWeight: 700 }}>
-        {fmtEur(Number(payload[0].value ?? 0))}
+    <div className="inline-flex rounded-[12px] border border-[#dfe6f2] bg-white p-1 shadow-[0_1px_2px_rgba(16,24,40,0.025)]">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className="relative rounded-[9px] px-3 py-1.5 text-[11px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#003883]/10"
+            style={{
+              color: active ? NAVY : "rgba(0,0,0,0.45)",
+              fontWeight: active ? 750 : 650,
+            }}
+          >
+            {active && (
+              <motion.span
+                layoutId="marketing-kpi-scope-active"
+                className="absolute inset-0 rounded-[9px] bg-[#eef3fb]"
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
+            <span className="relative z-10">{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MarketingActionCard({
+  title,
+  onClick,
+  variant = "secondary",
+}: {
+  title: string;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
+}) {
+  const isPrimary = variant === "primary";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-w-[146px] will-change-transform items-center gap-2 rounded-[12px] border px-2.5 py-2 text-left shadow-[0_1px_2px_rgba(16,24,40,0.025)] transition-[transform,box-shadow,background-color,border-color] duration-100 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(16,24,40,0.055)] active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#003883]/10"
+      style={{
+        backgroundColor: isPrimary ? "#f3f6fb" : "white",
+        borderColor: isPrimary ? "#e2e9f4" : "#dfe6f2",
+      }}
+    >
+      <span
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] transition-colors duration-100"
+        style={{
+          backgroundColor: isPrimary ? "rgba(255,255,255,0.58)" : "#eef3fb",
+          color: NAVY,
+        }}
+      >
+        <Plus size={13.5} strokeWidth={2.4} />
+      </span>
+      <span
+        className="block text-[11.5px] leading-tight"
+        style={{ color: NAVY, fontWeight: 750 }}
+      >
+        {title}
+      </span>
+    </button>
+  );
+}
+
+function OfflineSummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[14px] border border-[#edf0f5] bg-[#fbfcfe] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-black/32">{label}</p>
+      <p className="mt-1 text-[18px] leading-none tracking-[-0.03em]" style={{ color: NAVY, fontWeight: 750 }}>
+        {value}
       </p>
     </div>
-  );
-}
-
-function LineTooltip({ active, payload, label }: LineTooltipProps) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-[10px] border border-[#e8e8ec] bg-white px-3 py-2.5" style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.10)" }}>
-      <p className="mb-1.5 text-[11px] text-black/40">{label}</p>
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-2 py-0.5">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: p.stroke ?? NAVY }} />
-          <span className="text-[12px] text-black/50">{p.name ?? "—"}:</span>
-          <span className="text-[12px]" style={{ color: p.stroke ?? NAVY, fontWeight: 600 }}>
-            {fmtNum(Number(p.value ?? 0))}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ChartYearSelect({ value, onChange }: { value: number; onChange: (year: number) => void }) {
-  return (
-    <label className="flex items-center gap-2">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Viti</span>
-      <CustomSelect
-        size="sm"
-        className="min-w-[92px]"
-        options={[...YEAR_OPTIONS]}
-        value={String(value)}
-        onChange={(next) => onChange(Number(next))}
-      />
-    </label>
   );
 }
 
@@ -251,24 +615,48 @@ function ModalTextField({
   );
 }
 
-function ModalDateField({
-  label, value, onChange, required = false,
+function ModalSelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  required = false,
+  size = "sm",
 }: {
-  label: string; value: string; onChange: (v: string) => void; required?: boolean;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  required?: boolean;
+  size?: "sm" | "md";
 }) {
   return (
     <div>
       <label className="mb-1 block text-[12px] font-semibold text-black/55">
         {label}{required && <span className="ml-0.5 text-[#b14b4b]">*</span>}
       </label>
-      <input
-        type="date"
+      <CustomSelect
+        size={size}
+        className="w-full"
+        options={options}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-[38px] w-full rounded-[10px] border border-[#e8e8ec] bg-white px-3 text-[13px] outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-        style={{ color: "rgba(0,0,0,0.85)", fontWeight: 500 }}
+        placeholder={placeholder}
+        onChange={onChange}
       />
     </div>
+  );
+}
+
+function ModalSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-black/35">
+        {title}
+      </p>
+      {children}
+    </section>
   );
 }
 
@@ -336,6 +724,8 @@ function DigitalModal({
   const selectedMonthNumber = SQ_MONTHS.indexOf(monthName) + 1;
   const selectedExistingRow = existingData[Number(year)]?.[selectedMonthNumber] ?? null;
   const canSubmit = year && selectedMonthNumber >= 1 && !saving;
+  const periodLabel = `${monthName} ${year}`;
+  const modeLabel = selectedExistingRow ? "Përditësim" : "Regjistrim i ri";
 
   useEffect(() => {
     const next = digitalFormValuesFromRow(selectedExistingRow);
@@ -402,13 +792,18 @@ function DigitalModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[480px] rounded-[20px] border border-[#e8e8ec] bg-white p-6"
+        className="w-full max-w-[520px] rounded-[22px] border border-[#e8e8ec] bg-white px-7 py-6"
         style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
-            {selectedExistingRow ? "Përditëso të dhënat digjitale" : "Shto të dhëna digjitale"}
-          </h2>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-[18px] leading-tight tracking-[-0.02em]" style={{ fontWeight: 750, color: NAVY }}>
+              Të dhëna digjitale
+            </h2>
+            <p className="mt-1 text-[12px] font-medium text-black/42">
+              {modeLabel} · {periodLabel}
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-[8px] text-black/35 transition hover:bg-[#f5f7fb] hover:text-black/60"
@@ -417,31 +812,46 @@ function DigitalModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-[12px] font-semibold text-black/55">
-              Viti<span className="ml-0.5 text-[#b14b4b]">*</span>
-            </label>
-            <CustomSelect size="sm" className="w-full" options={[...YEAR_OPTIONS]} value={year} onChange={setYear} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-semibold text-black/55">
-              Muaji<span className="ml-0.5 text-[#b14b4b]">*</span>
-            </label>
-            <CustomSelect
-              size="sm"
-              className="w-full"
-              options={SQ_MONTHS}
+        <div className="rounded-[14px] border border-[#edf0f5] bg-[#fbfcfe] p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <ModalSelectField
+              label="Viti"
+              value={year}
+              onChange={setYear}
+              options={[...YEAR_OPTIONS]}
+              required
+            />
+            <ModalSelectField
+              label="Muaji"
               value={monthName}
               onChange={setMonthName}
+              options={SQ_MONTHS}
+              required
             />
           </div>
-          <ModalNumberField label="Shpenzime Facebook (€)" value={spendFB} onChange={setSpendFB} />
-          <ModalNumberField label="Shikime Facebook"       value={viewsFB} onChange={setViewsFB} />
-          <ModalNumberField label="Shikime TikTok"         value={viewsTT} onChange={setViewsTT} />
-          <ModalNumberField label="Kontakte Facebook"      value={leadsFB} onChange={setLeadsFB} />
-          <ModalNumberField label="Kontakte Instagram"     value={leadsIG} onChange={setLeadsIG} />
-          <ModalNumberField label="Kontakte TikTok"        value={leadsTT} onChange={setLeadsTT} />
+        </div>
+
+        <div className="my-5 border-t border-[#f0f0f4]" />
+
+        <div className="space-y-4">
+          <ModalSection title="Shpenzime">
+            <ModalNumberField label="Facebook Ads (€)" value={spendFB} onChange={setSpendFB} />
+          </ModalSection>
+
+          <ModalSection title="Shikime">
+            <div className="grid grid-cols-2 gap-3">
+              <ModalNumberField label="Facebook" value={viewsFB} onChange={setViewsFB} />
+              <ModalNumberField label="TikTok" value={viewsTT} onChange={setViewsTT} />
+            </div>
+          </ModalSection>
+
+          <ModalSection title="Kontakte">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <ModalNumberField label="Facebook" value={leadsFB} onChange={setLeadsFB} />
+              <ModalNumberField label="Instagram" value={leadsIG} onChange={setLeadsIG} />
+              <ModalNumberField label="TikTok" value={leadsTT} onChange={setLeadsTT} />
+            </div>
+          </ModalSection>
         </div>
 
         {errMsg && (
@@ -451,7 +861,7 @@ function DigitalModal({
           </div>
         )}
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-3">
           <button
             onClick={onClose}
             className="h-[38px] rounded-[10px] border border-[#e8e8ec] px-4 text-[13px] text-black/55 transition hover:bg-[#f5f7fb]"
@@ -464,7 +874,7 @@ function DigitalModal({
             className="h-[38px] rounded-[10px] px-5 text-[13px] text-white transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: NAVY, fontWeight: 600 }}
           >
-            {saving ? "Duke ruajtur..." : selectedExistingRow ? "Përditëso të dhënat" : "Shto të dhënat"}
+            {saving ? "Duke ruajtur..." : selectedExistingRow ? "Ruaj ndryshimet" : "Ruaj"}
           </button>
         </div>
       </motion.div>
@@ -496,6 +906,10 @@ function OfflineModal({
   const canSubmit =
     channel && amount && year && date &&
     (periodType === "Vjetore" || month) && !saving;
+  const selectedOfflineMonthName = SQ_MONTHS[Number(month) - 1] ?? SQ_MONTHS[defaultMonth - 1] ?? "";
+  const offlinePeriodLabel = periodType === "Vjetore"
+    ? `Vjetore ${year}`
+    : `${selectedOfflineMonthName} ${year}`;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -542,13 +956,18 @@ function OfflineModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[480px] rounded-[20px] border border-[#e8e8ec] bg-white p-6"
+        className="w-full max-w-[520px] rounded-[22px] border border-[#e8e8ec] bg-white px-7 py-6"
         style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-[15px]" style={{ fontWeight: 700, color: NAVY }}>
-            Regjistro hyrje offline
-          </h2>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-[18px] leading-tight tracking-[-0.02em]" style={{ fontWeight: 750, color: NAVY }}>
+              Të dhëna offline
+            </h2>
+            <p className="mt-1 text-[12px] font-medium text-black/42">
+              Regjistrim shpenzimi · {offlinePeriodLabel}
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-[8px] text-black/35 transition hover:bg-[#f5f7fb] hover:text-black/60"
@@ -557,62 +976,68 @@ function OfflineModal({
           </button>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="mb-1 block text-[12px] font-semibold text-black/55">
-              Kanali<span className="ml-0.5 text-[#b14b4b]">*</span>
-            </label>
-            <CustomSelect
-              size="md"
-              className="w-full"
-              options={[...CHANNELS]}
-              value={channel}
-              placeholder="Zgjidh kanalin"
-              onChange={setPeriodChannel}
-            />
-          </div>
-          <ModalTextField
-            label="Përshkrimi"
-            value={description}
-            onChange={setDescription}
-            placeholder="p.sh. Billboard pranë hyrjes kryesore"
-          />
-          <ModalNumberField label="Shuma (€)" value={amount} onChange={setAmount} required />
-          <div>
-            <label className="mb-1 block text-[12px] font-semibold text-black/55">
-              Periudha<span className="ml-0.5 text-[#b14b4b]">*</span>
-            </label>
-            <CustomSelect
-              size="md"
-              className="w-full"
-              options={["Mujore", "Vjetore"]}
-              value={periodType}
-              onChange={(v) => setPeriodType(v as "Mujore" | "Vjetore")}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-[12px] font-semibold text-black/55">
-                Viti<span className="ml-0.5 text-[#b14b4b]">*</span>
-              </label>
-              <CustomSelect size="md" className="w-full" options={[...YEAR_OPTIONS]} value={year} onChange={setYear} />
-            </div>
-            {periodType === "Mujore" && (
-              <div>
-                <label className="mb-1 block text-[12px] font-semibold text-black/55">
-                  Muaji<span className="ml-0.5 text-[#b14b4b]">*</span>
-                </label>
-                <CustomSelect
-                  size="md"
-                  className="w-full"
-                  options={SQ_MONTHS}
-                  value={SQ_MONTHS[Number(month) - 1] ?? ""}
+        <div className="space-y-4">
+          <ModalSection title="Periudha">
+            <div className={`grid grid-cols-1 gap-3 ${periodType === "Mujore" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+              <ModalSelectField
+                label="Viti"
+                value={year}
+                onChange={setYear}
+                options={[...YEAR_OPTIONS]}
+                required
+              />
+              {periodType === "Mujore" && (
+                <ModalSelectField
+                  label="Muaji"
+                  value={selectedOfflineMonthName}
                   onChange={(v) => setMonth(String(SQ_MONTHS.indexOf(v) + 1))}
+                  options={SQ_MONTHS}
+                  required
                 />
-              </div>
-            )}
-          </div>
-          <ModalDateField label="Data" value={date} onChange={setDate} required />
+              )}
+              <ModalSelectField
+                label="Lloji"
+                value={periodType}
+                onChange={(v) => setPeriodType(v as "Mujore" | "Vjetore")}
+                options={["Mujore", "Vjetore"]}
+                required
+              />
+            </div>
+          </ModalSection>
+
+          <div className="border-t border-[#f0f0f4]" />
+
+          <ModalSection title="Shpenzimi">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ModalSelectField
+                label="Kanali"
+                value={channel}
+                onChange={setPeriodChannel}
+                options={[...CHANNELS]}
+                placeholder="Zgjidh kanalin"
+                required
+                size="md"
+              />
+              <ModalNumberField label="Shuma (€)" value={amount} onChange={setAmount} required />
+            </div>
+          </ModalSection>
+
+          <ModalSection title="Detajet">
+            <div className="grid grid-cols-1 gap-3">
+              <DatePickerField
+                label="Data"
+                value={date}
+                onChange={(next) => setDate(next ?? "")}
+                required
+              />
+              <ModalTextField
+                label="Përshkrimi"
+                value={description}
+                onChange={setDescription}
+                placeholder="p.sh. Billboard pranë hyrjes kryesore"
+              />
+            </div>
+          </ModalSection>
         </div>
 
         {errMsg && (
@@ -622,7 +1047,7 @@ function OfflineModal({
           </div>
         )}
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-3">
           <button
             onClick={onClose}
             className="h-[38px] rounded-[10px] border border-[#e8e8ec] px-4 text-[13px] text-black/55 transition hover:bg-[#f5f7fb]"
@@ -635,7 +1060,7 @@ function OfflineModal({
             className="h-[38px] rounded-[10px] px-5 text-[13px] text-white transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: NAVY, fontWeight: 600 }}
           >
-            {saving ? "Duke ruajtur..." : "Shto hyrjen"}
+            {saving ? "Duke ruajtur..." : "Ruaj"}
           </button>
         </div>
       </motion.div>
@@ -706,11 +1131,7 @@ function DeleteConfirmModal({
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-type MarketingDashboardProps = {
-  onOpenDataInput?: () => void;
-};
-
-export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboardProps) {
+export default function MarketingDashboard() {
   const {
     marketingData, offlineEntries, loading,
     saveMonthlyData, createOfflineEntry, deleteOfflineEntry,
@@ -718,17 +1139,19 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
 
   const [started, setStarted] = useState(false);
   const now = new Date();
-  const [filterYear, setFilterYear] = useState(
-    YEARS.includes(now.getFullYear()) ? now.getFullYear() : YEARS[0]
-  );
-  const [filterMonth, setFilterMonth] = useState<number | "all">(now.getMonth() + 1);
+  const currentYear = YEARS.includes(now.getFullYear()) ? now.getFullYear() : YEARS[0];
+  const currentMonth = now.getMonth() + 1;
+  const [filterYear, setFilterYear] = useState(currentYear);
+  const [filterMonth, setFilterMonth] = useState<number | "all">(currentMonth);
+  const [kpiScope, setKpiScope] = useState<KpiScope>("month");
+  const [offlineLogYear, setOfflineLogYear] = useState(currentYear);
+  const [offlineLogMonth, setOfflineLogMonth] = useState(currentMonth);
 
   const [showDigitalModal, setShowDigitalModal] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId]     = useState<string | null>(null);
   const [deleting, setDeleting]                 = useState(false);
   const [deleteError, setDeleteError]           = useState<string | null>(null);
-  const [logFilter, setLogFilter]               = useState<"E gjitha" | "Mujore" | "Vjetore">("E gjitha");
 
   useEffect(() => {
     if (!loading) {
@@ -759,18 +1182,23 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
     () =>
       marketingData.filter((r) => {
         if (r.year !== filterYear) return false;
-        if (filterMonth !== "all" && r.month !== filterMonth) return false;
+        if (filterMonth === "all") return true;
+        if (kpiScope === "ytd") return r.month <= filterMonth;
+        if (r.month !== filterMonth) return false;
         return true;
       }),
-    [marketingData, filterYear, filterMonth]
+    [marketingData, filterYear, filterMonth, kpiScope]
   );
 
   const prevDigitalRows = useMemo(() => {
     if (filterMonth === "all") return marketingData.filter((r) => r.year === filterYear - 1);
+    if (kpiScope === "ytd") {
+      return marketingData.filter((r) => r.year === filterYear - 1 && r.month <= filterMonth);
+    }
     const prevYear  = filterMonth === 1 ? filterYear - 1 : filterYear;
     const prevMonth = filterMonth === 1 ? 12 : (filterMonth as number) - 1;
     return marketingData.filter((r) => r.year === prevYear && r.month === prevMonth);
-  }, [marketingData, filterYear, filterMonth]);
+  }, [marketingData, filterYear, filterMonth, kpiScope]);
 
   const currentDigital = useMemo(() => aggregateDigital(currentDigitalRows), [aggregateDigital, currentDigitalRows]);
   const prevDigital    = useMemo(() => aggregateDigital(prevDigitalRows),    [aggregateDigital, prevDigitalRows]);
@@ -778,13 +1206,9 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
   const offlineSpendCurrent = useMemo(
     () =>
       offlineEntries
-        .filter((e) => {
-          if (e.year !== filterYear) return false;
-          if (filterMonth === "all") return true;
-          return e.period_type === "Vjetore" || e.month === (filterMonth as number);
-        })
+        .filter((entry) => offlineEntryMatchesKpiScope(entry, filterYear, filterMonth, kpiScope))
         .reduce((s, e) => s + e.amount, 0),
-    [offlineEntries, filterYear, filterMonth]
+    [offlineEntries, filterYear, filterMonth, kpiScope]
   );
 
   const offlineSpendPrev = useMemo(() => {
@@ -793,23 +1217,33 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
         .filter((e) => e.year === filterYear - 1)
         .reduce((s, e) => s + e.amount, 0);
     }
+    if (kpiScope === "ytd") {
+      return offlineEntries
+        .filter((entry) => offlineEntryMatchesKpiScope(entry, filterYear - 1, filterMonth, "ytd"))
+        .reduce((s, e) => s + e.amount, 0);
+    }
     const prevYear  = filterMonth === 1 ? filterYear - 1 : filterYear;
     const prevMonth = filterMonth === 1 ? 12 : (filterMonth as number) - 1;
     return offlineEntries
-      .filter((e) => {
-        if (e.year !== prevYear) return false;
-        return e.period_type === "Vjetore" || e.month === prevMonth;
-      })
+      .filter((entry) => offlineEntryMatchesPeriod(entry, prevYear, prevMonth))
       .reduce((s, e) => s + e.amount, 0);
-  }, [offlineEntries, filterYear, filterMonth]);
+  }, [offlineEntries, filterYear, filterMonth, kpiScope]);
 
   const totalSpend    = currentDigital.spend + offlineSpendCurrent;
   const prevTotalSpend = prevDigital.spend + offlineSpendPrev;
   const hasPrevPeriod  = prevDigitalRows.length > 0 || offlineSpendPrev > 0;
+  const selectedChartMonthLabel = filterMonth === "all" ? null : SQ_MONTHS[(filterMonth as number) - 1];
+  const kpiPeriodLabel = getKpiPeriodLabel(filterYear, filterMonth, kpiScope);
+  const comparisonLabel =
+    filterMonth === "all"
+      ? "viti i kaluar"
+      : kpiScope === "ytd"
+        ? getKpiPeriodLabel(filterYear - 1, filterMonth, "ytd")
+        : "muaji i kaluar";
 
   const chartData = useMemo(
-    () =>
-      SQ_MONTHS_SHORT.map((label, idx) => {
+    (): MarketingChartPoint[] =>
+      SQ_MONTHS.map((label, idx) => {
         const row = existingData[filterYear]?.[idx + 1];
         return {
           label,
@@ -821,12 +1255,24 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
     [existingData, filterYear]
   );
 
-  const filteredOfflineLog = useMemo(() => {
-    if (logFilter === "E gjitha") return offlineEntries;
-    return offlineEntries.filter((e) => e.period_type === logFilter);
-  }, [offlineEntries, logFilter]);
+  const filteredOfflineLog = useMemo(
+    () =>
+      offlineEntries
+        .filter((entry) => {
+          if (entry.year !== offlineLogYear) return false;
+          if (entry.period_type === "Vjetore") return getIsoMonth(entry.date) === offlineLogMonth;
+          return entry.month === offlineLogMonth;
+        })
+        .sort((a, b) => {
+          if (a.period_type !== b.period_type) return a.period_type === "Mujore" ? -1 : 1;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        }),
+    [offlineEntries, offlineLogYear, offlineLogMonth],
+  );
 
-  const defaultModalMonth = filterMonth === "all" ? now.getMonth() + 1 : (filterMonth as number);
+  const offlineLogSpend = filteredOfflineLog.reduce((sum, entry) => sum + entry.amount, 0);
+  const offlineLogMonthName = SQ_MONTHS[offlineLogMonth - 1];
+  const defaultModalMonth = filterMonth === "all" ? currentMonth : (filterMonth as number);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTargetId) return;
@@ -859,31 +1305,20 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
               Performanca e marketingut digjital dhe offline
             </motion.span>
           }
-          right={
-            onOpenDataInput ? (
-              <motion.div {...fadeUp(0.08)}>
-                <button
-                  onClick={onOpenDataInput}
-                  className="flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] text-white transition hover:opacity-90"
-                  style={{ backgroundColor: NAVY }}
-                >
-                  <Database size={14} strokeWidth={2.1} />
-                  Hap Të dhënat
-                </button>
-              </motion.div>
-            ) : null
-          }
         />
 
-        {/* Period selectors + action buttons */}
-        <motion.div {...fadeUp(0.08)} className="mb-4 flex items-center justify-between gap-2">
+        {/* Period selectors + quick actions */}
+        <motion.div {...fadeUp(0.08)} className="mb-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <CustomSelect
               size="sm"
               className="min-w-[100px]"
               options={[...YEAR_OPTIONS]}
               value={String(filterYear)}
-              onChange={(v) => setFilterYear(Number(v))}
+              onChange={(v) => {
+                setFilterYear(Number(v));
+                setOfflineLogYear(Number(v));
+              }}
             />
             <CustomSelect
               size="sm"
@@ -891,27 +1326,54 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
               options={SQ_MONTHS}
               value={filterMonth === "all" ? "" : SQ_MONTHS[(filterMonth as number) - 1]}
               placeholder="Të gjitha muajt"
-              onChange={(v) => setFilterMonth(v === "" ? "all" : SQ_MONTHS.indexOf(v) + 1)}
+              onChange={(v) => {
+                if (v === "") {
+                  setFilterMonth("all");
+                  return;
+                }
+                const nextMonth = SQ_MONTHS.indexOf(v) + 1;
+                setFilterMonth(nextMonth);
+                setOfflineLogMonth(nextMonth);
+              }}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex items-center gap-3">
+            <MarketingActionCard
+              title="Performancë digjitale"
+              variant="primary"
               onClick={() => setShowDigitalModal(true)}
-              className="flex h-[34px] items-center gap-1.5 rounded-[10px] px-3.5 text-[12.5px] text-white transition hover:opacity-90"
-              style={{ backgroundColor: NAVY, fontWeight: 600 }}
-            >
-              <Plus size={13} strokeWidth={2.5} />
-              Shto të dhëna digjitale
-            </button>
-            <button
+            />
+            <MarketingActionCard
+              title="Shpenzim offline"
               onClick={() => setShowOfflineModal(true)}
-              className="flex h-[34px] items-center gap-1.5 rounded-[10px] border px-3.5 text-[12.5px] transition hover:bg-[#f5f7fb]"
-              style={{ borderColor: `${NAVY}40`, color: NAVY, fontWeight: 600 }}
-            >
-              <Plus size={13} strokeWidth={2.5} />
-              Shto hyrje offline
-            </button>
+            />
           </div>
+        </motion.div>
+
+        {/* KPI scope */}
+        <motion.div
+          {...fadeUp(0.1)}
+          className="mb-3 flex items-center justify-between gap-3"
+        >
+          <div>
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/32">
+              Përmbledhja
+            </p>
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={`${kpiScope}-${kpiPeriodLabel}`}
+                initial={{ opacity: 0, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -3 }}
+                transition={{ duration: 0.14, ease: "easeOut" }}
+                className="mt-0.5 text-[12px] font-semibold"
+                style={{ color: NAVY }}
+              >
+                {kpiPeriodLabel}
+              </motion.p>
+            </AnimatePresence>
+          </div>
+          <KpiScopeSwitch value={kpiScope} onChange={setKpiScope} />
         </motion.div>
 
         {/* Hero cards */}
@@ -922,6 +1384,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
             prevValue={hasPrevPeriod ? prevTotalSpend : null}
             format={fmtEur}
             icon={TrendingUp}
+            comparisonLabel={comparisonLabel}
             delay={0.1}
             active={started}
           />
@@ -931,6 +1394,7 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
             prevValue={prevDigitalRows.length > 0 ? prevDigital.views : null}
             format={fmtNum}
             icon={Eye}
+            comparisonLabel={comparisonLabel}
             delay={0.17}
             active={started}
           />
@@ -940,12 +1404,13 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
             prevValue={prevDigitalRows.length > 0 ? prevDigital.leads : null}
             format={fmtNum}
             icon={Users}
+            comparisonLabel={comparisonLabel}
             delay={0.24}
             active={started}
           />
         </div>
 
-        {/* Spend bar chart */}
+        {/* Spend mini bars */}
         <motion.div
           {...fadeUp(0.3)}
           className="mb-5 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
@@ -953,26 +1418,15 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
         >
           <CardSectionHeader
             title="Shpenzimet sipas muajve"
-            subtitle={`Shpenzimet e Facebook sipas muajve — ${filterYear}`}
-            className="mb-5 border-b-0 px-0 py-0"
-            right={<ChartYearSelect value={filterYear} onChange={setFilterYear} />}
+            subtitle={`Shpenzimet e Facebook Ads sipas muajve — ${filterYear}`}
+            className="mb-3 border-b-0 px-0 py-0"
+            titleStyle={CHART_HEADER_TITLE_STYLE}
+            subtitleStyle={CHART_HEADER_SUBTITLE_STYLE}
           />
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={chartData} barSize={22} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <XAxis dataKey="label" axisLine={false} tickLine={false}
-                tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)", fontWeight: 500 }} />
-              <YAxis hide />
-              <Tooltip content={<SpendTooltip />} cursor={{ fill: "rgba(0,56,131,0.04)", radius: 6 }} />
-              <Bar dataKey="spend" name="Facebook" fill={FB_COLOR} radius={[5, 5, 0, 0]} fillOpacity={0.9} />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="mt-3 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full" style={{ background: FB_COLOR }} />
-            <span className="text-[11.5px] text-black/40">Facebook</span>
-          </div>
+          <SpendMiniBars data={chartData} selectedMonthLabel={selectedChartMonthLabel} />
         </motion.div>
 
-        {/* Views / leads line chart */}
+        {/* Views / leads mini bars */}
         <motion.div
           {...fadeUp(0.36)}
           className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
@@ -981,145 +1435,146 @@ export default function MarketingDashboard({ onOpenDataInput }: MarketingDashboa
           <CardSectionHeader
             title="Shikimet dhe kontaktet sipas muajve"
             subtitle={`Shikimet dhe kontaktet sipas muajve — ${filterYear}`}
-            className="mb-5 border-b-0 px-0 py-0"
-            right={<ChartYearSelect value={filterYear} onChange={setFilterYear} />}
+            className="mb-3 border-b-0 px-0 py-0"
+            titleStyle={CHART_HEADER_TITLE_STYLE}
+            subtitleStyle={CHART_HEADER_SUBTITLE_STYLE}
           />
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />
-              <XAxis dataKey="label" axisLine={false} tickLine={false}
-                interval={0}
-                minTickGap={0}
-                padding={{ left: 8, right: 8 }}
-                tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)", fontWeight: 500 }} />
-              <YAxis hide />
-              <Tooltip content={<LineTooltip />} />
-              <Line type="monotone" dataKey="views" name="Shikime"    stroke={VIEWS_COLOR} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="leads" name="Kontaktet"  stroke={LEADS_COLOR} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="mt-3 flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: VIEWS_COLOR }} />
-              <span className="text-[11.5px] text-black/40">Shikime</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: LEADS_COLOR }} />
-              <span className="text-[11.5px] text-black/40">Kontaktet</span>
-            </div>
-          </div>
+          <EngagementMiniBars data={chartData} selectedMonthLabel={selectedChartMonthLabel} />
         </motion.div>
 
         {/* Offline marketing log */}
         <motion.div
           {...fadeUp(0.42)}
-          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-6"
+          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white px-6 py-5"
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
           <CardSectionHeader
             title="Regjistri i marketingut offline"
-            className="mb-4 border-b-0 px-0 py-0"
+            className="mb-3 border-b-0 px-0 py-0"
+            titleStyle={SECTION_HEADER_TITLE_STYLE}
             right={
-              <div className="flex items-center rounded-[10px] border border-[#e8e8ec] p-0.5">
-                {OFFLINE_FILTERS.map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setLogFilter(f)}
-                    className="rounded-[8px] px-3 py-1.5 text-[11.5px] transition"
-                    style={{
-                      background: logFilter === f ? NAVY : "transparent",
-                      color: logFilter === f ? "white" : "rgba(0,0,0,0.45)",
-                      fontWeight: logFilter === f ? 600 : 400,
-                    }}
-                  >
-                    {f}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Muaji</span>
+                  <CustomSelect
+                    size="sm"
+                    className="min-w-[112px]"
+                    options={SQ_MONTHS}
+                    value={offlineLogMonthName}
+                    onChange={(next) => setOfflineLogMonth(SQ_MONTHS.indexOf(next) + 1)}
+                  />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">Viti</span>
+                  <CustomSelect
+                    size="sm"
+                    className="min-w-[92px]"
+                    options={[...YEAR_OPTIONS]}
+                    value={String(offlineLogYear)}
+                    onChange={(next) => setOfflineLogYear(Number(next))}
+                  />
+                </label>
               </div>
             }
           />
 
-          {filteredOfflineLog.length === 0 ? (
-            <div className="flex flex-col items-center py-10">
-              <p className="text-[13px] text-black/40" style={{ fontWeight: 500 }}>
-                {offlineEntries.length === 0
-                  ? "Nuk ka hyrje offline të regjistruara ende"
-                  : "Nuk ka hyrje offline për filtrin aktual"}
-              </p>
-              <p className="mt-1 text-[12px] text-black/28">
-                {offlineEntries.length === 0
-                  ? "Regjistro hyrjen e parë për ta nisur evidencën operative."
-                  : "Ndrysho filtrin për të parë hyrjet ekzistuese."}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#f0f0f4]">
-                    {["Kanali", "Përshkrimi", "Shuma (€)", "Periudha", "Data", ""].map((h) => (
-                      <th
-                        key={h}
-                        className="pb-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-black/35"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOfflineLog.map((entry) => (
-                    <tr key={entry.id} className="border-b border-[#f8f8fa] transition hover:bg-[#fafbfd]">
-                      <td className="py-3 pr-4">
-                        <span
-                          className="inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11.5px]"
-                          style={{
-                            background: `${CHANNEL_COLOR[entry.channel] ?? "#6b7280"}18`,
-                            color:       CHANNEL_COLOR[entry.channel] ?? "#6b7280",
-                            fontWeight:  600,
-                          }}
+          <div className="mb-3 grid grid-cols-3 gap-2.5">
+            <OfflineSummaryCard label="Periudha" value={`${offlineLogMonthName} ${offlineLogYear}`} />
+            <OfflineSummaryCard label="Shpenzime të muajit" value={fmtEur(offlineLogSpend)} />
+            <OfflineSummaryCard label="Hyrje" value={String(filteredOfflineLog.length)} />
+          </div>
+
+          <AnimatePresence mode="wait" initial={false}>
+            {filteredOfflineLog.length === 0 ? (
+              <motion.div key={`empty-${offlineLogYear}-${offlineLogMonth}`} {...OFFLINE_LOG_MOTION} className="flex flex-col items-center py-10">
+                <p className="text-[13px] text-black/40" style={{ fontWeight: 500 }}>
+                  {offlineEntries.length === 0
+                    ? "Nuk ka hyrje offline të regjistruara ende"
+                    : `Nuk ka hyrje offline për ${offlineLogMonthName} ${offlineLogYear}`}
+                </p>
+                <p className="mt-1 text-[12px] text-black/28">
+                  {offlineEntries.length === 0
+                    ? "Regjistro hyrjen e parë për ta nisur evidencën operative."
+                    : "Ndrysho periudhën ose shto një hyrje offline për këtë muaj."}
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div key={`table-${offlineLogYear}-${offlineLogMonth}`} {...OFFLINE_LOG_MOTION} className="overflow-x-auto">
+                <table className="w-full table-fixed">
+                  <colgroup>
+                    <col className="w-[170px]" />
+                    <col />
+                    <col className="w-[92px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[96px]" />
+                    <col className="w-[28px]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-[#f0f0f4]">
+                      {["Kanali", "Përshkrimi", "Shuma (€)", "Periudha", "Data", ""].map((h) => (
+                        <th
+                          key={h}
+                          className="whitespace-nowrap pb-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-black/35"
                         >
-                          {entry.channel}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-[12.5px] text-black/50">
-                        {entry.description || <span className="text-black/25">—</span>}
-                      </td>
-                      <td className="py-3 pr-4 text-[13px]" style={{ color: NAVY, fontWeight: 700 }}>
-                        {fmtEur(entry.amount)}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span
-                          className="inline-flex items-center rounded-[6px] px-2 py-0.5 text-[11px]"
-                          style={{
-                            background: entry.period_type === "Vjetore" ? "#eaf0fa" : "#f0f7f3",
-                            color:      entry.period_type === "Vjetore" ? NAVY : "#3c7a57",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {entry.period_type}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-[12.5px] text-black/45">
-                        {fmtDate(entry.date)}
-                      </td>
-                      <td className="py-3 text-right">
-                        <button
-                          onClick={() => {
-                            setDeleteTargetId(entry.id);
-                            setDeleteError(null);
-                          }}
-                          className="flex h-7 w-7 items-center justify-center rounded-[7px] text-black/25 transition hover:bg-[#fdf3f3] hover:text-[#b14b4b]"
-                        >
-                          <Trash2 size={13} strokeWidth={2} />
-                        </button>
-                      </td>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {filteredOfflineLog.map((entry) => (
+                      <tr key={entry.id} className="border-b border-[#f8f8fa] transition hover:bg-[#fafbfd]">
+                        <td className="py-3 pr-4">
+                          <span
+                            className="inline-flex items-center whitespace-nowrap rounded-[7px] px-2.5 py-1 text-[11.5px]"
+                            style={{
+                              background: "#f0f1f3",
+                              color: "rgba(24, 31, 42, 0.62)",
+                              fontWeight:  600,
+                            }}
+                          >
+                            {entry.channel}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-[12.5px] text-black/50">
+                          {entry.description || <span className="text-black/25">—</span>}
+                        </td>
+                        <td className="py-3 pr-4 text-[13px]" style={{ color: NAVY, fontWeight: 700 }}>
+                          {fmtEur(entry.amount)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span
+                            className="inline-flex items-center whitespace-nowrap rounded-[6px] px-2 py-0.5 text-[11px]"
+                            style={{
+                              background: entry.period_type === "Vjetore" ? "#eaf0fa" : "#f0f7f3",
+                              color:      entry.period_type === "Vjetore" ? NAVY : "#3c7a57",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {entry.period_type}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-[12.5px] text-black/45">
+                          {fmtDate(entry.date)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setDeleteTargetId(entry.id);
+                              setDeleteError(null);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-black/25 transition hover:bg-[#fdf3f3] hover:text-[#b14b4b]"
+                          >
+                            <Trash2 size={13} strokeWidth={2} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
       </div>

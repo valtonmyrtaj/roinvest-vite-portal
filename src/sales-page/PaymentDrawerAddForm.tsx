@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus } from "lucide-react";
+import { DatePickerField } from "../components/ui/DatePickerField";
 import { NAVY } from "./shared";
 
 /**
@@ -136,20 +137,16 @@ export function PaymentDrawerAddForm({
               />
             </label>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/32">
-                Data e skadimit
-              </span>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(event) => {
-                  setDueDate(event.target.value);
-                  setError("");
-                }}
-                className="h-10 rounded-[11px] border border-[#e8e8ec] bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-              />
-            </label>
+            <DatePickerField
+              label="Data e skadimit"
+              value={dueDate}
+              onChange={(next) => {
+                setDueDate(next ?? "");
+                setError("");
+              }}
+              required
+              labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-black/32"
+            />
 
             <label className="flex flex-col gap-1.5 md:col-span-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/32">

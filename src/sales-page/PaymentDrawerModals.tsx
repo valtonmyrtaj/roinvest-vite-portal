@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { DatePickerField } from "../components/ui/DatePickerField";
 import type { Payment } from "../hooks/usePayments";
 import { GREEN, NAVY, RED } from "./shared";
 
@@ -197,21 +198,18 @@ export function MarkPaidModal({
           Kësti #{payment.installment_number} do të shënohet si i paguar dhe progresi i arkëtimit do të përditësohet.
         </p>
 
-        <label className="mt-5 flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/32">
-            Data e pagesës
-          </span>
-          <input
-            type="date"
-            max={todayIso()}
-            value={paidDate}
-            onChange={(event) => {
-              setPaidDate(event.target.value);
-              setError("");
-            }}
-            className="h-10 rounded-[11px] border border-[#e8e8ec] bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-          />
-        </label>
+        <DatePickerField
+          className="mt-5"
+          label="Data e pagesës"
+          max={todayIso()}
+          value={paidDate}
+          onChange={(next) => {
+            setPaidDate(next ?? "");
+            setError("");
+          }}
+          required
+          labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-black/32"
+        />
         {error && <p className="mt-3 text-[12px] text-red-500">{error}</p>}
 
         <div className="mt-6 flex justify-end gap-2">

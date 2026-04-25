@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { CustomSelect } from "../../components/CustomSelect";
+import { DatePickerField } from "../../components/ui/DatePickerField";
 import { NAVY, SOFT_EASE } from "../shared";
 import type {
   ShowingPaymentType,
@@ -178,17 +179,13 @@ export function ShowingSaleCompletionModal({
               className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
             />
           </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-              Data e shitjes <span className="text-red-400">*</span>
-            </span>
-            <input
-              type="date"
-              value={saleDate}
-              onChange={(event) => setSaleDate(event.target.value)}
-              className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-            />
-          </label>
+          <DatePickerField
+            label="Data e shitjes"
+            value={saleDate}
+            onChange={(next) => setSaleDate(next ?? "")}
+            required
+            labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-black/35"
+          />
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
               Çmimi final <span className="text-red-400">*</span>
@@ -248,11 +245,10 @@ export function ShowingSaleCompletionModal({
             <div className="space-y-2.5">
               {installments.map((installment, index) => (
                 <div key={`${installment.due_date}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                  <input
-                    type="date"
+                  <DatePickerField
                     value={installment.due_date}
-                    onChange={(event) => updateInstallment(index, "due_date", event.target.value)}
-                    className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+                    onChange={(next) => updateInstallment(index, "due_date", next ?? "")}
+                    required
                   />
                   <input
                     type="number"

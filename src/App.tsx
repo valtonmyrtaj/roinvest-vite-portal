@@ -253,7 +253,7 @@ function ProtectedApp() {
             {currentPage === "units" && <UnitsDashboard />}
             {currentPage === "marketing" &&
               approvedUser.role === "sales_director" && (
-                <MarketingDashboard onOpenDataInput={() => handleNavigate("input")} />
+                <MarketingDashboard />
               )}
             {currentPage === "crm" &&
               approvedUser.role === "sales_director" && <CRMContent />}

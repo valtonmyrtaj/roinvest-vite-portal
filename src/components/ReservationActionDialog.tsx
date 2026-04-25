@@ -4,6 +4,7 @@ import { CalendarRange, RefreshCw, Undo2, X } from "lucide-react";
 import type { Unit } from "../hooks/useUnits";
 import { todayIsoDate } from "../lib/reservationExpiry";
 import { NAVY } from "../ui/tokens";
+import { DatePickerField } from "./ui/DatePickerField";
 import { fmtDateShort, statusStyleFor } from "../units-dashboard/shared";
 import { PillBadge } from "./ui/PillBadge";
 
@@ -137,18 +138,16 @@ export function ReservationActionDialog({
                 <CalendarRange size={14} />
                 Afati i ri
               </div>
-              <label className="mt-3 flex flex-col gap-1.5">
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/30">
-                  Skadon më
-                </span>
-                <input
-                  type="date"
-                  min={minDate}
-                  value={expiresAt}
-                  onChange={(event) => setExpiresAt(event.target.value)}
-                  className="h-11 rounded-[12px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-                />
-              </label>
+              <DatePickerField
+                className="mt-3"
+                label="Skadon më"
+                min={minDate}
+                value={expiresAt}
+                onChange={(next) => setExpiresAt(next ?? "")}
+                required
+                size="lg"
+                labelClassName="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/30"
+              />
               <p className="mt-2 text-[11.5px] leading-5 text-black/38">
                 Afati i ri do të përditësohet në rezervim, në pasqyrën e njësisë dhe në histori.
               </p>
