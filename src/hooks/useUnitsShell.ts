@@ -149,6 +149,7 @@ function mapActiveReservationRowToUnit(row: ActiveReservationShellRow): Unit {
     toilets: null,
     orientation: null,
     floorplan_code: null,
+    has_storage: row.has_storage ?? false,
     balcony_area: null,
     terrace_area: null,
     final_price: null,

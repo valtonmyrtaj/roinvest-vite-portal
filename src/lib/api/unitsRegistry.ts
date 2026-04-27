@@ -18,6 +18,7 @@ export type RegistryUnitRow = Pick<
   | "owner_name"
   | "created_at"
   | "updated_at"
+  | "has_storage"
 > & {
   final_price: number | null;
   sale_date: string | null;
@@ -55,7 +56,7 @@ type FilterableQuery<TQuery> = {
 };
 
 const REGISTRY_SELECT =
-  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,created_at,updated_at";
+  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,created_at,updated_at,has_storage";
 
 function applyRegistryScopeFilters<TQuery extends FilterableQuery<TQuery>>(
   query: TQuery,
@@ -181,6 +182,7 @@ export async function getUnitsRegistrySnapshot(
       | "owner_name"
       | "created_at"
       | "updated_at"
+      | "has_storage"
     >
   >;
   const rowIds = rows.map((row) => row.id);

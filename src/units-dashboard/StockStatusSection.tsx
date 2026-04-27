@@ -85,32 +85,35 @@ export function StockStatusSection({
                 <p className="mb-3 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
                   Pamja sipas pronësisë
                 </p>
-                <div className="inline-flex flex-wrap rounded-[14px] border border-[#e8e8ec] bg-white p-[4px] shadow-[0_1px_2px_rgba(16,24,40,0.02)]">
+                <div className="grid rounded-[18px] border border-[#e4e9f1] bg-[#f7f9fc] p-[5px] shadow-[0_1px_2px_rgba(16,24,40,0.025)] sm:grid-cols-3">
                   {OWNER_CATEGORIES.map((ownerCategory) => {
                     const active = selectedOwnerCategory === ownerCategory;
                     return (
                       <button
                         key={ownerCategory}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => onOwnerCategoryChange(ownerCategory)}
-                        className="relative flex items-center gap-2 rounded-[11px] px-4 py-[8px] text-[13px]"
+                        className="relative min-h-[42px] rounded-[13px] px-4 py-2.5 text-left text-[13px] transition-colors duration-150 hover:bg-white/55"
                       >
                         {active && (
                           <motion.span
                             layoutId="owner-switcher-pill"
-                            className="absolute inset-0 rounded-[11px]"
+                            className="absolute inset-0 rounded-[13px] border"
                             style={{
-                              backgroundColor: "#003883",
-                              boxShadow: "0 1px 2px rgba(0,56,131,0.12)",
+                              backgroundColor: "#ffffff",
+                              borderColor: "#dbe5f3",
+                              boxShadow:
+                                "0 1px 2px rgba(15,23,42,0.035), 0 8px 18px rgba(15,23,42,0.055)",
                             }}
-                            transition={{ duration: 0.18, ease: SOFT_EASE }}
+                            transition={{ duration: 0.2, ease: SOFT_EASE }}
                           />
                         )}
                         <span
                           className="relative z-10 transition-colors duration-150"
                           style={{
-                            color: active ? "#ffffff" : "rgba(0,0,0,0.48)",
-                            fontWeight: active ? 600 : 450,
+                            color: active ? "#003883" : "rgba(0,0,0,0.48)",
+                            fontWeight: active ? 650 : 500,
                           }}
                         >
                           {ownerCategory}
@@ -137,7 +140,13 @@ export function StockStatusSection({
           </div>
 
           <div className="-mt-3 px-5 pb-5">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <motion.div
+              key={`${selectedOwnerCategory}-${selectedOwnerEntity || "all"}-${loading ? "loading" : "ready"}`}
+              initial={{ opacity: 0.72 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.14, ease: SOFT_EASE }}
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
               {loading
                 ? Array.from({ length: 4 }, (_, index) => (
                     <motion.div
@@ -186,7 +195,7 @@ export function StockStatusSection({
                       </KpiCardSurface>
                     </motion.div>
                   ))}
-            </div>
+            </motion.div>
           </div>
         </div>
       </Card>

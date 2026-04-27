@@ -14,8 +14,22 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function toUiStatus(status: PaymentDbStatus, dueDate: string): PaymentStatus {
+function toUiStatus(
+  status: PaymentDbStatus,
+  dueDate: string,
+  paidAmount: number,
+  remainingAmount: number,
+): PaymentStatus {
   const normalizedDueDate = dueDate.slice(0, 10);
+
+  if (status === "E paguar" || remainingAmount <= 0) {
+    return "E paguar";
+  }
+
+  if (paidAmount > 0) {
+    return "Pjesërisht paguar";
+  }
+
   return status === "E papaguar" && normalizedDueDate < todayIso()
     ? "E vonuar"
     : status;
@@ -27,6 +41,8 @@ function normalizePaymentRow(row: {
   sale_id: string | null;
   installment_number: number;
   amount: number;
+  paid_amount: number;
+  remaining_amount: number;
   due_date: string;
   paid_date: string | null;
   status: PaymentDbStatus;
@@ -35,6 +51,8 @@ function normalizePaymentRow(row: {
 }): Payment {
   const dueDate = row.due_date.slice(0, 10);
   const paidDate = row.paid_date ? row.paid_date.slice(0, 10) : null;
+  const paidAmount = Math.min(row.paid_amount, row.amount);
+  const remainingAmount = Math.max(row.remaining_amount, 0);
 
   return {
     id: row.id,
@@ -44,9 +62,13 @@ function normalizePaymentRow(row: {
     amount: row.amount,
     due_date: dueDate,
     paid_date: paidDate,
-    status: toUiStatus(row.status, dueDate),
+    status: toUiStatus(row.status, dueDate, paidAmount, remainingAmount),
     notes: row.notes,
     created_at: row.created_at ?? "",
+    receipts: [],
+    paid_amount: paidAmount,
+    remaining_amount: remainingAmount,
+    last_receipt_date: paidDate,
   };
 }
 

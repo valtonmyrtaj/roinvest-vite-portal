@@ -4,8 +4,9 @@ import { formatEuro as fmtEur } from "../lib/formatCurrency";
 import { fmtDate, formatPaymentType, GREEN, NAVY } from "./shared";
 
 /**
- * Top summary card inside the drawer: identity chips, final price,
- * collected-to-date, unit specifics, and (conditionally) sale context.
+ * Top summary card inside the drawer: sale context, final price, and
+ * collected-to-date. The drawer header owns the unit identity to avoid
+ * repeating the same unit metadata inside the body.
  * Purely presentational — takes the unit plus the running `paidAmount`
  * tally and derives everything else internally.
  */
@@ -19,15 +20,10 @@ export function PaymentDrawerSummary({
   const finalPrice = getUnitContractValue(unit);
   const paymentType = formatPaymentType(unit.payment_type);
 
-  const unitMeta = [
-    { label: "Blloku", value: unit.block },
-    { label: "Lloji", value: unit.type },
-    { label: "Niveli", value: unit.level },
-    { label: "Sipërfaqja", value: `${unit.size} m²` },
-  ];
   const saleMeta = [
     unit.buyer_name ? { label: "Blerësi", value: unit.buyer_name } : null,
     paymentType ? { label: "Lloji i pagesës", value: paymentType } : null,
+    unit.sale_date ? { label: "Data e shitjes", value: fmtDate(unit.sale_date) } : null,
   ].filter((item): item is { label: string; value: string } => Boolean(item));
 
   return (
@@ -35,25 +31,26 @@ export function PaymentDrawerSummary({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-[240px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-[#f4f7fc] px-2.5 py-1 text-[10.5px] font-semibold text-[#003883]">
-              Njësia
-            </span>
             <span className="inline-flex items-center rounded-full bg-[#fbeeee] px-2.5 py-1 text-[10.5px] font-semibold text-[#b14b4b]">
               E shitur
             </span>
-            {paymentType && (
-              <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-black/52 ring-1 ring-black/[0.06]">
-                {paymentType}
-              </span>
-            )}
           </div>
 
-          <p className="mt-3 text-[28px] leading-none tracking-[-0.04em]" style={{ color: NAVY, fontWeight: 700 }}>
-            {unit.unit_id}
+          <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+            Konteksti i shitjes
           </p>
-          <p className="mt-2 text-[13px] leading-[1.45] text-black/50">
-            {unit.block} · {unit.type} · {unit.level} · {unit.size} m²
-          </p>
+          <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-3">
+            {saleMeta.map((item) => (
+              <div key={item.label}>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">
+                  {item.label}
+                </p>
+                <p className="mt-1.5 text-[13px] leading-[1.35] text-black/72" style={{ fontWeight: 600 }}>
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="min-w-[220px] rounded-[20px] border border-[#dfe6f1] bg-white px-4 py-4 shadow-[0_4px_14px_rgba(15,23,42,0.04)]">
@@ -75,52 +72,7 @@ export function PaymentDrawerSummary({
               </p>
             </div>
           </div>
-          {unit.sale_date && (
-            <p className="mt-3 text-[11.5px] text-black/42">
-              Shitur më {fmtDate(unit.sale_date)}
-            </p>
-          )}
         </div>
-      </div>
-
-      <div className={`mt-5 grid gap-3 ${saleMeta.length > 0 ? "md:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.9fr)]" : ""}`}>
-        <div className="rounded-[20px] border border-[#e7ebf2] bg-white/92 px-4 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-            Detajet e njësisë
-          </p>
-          <div className="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-2">
-            {unitMeta.map((item) => (
-              <div key={item.label}>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">
-                  {item.label}
-                </p>
-                <p className="mt-1.5 text-[13px] leading-[1.35] text-black/72" style={{ fontWeight: 600 }}>
-                  {item.value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {saleMeta.length > 0 && (
-          <div className="rounded-[20px] border border-[#e7ebf2] bg-white/92 px-4 py-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-              Konteksti i shitjes
-            </p>
-            <div className="mt-4 grid gap-3">
-              {saleMeta.map((item) => (
-                <div key={item.label}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">
-                    {item.label}
-                  </p>
-                  <p className="mt-1.5 text-[13px] leading-[1.35] text-black/72" style={{ fontWeight: 600 }}>
-                    {item.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

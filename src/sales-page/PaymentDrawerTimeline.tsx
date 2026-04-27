@@ -72,9 +72,13 @@ export function PaymentDrawerTimeline({
             <div className="relative flex min-w-max gap-5 px-1">
               {payments.map((payment) => {
                 const isPaid = payment.status === "E paguar";
+                const hasPartialReceipt = payment.paid_amount > 0 && !isPaid;
                 const isHovered = hoveredInstallmentId === payment.id;
                 const nodeBorder = isPaid ? "#2D6A4F" : payment.status === "E vonuar" ? RED : "#B0892F";
                 const nodeBackground = isPaid ? "#2D6A4F" : payment.status === "E vonuar" ? "#fff3f3" : "#ffffff";
+                const displayDate = isPaid || hasPartialReceipt
+                  ? payment.last_receipt_date ?? payment.paid_date
+                  : payment.due_date;
 
                 return (
                   <div
@@ -105,8 +109,13 @@ export function PaymentDrawerTimeline({
                       Kësti #{payment.installment_number}
                     </p>
                     <p className="mt-1.5 text-[13px] font-semibold text-black/76">{fmtEur(payment.amount)}</p>
+                    {hasPartialReceipt && (
+                      <p className="mt-1 text-[10.5px] font-semibold" style={{ color: GREEN }}>
+                        {fmtEur(payment.paid_amount)} arkëtuar
+                      </p>
+                    )}
                     <p className="mt-1 text-[11px] text-black/40">
-                      {isPaid ? fmtDateCompact(payment.paid_date) : fmtDateCompact(payment.due_date)}
+                      {fmtDateCompact(displayDate)}
                     </p>
                   </div>
                 );

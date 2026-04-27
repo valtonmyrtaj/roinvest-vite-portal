@@ -94,6 +94,7 @@ export function EditModal({
     toilets: unit.toilets,
     orientation: unit.orientation ?? null,
     floorplan_code: unit.floorplan_code ?? "",
+    has_storage: unit.has_storage ?? false,
     balcony_area: unit.balcony_area,
     terrace_area: unit.terrace_area,
   });
@@ -200,6 +201,7 @@ export function EditModal({
       toilets: isLokal ? (form.toilets ?? null) : null,
       orientation: form.orientation ?? null,
       floorplan_code: normalizedFloorplanCode,
+      has_storage: Boolean(form.has_storage),
       balcony_area: isApartment ? normalizeOptionalArea(form.balcony_area) : null,
       terrace_area: isApartment ? normalizeOptionalArea(form.terrace_area) : null,
       reservation_expires_at:
@@ -458,6 +460,13 @@ export function EditModal({
                 value={form.floorplan_code ?? ""}
                 onChange={(v) => set("floorplan_code", v)}
                 placeholder="p.sh. A-2.1"
+              />
+              <SelectField
+                label="Depo"
+                value={form.has_storage ? "Po" : "Jo"}
+                onChange={(v) => set("has_storage", v === "Po")}
+                options={["Jo", "Po"]}
+                placeholder="Zgjidh"
               />
               {architectureCategory === "apartment" && (
                 <>

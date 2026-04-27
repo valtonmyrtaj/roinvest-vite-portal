@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { ChevronsLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { SectionEyebrow } from "../components/ui/Eyebrow";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { PillBadge } from "../components/ui/PillBadge";
@@ -137,8 +137,17 @@ export function UnitsRegistrySection({
               : `${filteredCount} nga ${registryScopeCount} njësi në listë`
           }
           className="px-6 pt-4 pb-5"
-          titleClassName="text-[21px] leading-[1.08] tracking-[-0.035em]"
-          subtitleClassName="mt-1 text-[12.5px] leading-[1.3]"
+          titleStyle={{
+            fontSize: 16,
+            fontWeight: 700,
+            letterSpacing: "0em",
+            lineHeight: 1.18,
+          }}
+          subtitleStyle={{
+            fontSize: 11.75,
+            fontWeight: 500,
+            lineHeight: 1.35,
+          }}
           right={
             <div className="flex flex-wrap items-center justify-end gap-2">
               <span className="rounded-full border border-[#e7ebf2] bg-[#fbfcfe] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/32">
@@ -412,27 +421,39 @@ export function UnitsRegistrySection({
               </p>
 
               {hasPagination && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-full border border-[#e7ebf2] bg-white p-1 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+                  <button
+                    type="button"
+                    onClick={() => onPageChange(1)}
+                    disabled={currentPage <= 1 || loading}
+                    aria-label="Faqja e parë"
+                    className="grid h-[28px] w-[24px] place-items-center rounded-full text-black/38 transition hover:bg-[#f6f8fd] hover:text-[#003883] disabled:cursor-not-allowed disabled:text-black/16 disabled:hover:bg-transparent"
+                  >
+                    <ChevronsLeft size={14} strokeWidth={2.15} />
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage <= 1 || loading}
-                    className="rounded-[10px] border border-[#e2e7f0] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-black/46 transition hover:border-[#cfd8ea] hover:bg-[#f8fbff] hover:text-[#003883] disabled:cursor-not-allowed disabled:opacity-45"
+                    aria-label="Faqja e mëparshme"
+                    className="grid h-[28px] w-[24px] place-items-center rounded-full text-black/38 transition hover:bg-[#f6f8fd] hover:text-[#003883] disabled:cursor-not-allowed disabled:text-black/16 disabled:hover:bg-transparent"
                   >
-                    Para
+                    <ChevronLeft size={14} strokeWidth={2.15} />
                   </button>
 
-                  <span className="rounded-full border border-[#e7ebf2] bg-[#fbfcfe] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/32">
-                    Faqja {currentPage} / {totalPages}
+                  <span className="ml-1 min-w-[94px] rounded-full bg-[#f8faff] px-2.5 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.1em] text-black/36">
+                    Faqja {currentPage} nga {totalPages}
                   </span>
 
                   <button
                     type="button"
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage >= totalPages || loading}
-                    className="rounded-[10px] border border-[#e2e7f0] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-black/46 transition hover:border-[#cfd8ea] hover:bg-[#f8fbff] hover:text-[#003883] disabled:cursor-not-allowed disabled:opacity-45"
+                    aria-label="Faqja tjetër"
+                    className="ml-1 grid h-[28px] w-[24px] place-items-center rounded-full text-black/38 transition hover:bg-[#f6f8fd] hover:text-[#003883] disabled:cursor-not-allowed disabled:text-black/16 disabled:hover:bg-transparent"
                   >
-                    Pas
+                    <ChevronRight size={14} strokeWidth={2.15} />
                   </button>
                 </div>
               )}

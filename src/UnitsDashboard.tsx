@@ -227,8 +227,8 @@ export function UnitsDashboard() {
           className="!mb-3 items-start gap-x-8 gap-y-2.5"
           bodyClassName="min-w-[320px] flex-[1_1_560px] sm:self-center"
           contentClassName="max-w-[620px]"
-          titleClassName="leading-[0.94]"
-          subtitleClassName="max-w-[620px]"
+          titleClassName="leading-none"
+          subtitleClassName="!mt-0 max-w-[620px]"
           rightClassName="w-full sm:w-auto sm:self-start"
           right={
             <div className="w-full rounded-[16px] border border-black/[0.05] bg-[#fcfcfd] px-3 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.03)] sm:min-w-[404px] sm:max-w-[428px]">
@@ -405,6 +405,7 @@ function mapRegistryRowToUnit(row: RegistryUnitRow): Unit {
     toilets: null,
     orientation: null,
     floorplan_code: null,
+    has_storage: row.has_storage ?? false,
     balcony_area: null,
     terrace_area: null,
     final_price: row.final_price,

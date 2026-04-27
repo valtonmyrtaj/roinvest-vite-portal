@@ -48,6 +48,7 @@ export function UnitForm({
           draft.toilets ||
           draft.orientation ||
           draft.floorplan_code ||
+          draft.has_storage ||
           draft.balcony_area ||
           draft.terrace_area,
       ),
@@ -59,7 +60,13 @@ export function UnitForm({
     draft.bedrooms != null || draft.bathrooms != null || draft.toilets != null;
   const hasArchitectureMetadata =
     hasRoomMetadata ||
-    Boolean(draft.orientation || draft.floorplan_code || draft.balcony_area || draft.terrace_area);
+    Boolean(
+      draft.orientation ||
+        draft.floorplan_code ||
+        draft.has_storage ||
+        draft.balcony_area ||
+        draft.terrace_area,
+    );
   const architectureDetailsSummary =
     roomDetailsCategory === "apartment"
       ? hasRoomMetadata
@@ -200,6 +207,13 @@ export function UnitForm({
                     value={draft.floorplan_code ?? ""}
                     onChange={(v) => set("floorplan_code", v)}
                     placeholder="p.sh. A-2.1"
+                  />
+                  <SelectField
+                    label="Depo"
+                    value={draft.has_storage ? "Po" : "Jo"}
+                    onChange={(v) => set("has_storage", v === "Po")}
+                    options={["Jo", "Po"]}
+                    placeholder="Zgjidh"
                   />
                   {roomDetailsCategory === "apartment" ? (
                     <>
