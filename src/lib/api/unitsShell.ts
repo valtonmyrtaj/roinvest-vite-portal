@@ -24,6 +24,7 @@ export interface ActiveReservationShellRow
     | "reservation_expires_at"
     | "created_at"
     | "updated_at"
+    | "has_storage"
   > {
   active_reservation_id: string | null;
   active_reservation_showing_id: string | null;
@@ -100,7 +101,7 @@ function rowsToOwnerOptions(
 }
 
 const ACTIVE_RESERVATION_UNITS_SELECT =
-  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,reservation_expires_at,created_at,updated_at";
+  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,reservation_expires_at,created_at,updated_at,has_storage";
 
 export async function getUnitsShellSnapshot(
   filters: UnitsShellFilters,
@@ -165,6 +166,7 @@ export async function getUnitsShellSnapshot(
       | "reservation_expires_at"
       | "created_at"
       | "updated_at"
+      | "has_storage"
     >
   >)
     .map((row) => {

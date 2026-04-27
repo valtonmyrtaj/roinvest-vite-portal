@@ -177,6 +177,7 @@ export default function DataInputPage({
         toilets: cat === "lokal" ? (rawInput.toilets ?? null) : null,
         orientation: rawInput.orientation ?? null,
         floorplan_code: rawInput.floorplan_code?.trim() || null,
+        has_storage: Boolean(rawInput.has_storage),
         balcony_area: isApartment ? normalizeOptionalArea(rawInput.balcony_area) : null,
         terrace_area: isApartment ? normalizeOptionalArea(rawInput.terrace_area) : null,
       };

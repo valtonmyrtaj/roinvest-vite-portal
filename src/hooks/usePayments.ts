@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { payments as paymentsApi } from "../lib/api";
 import type {
+  CreatePaymentReceiptPayload,
   CreatePaymentPayload,
   PaymentDbStatus,
-  PaymentRow,
+  PaymentReceiptRow,
+  PaymentWithReceiptsRow,
   UpdatePaymentPatch,
 } from "../lib/api/payments";
 
@@ -15,7 +17,16 @@ export type { PaymentDbStatus } from "../lib/api/payments";
 
 // `E vonuar` is a frontend-derived status layered on top of the
 // persisted DB values. It is NOT a DB value and is never written back.
-export type PaymentStatus = PaymentDbStatus | "E vonuar";
+export type PaymentStatus = PaymentDbStatus | "E vonuar" | "Pjesërisht paguar";
+
+export interface PaymentReceipt {
+  id: string;
+  payment_id: string;
+  amount: number;
+  paid_date: string;
+  notes: string | null;
+  created_at: string;
+}
 
 export interface Payment {
   id: string;
@@ -28,6 +39,10 @@ export interface Payment {
   status: PaymentStatus;
   notes: string | null;
   created_at: string;
+  receipts: PaymentReceipt[];
+  paid_amount: number;
+  remaining_amount: number;
+  last_receipt_date: string | null;
 }
 
 type CreatePaymentInput = {
@@ -39,12 +54,33 @@ type CreatePaymentInput = {
   notes?: string | null;
 };
 
+type RegisterPaymentReceiptInput = {
+  payment_id: string;
+  amount: number;
+  paid_date: string;
+  notes?: string | null;
+};
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function toUiStatus(status: PaymentDbStatus, dueDate: string): PaymentStatus {
+function toUiStatus(
+  status: PaymentDbStatus,
+  dueDate: string,
+  paidAmount: number,
+  remainingAmount: number,
+): PaymentStatus {
   const normalizedDueDate = dueDate.slice(0, 10);
+
+  if (status === "E paguar" || remainingAmount <= 0) {
+    return "E paguar";
+  }
+
+  if (paidAmount > 0) {
+    return "Pjesërisht paguar";
+  }
+
   return status === "E papaguar" && normalizedDueDate < todayIso()
     ? "E vonuar"
     : status;
@@ -55,9 +91,23 @@ function toDbStatus(status: PaymentStatus | undefined): PaymentDbStatus | undefi
   return status === "E paguar" ? "E paguar" : "E papaguar";
 }
 
-function normalizePayment(row: PaymentRow): Payment {
+function normalizeReceipt(row: PaymentReceiptRow): PaymentReceipt {
+  return {
+    id: row.id,
+    payment_id: row.payment_id,
+    amount: row.amount,
+    paid_date: row.paid_date.slice(0, 10),
+    notes: row.notes,
+    created_at: row.created_at ?? "",
+  };
+}
+
+function normalizePayment(row: PaymentWithReceiptsRow): Payment {
   const dueDate = row.due_date.slice(0, 10);
   const paidDate = row.paid_date ? row.paid_date.slice(0, 10) : null;
+  const lastReceiptDate = row.last_receipt_date ? row.last_receipt_date.slice(0, 10) : null;
+  const paidAmount = Math.min(row.paid_amount, row.amount);
+  const remainingAmount = Math.max(row.amount - paidAmount, 0);
 
   return {
     id: row.id,
@@ -67,9 +117,13 @@ function normalizePayment(row: PaymentRow): Payment {
     amount: row.amount,
     due_date: dueDate,
     paid_date: paidDate,
-    status: toUiStatus(row.status, dueDate),
+    status: toUiStatus(row.status, dueDate, paidAmount, remainingAmount),
     notes: row.notes,
     created_at: row.created_at ?? "",
+    receipts: row.receipts.map(normalizeReceipt),
+    paid_amount: paidAmount,
+    remaining_amount: remainingAmount,
+    last_receipt_date: lastReceiptDate,
   };
 }
 
@@ -240,6 +294,23 @@ export function usePayments() {
     return { error: null };
   }, []);
 
+  const registerPaymentReceipt = useCallback(async (input: RegisterPaymentReceiptInput) => {
+    const payload: CreatePaymentReceiptPayload = {
+      payment_id: input.payment_id,
+      amount: input.amount,
+      paid_date: input.paid_date,
+      notes: input.notes ?? null,
+    };
+
+    const result = await paymentsApi.createPaymentReceipt(payload);
+
+    if (result.error !== null) {
+      return { error: result.error };
+    }
+
+    return { data: normalizeReceipt(result.data), error: null };
+  }, []);
+
   return {
     payments,
     allPayments,
@@ -248,6 +319,7 @@ export function usePayments() {
     createPayment,
     updatePayment,
     deletePayment,
+    registerPaymentReceipt,
     loading,
   };
 }

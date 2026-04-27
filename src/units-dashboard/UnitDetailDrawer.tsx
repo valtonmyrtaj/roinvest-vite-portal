@@ -27,12 +27,6 @@ const HIDDEN_HISTORY_FIELDS = new Set([
   "updated_at",
 ]);
 
-const OWNER_CATEGORY_STYLE = {
-  background: "#f7f7f8",
-  color: "rgba(15, 23, 42, 0.66)",
-  border: "1px solid #e5e7eb",
-} as const;
-
 function notNull<T>(value: T | null): value is T {
   return value !== null;
 }
@@ -55,7 +49,7 @@ function DetailSectionCard({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
         {title}
       </p>
-      <div className="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+      <div className="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
         {items.map((item) => (
           <div key={item.label}>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">
@@ -95,8 +89,13 @@ function isNumericValue(val: string) {
   return val.trim() !== "" && !Number.isNaN(Number(val));
 }
 
-function formatOptionalArea(value: number | null | undefined): string | null {
-  if (value == null || value <= 0) return null;
+function formatOptionalNumber(value: number | null | undefined): string {
+  if (value == null || value <= 0) return "—";
+  return String(value);
+}
+
+function formatOptionalArea(value: number | null | undefined): string {
+  if (value == null || value <= 0) return "—";
   return `${value.toLocaleString("de-DE")} m²`;
 }
 
@@ -159,76 +158,34 @@ export function UnitDetailDrawer({
   }, [activeTab, fetchHistory, historyLoaded, unit.id]);
 
   const typeLabel = getUnitTypeDisplay(unit.type, unit.level);
-  const headerMeta = `${unit.block} · ${typeLabel} · ${unit.level} · ${unit.size} m²`;
   const noteText = unit.notes?.trim() ?? "";
-  const balconyAreaLabel = formatOptionalArea(unit.balcony_area);
-  const terraceAreaLabel = formatOptionalArea(unit.terrace_area);
 
-  const unitDetails = useMemo<DetailItem[]>(
+  const unitProfileDetails = useMemo<DetailItem[]>(
     () =>
       [
         { label: "Blloku", value: unit.block },
         { label: "Lloji", value: typeLabel },
-        { label: "Niveli", value: unit.level },
+        { label: "Kati", value: unit.level },
         { label: "Sipërfaqja", value: `${unit.size} m²` },
-        unit.bedrooms && unit.bedrooms > 0
-          ? { label: "Dhoma gjumi", value: String(unit.bedrooms) }
-          : null,
-        unit.bathrooms && unit.bathrooms > 0
-          ? { label: "Banjo", value: String(unit.bathrooms) }
-          : null,
-        unit.toilets && unit.toilets > 0
-          ? { label: "Tualete", value: String(unit.toilets) }
-          : null,
-      ].filter(notNull),
+        { label: "Dhoma gjumi", value: formatOptionalNumber(unit.bedrooms) },
+        { label: "Banjo", value: formatOptionalNumber(unit.bathrooms) },
+        { label: "Tualete", value: formatOptionalNumber(unit.toilets) },
+        { label: "Orientimi", value: unit.orientation || "—" },
+        { label: "Depo", value: unit.has_storage ? "Po" : "Jo" },
+        { label: "Ballkon", value: formatOptionalArea(unit.balcony_area) },
+      ],
     [
       typeLabel,
       unit.bathrooms,
       unit.bedrooms,
       unit.block,
       unit.level,
+      unit.orientation,
+      unit.has_storage,
       unit.size,
+      unit.balcony_area,
       unit.toilets,
     ],
-  );
-
-  const architectureDetails = useMemo<DetailItem[]>(
-    () =>
-      [
-        unit.orientation ? { label: "Orientimi", value: unit.orientation } : null,
-        unit.floorplan_code ? { label: "Planimetria", value: unit.floorplan_code } : null,
-        balconyAreaLabel ? { label: "Ballkoni", value: balconyAreaLabel } : null,
-        terraceAreaLabel ? { label: "Terrasa", value: terraceAreaLabel } : null,
-      ].filter(notNull),
-    [balconyAreaLabel, terraceAreaLabel, unit.floorplan_code, unit.orientation],
-  );
-
-  const operationalDetails = useMemo<DetailItem[]>(
-    () =>
-      [
-        {
-          label: "Statusi",
-          value: (
-            <PillBadge weight="medium" style={statusStyleFor(unit.status)}>
-              {unit.status}
-            </PillBadge>
-          ),
-        },
-        {
-          label: "Pronësia",
-          value: (
-            <PillBadge weight="medium" style={OWNER_CATEGORY_STYLE}>
-              {unit.owner_category}
-            </PillBadge>
-          ),
-        },
-        { label: "Pronari", value: unit.owner_name || "—" },
-        unit.created_at ? { label: "Krijuar më", value: formatDateTime(unit.created_at) } : null,
-        unit.updated_at
-          ? { label: "Përditësuar më", value: formatDateTime(unit.updated_at) }
-          : null,
-      ].filter(notNull),
-    [unit.created_at, unit.owner_category, unit.owner_name, unit.status, unit.updated_at],
   );
 
   const saleDetails = useMemo<DetailItem[]>(
@@ -262,6 +219,7 @@ export function UnitDetailDrawer({
     if (field === "type") {
       return getUnitTypeDisplay(s, snapshot?.level);
     }
+    if (field === "has_storage") return val ? "Po" : "Jo";
     if (field === "reservation_expires_at" || field === "sale_date") {
       if (isDateOnly(s)) return fmtDateShort(s);
       if (isTimestamp(s)) return fmtDateShort(s);
@@ -299,6 +257,7 @@ export function UnitDetailDrawer({
     toilets: "Tualete",
     orientation: "Orientimi",
     floorplan_code: "Planimetria",
+    has_storage: "Depo",
     balcony_area: "Ballkoni",
     terrace_area: "Terrasa",
   };
@@ -404,7 +363,6 @@ export function UnitDetailDrawer({
             >
               {unit.unit_id}
             </p>
-            <p className="mt-1 text-[13px] text-black/48">{headerMeta}</p>
           </div>
 
           <button
@@ -484,6 +442,7 @@ export function UnitDetailDrawer({
                         <p className="mt-2 text-[13px] leading-[1.45] text-black/44">
                           {unit.owner_category}
                         </p>
+
                       </div>
                     </div>
 
@@ -556,11 +515,18 @@ export function UnitDetailDrawer({
 
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-2">
-                  <DetailSectionCard title="Detajet e njësisë" items={unitDetails} />
-                  <DetailSectionCard title="Arkitektura" items={architectureDetails} />
-                  <DetailSectionCard title="Gjendja operative" items={operationalDetails} />
-                </div>
+                <DetailSectionCard title="Profili i njësisë" items={unitProfileDetails} />
+
+                {(unit.created_at || unit.updated_at) && (
+                  <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-1 text-[10.5px] font-medium text-black/34">
+                    {unit.created_at && (
+                      <span>Krijuar më {formatDateTime(unit.created_at)}</span>
+                    )}
+                    {unit.updated_at && (
+                      <span>Përditësuar më {formatDateTime(unit.updated_at)}</span>
+                    )}
+                  </div>
+                )}
 
                 {saleDetails.length > 0 && (
                   <DetailSectionCard title="Detajet e shitjes" items={saleDetails} />

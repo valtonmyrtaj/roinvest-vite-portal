@@ -1,9 +1,8 @@
 import { useMemo } from "react";
-import type { Payment, PaymentStatus } from "./usePayments";
+import type { Payment } from "./usePayments";
 import type { OwnerCategory, Unit } from "./useUnits";
 import { getUnitContractValue } from "../lib/unitFinancials";
 
-const PAID: PaymentStatus = "E paguar";
 const MONTH_LABELS = [
   "Janar",
   "Shkurt",
@@ -143,18 +142,20 @@ export function usePortfolioMetrics({
 
   const collectedValue = periodSoldUnitsData.reduce((sum, unit) => {
     const unitPayments = paymentsByUnitId.get(unit.id) ?? [];
-    const paidAmount = unitPayments
-      .filter((payment) => payment.status === PAID)
-      .reduce((paymentSum, payment) => paymentSum + payment.amount, 0);
+    const paidAmount = unitPayments.reduce(
+      (paymentSum, payment) => paymentSum + payment.paid_amount,
+      0,
+    );
 
     return sum + paidAmount;
   }, 0);
 
   const pendingValue = periodSoldUnitsData.reduce((sum, unit) => {
     const unitPayments = paymentsByUnitId.get(unit.id) ?? [];
-    const paidAmount = unitPayments
-      .filter((payment) => payment.status === PAID)
-      .reduce((paymentSum, payment) => paymentSum + payment.amount, 0);
+    const paidAmount = unitPayments.reduce(
+      (paymentSum, payment) => paymentSum + payment.paid_amount,
+      0,
+    );
 
     return sum + Math.max(getUnitContractValue(unit) - paidAmount, 0);
   }, 0);

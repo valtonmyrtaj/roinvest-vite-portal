@@ -134,9 +134,11 @@ export function KpiCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.24, ease: SOFT_EASE }}
+      whileHover={{ y: -3, boxShadow: "0 12px 24px rgba(16,24,40,0.07)" }}
+      transition={{ duration: 0.2, ease: SOFT_EASE }}
+      className="h-full rounded-[20px] will-change-transform"
     >
-      <Card>
+      <Card className="h-full">
         <div
           className="mb-4 flex h-10 w-10 items-center justify-center rounded-[12px]"
           style={{ background: iconBg }}
@@ -173,7 +175,7 @@ export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
 
   return (
     <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-semibold"
+      className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10.5px] font-semibold"
       style={{ background: tone.bg, color: tone.color }}
     >
       {status}

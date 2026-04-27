@@ -4,7 +4,7 @@ import { CheckCircle2, X } from "lucide-react";
 import type { Payment } from "../hooks/usePayments";
 import type { Unit } from "../hooks/useUnits";
 import { NAVY } from "./shared";
-import { ConfirmDeleteModal, MarkPaidModal } from "./PaymentDrawerModals";
+import { ConfirmDeleteModal, RegisterPaymentModal } from "./PaymentDrawerModals";
 import { PaymentDrawerSummary } from "./PaymentDrawerSummary";
 import { PaymentDrawerTimeline } from "./PaymentDrawerTimeline";
 import { PaymentDrawerTable } from "./PaymentDrawerTable";
@@ -23,8 +23,8 @@ import { getUnitContractValue } from "../lib/unitFinancials";
  *     (not inside it) so their backdrop stacks above the drawer
  *
  * The public props shape is preserved verbatim: `SalesPage` drives the
- * data + the three mutation callbacks (`onCreatePayment`, `onMarkPaid`,
- * `onDeletePayment`) exactly as before.
+ * data + the three mutation callbacks (`onCreatePayment`,
+ * `onRegisterPayment`, `onDeletePayment`) exactly as before.
  */
 export function PaymentDrawer({
   unit,
@@ -32,7 +32,7 @@ export function PaymentDrawer({
   loading,
   onClose,
   onCreatePayment,
-  onMarkPaid,
+  onRegisterPayment,
   onDeletePayment,
 }: {
   unit: Unit;
@@ -46,7 +46,10 @@ export function PaymentDrawer({
     due_date: string;
     notes?: string | null;
   }) => Promise<void>;
-  onMarkPaid: (payment: Payment, paidDate: string) => Promise<void>;
+  onRegisterPayment: (
+    payment: Payment,
+    data: { amount: number; paidDate: string; notes?: string | null },
+  ) => Promise<void>;
   onDeletePayment: (paymentId: string) => Promise<void>;
 }) {
   const [feedback, setFeedback] = useState<{
@@ -54,7 +57,7 @@ export function PaymentDrawer({
     title: string;
     detail: string;
   } | null>(null);
-  const [markPaidTarget, setMarkPaidTarget] = useState<Payment | null>(null);
+  const [registerPaymentTarget, setRegisterPaymentTarget] = useState<Payment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
 
   const nextInstallmentNumber = useMemo(() => {
@@ -64,9 +67,7 @@ export function PaymentDrawer({
 
   const paidAmount = useMemo(
     () =>
-      payments
-        .filter((payment) => payment.status === "E paguar")
-        .reduce((sum, payment) => sum + payment.amount, 0),
+      payments.reduce((sum, payment) => sum + payment.paid_amount, 0),
     [payments],
   );
 
@@ -74,7 +75,7 @@ export function PaymentDrawer({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || markPaidTarget || deleteTarget) return;
+      if (event.key !== "Escape" || registerPaymentTarget || deleteTarget) return;
       onClose();
     };
 
@@ -82,7 +83,7 @@ export function PaymentDrawer({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [deleteTarget, markPaidTarget, onClose]);
+  }, [deleteTarget, registerPaymentTarget, onClose]);
 
   useEffect(() => {
     if (!feedback) return undefined;
@@ -118,11 +119,19 @@ export function PaymentDrawer({
     );
   };
 
-  const handleMarkPaid = async (payment: Payment, paidDate: string) => {
-    await onMarkPaid(payment, paidDate);
+  const handleRegisterPayment = async (
+    payment: Payment,
+    data: { amount: number; paidDate: string; notes?: string | null },
+  ) => {
+    await onRegisterPayment(payment, data);
+    const isFullPayment = data.amount >= payment.remaining_amount;
     publishFeedback(
-      `Kësti #${payment.installment_number} u shënua si i paguar`,
-      "Bilanci i arkëtimeve u rifreskua.",
+      isFullPayment
+        ? `Kësti #${payment.installment_number} u shënua si i paguar`
+        : `Pagesa për këstin #${payment.installment_number} u regjistrua`,
+      isFullPayment
+        ? "Bilanci i arkëtimeve u rifreskua."
+        : "Shuma e mbetur e këstit u përditësua.",
     );
   };
 
@@ -215,7 +224,7 @@ export function PaymentDrawer({
           <PaymentDrawerTable
             payments={payments}
             loading={loading}
-            onRequestMarkPaid={setMarkPaidTarget}
+            onRequestRegisterPayment={setRegisterPaymentTarget}
             onRequestDelete={setDeleteTarget}
           />
 
@@ -228,11 +237,11 @@ export function PaymentDrawer({
       </motion.aside>
 
       <AnimatePresence>
-        {markPaidTarget && (
-          <MarkPaidModal
-            payment={markPaidTarget}
-            onClose={() => setMarkPaidTarget(null)}
-            onConfirm={(paidDate) => handleMarkPaid(markPaidTarget, paidDate)}
+        {registerPaymentTarget && (
+          <RegisterPaymentModal
+            payment={registerPaymentTarget}
+            onClose={() => setRegisterPaymentTarget(null)}
+            onConfirm={(data) => handleRegisterPayment(registerPaymentTarget, data)}
           />
         )}
       </AnimatePresence>

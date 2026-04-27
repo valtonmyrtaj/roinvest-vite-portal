@@ -16,7 +16,16 @@ const SQ_MONTHS = [
   "Korrik","Gusht","Shtator","Tetor","Nëntor","Dhjetor",
 ];
 const FILTER_YEARS = [2026, 2027, 2028, 2029, 2030];
-const CHART_YEARS  = [2026, 2027, 2028, 2029, 2030];
+const DEFAULT_OVERVIEW_PERIOD = (() => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const year = FILTER_YEARS.includes(currentYear) ? currentYear : "all";
+
+  return {
+    year,
+    month: year === "all" ? "all" : today.getMonth(),
+  } as const;
+})();
 const OverviewMonthlySalesChart = lazy(() => import("./OverviewMonthlySalesChart"));
 
 function todayAlbanian() {
@@ -350,7 +359,7 @@ function SecondaryPartyCard({
 
 function OverviewMonthlySalesChartFallback() {
   return (
-    <div className="flex h-[180px] items-center justify-center rounded-[14px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
+    <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
       <p className="text-[12.5px] text-black/36">Duke ngarkuar grafikun...</p>
     </div>
   );
@@ -358,9 +367,11 @@ function OverviewMonthlySalesChartFallback() {
 
 function DeferredOverviewMonthlySalesChart({
   chartYear,
+  selectedMonthIndex,
   started,
 }: {
-  chartYear: number;
+  chartYear: number | null;
+  selectedMonthIndex: number | null;
   started: boolean;
 }) {
   const [shouldLoadChart, setShouldLoadChart] = useState(false);
@@ -400,7 +411,11 @@ function DeferredOverviewMonthlySalesChart({
 
   return (
     <Suspense fallback={<OverviewMonthlySalesChartFallback />}>
-      <OverviewMonthlySalesChart chartYear={chartYear} started={started} />
+      <OverviewMonthlySalesChart
+        chartYear={chartYear}
+        selectedMonthIndex={selectedMonthIndex}
+        started={started}
+      />
     </Suspense>
   );
 }
@@ -410,11 +425,8 @@ export default function OverviewPage() {
   const { units, loading } = useUnits({ includeSaleTruth: false });
 
   // Period filter state
-  const [filterYear, setFilterYear] = useState<number | "all">("all");
-  const [filterMonth, setFilterMonth] = useState<number | "all">("all"); // 0-indexed
-
-  // Chart year — syncs with filterYear when a specific year is selected
-  const [chartYear, setChartYear] = useState(new Date().getFullYear());
+  const [filterYear, setFilterYear] = useState<number | "all">(DEFAULT_OVERVIEW_PERIOD.year);
+  const [filterMonth, setFilterMonth] = useState<number | "all">(DEFAULT_OVERVIEW_PERIOD.month); // 0-indexed
 
   const started = !loading;
 
@@ -429,6 +441,7 @@ export default function OverviewPage() {
   // Backend sale-reporting — period-aware financial KPIs (A2).
   const reportingYear = filterYear === "all" ? null : filterYear;
   const reportingMonth = filterMonth === "all" ? null : (filterMonth as number) + 1;
+  const chartYear = filterYear === "all" ? null : filterYear;
 
   const {
     metrics: reportingMetrics,
@@ -538,9 +551,6 @@ export default function OverviewPage() {
             onChange={(v) => {
               const nextYear = v === "Të gjitha vitet" ? "all" : Number(v);
               setFilterYear(nextYear);
-              if (nextYear !== "all") {
-                setChartYear(nextYear);
-              }
               setFilterMonth("all");
             }}
           />
@@ -630,24 +640,24 @@ export default function OverviewPage() {
         >
           <CardSectionHeader
             title="Shitjet mujore"
-            subtitle="Njësi të shitura sipas muajit"
+            subtitle={
+              chartYear === null
+                ? "Zgjidh një vit për të parë shitjet mujore"
+                : `Njësi të shitura sipas muajit — ${chartYear}`
+            }
             className="mb-3 border-b-0 px-0 py-0"
             bodyClassName="max-w-[420px]"
-            titleClassName="text-[14.5px] leading-[1.2] tracking-[-0.03em]"
-            subtitleClassName="mt-0.5 text-[11.5px] leading-[1.34]"
+            titleClassName="text-[16px] leading-[1.18] tracking-[0em]"
+            subtitleClassName="mt-0.5 text-[11.75px] leading-[1.35]"
+            titleStyle={{ fontWeight: 700 }}
             subtitleStyle={{ color: "rgba(15,23,42,0.42)" }}
-            right={
-              <CustomSelect
-                size="sm"
-                className="min-w-[90px]"
-                options={CHART_YEARS.map(String)}
-                value={String(chartYear)}
-                onChange={(v) => setChartYear(Number(v))}
-              />
-            }
           />
 
-          <DeferredOverviewMonthlySalesChart chartYear={chartYear} started={started} />
+          <DeferredOverviewMonthlySalesChart
+            chartYear={chartYear}
+            selectedMonthIndex={filterMonth === "all" ? null : filterMonth}
+            started={started}
+          />
         </motion.div>
 
         {/* Ownership structure — snapshot stock + filtered sold */}

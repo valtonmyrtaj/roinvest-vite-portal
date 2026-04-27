@@ -56,6 +56,7 @@ export interface Unit {
   toilets?: number | null;
   orientation?: UnitOrientation | null;
   floorplan_code?: string | null;
+  has_storage: boolean;
   balcony_area?: number | null;
   terrace_area?: number | null;
 
@@ -108,6 +109,7 @@ export interface CreateUnitInput {
   toilets?: number | null;
   orientation?: UnitOrientation | null;
   floorplan_code?: string | null;
+  has_storage?: boolean;
   balcony_area?: number | null;
   terrace_area?: number | null;
 }
@@ -158,6 +160,7 @@ function mapDbUnit(row: UnitRow): Unit {
     toilets: row.toilets,
     orientation: row.orientation as UnitOrientation | null,
     floorplan_code: row.floorplan_code,
+    has_storage: row.has_storage ?? false,
     balcony_area: row.balcony_area,
     terrace_area: row.terrace_area,
     // Legacy compat fallbacks — overridden by sale truth overlay when active unit_sales exists.

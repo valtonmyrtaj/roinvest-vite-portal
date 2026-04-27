@@ -45,6 +45,10 @@ export function SalesUpcomingPayments({
         subtitle="Këstet e papaguara të renditura sipas datës së skadimit"
         className="px-6 py-5"
         bodyClassName="max-w-[500px]"
+        titleClassName="text-[16px] leading-[1.18] tracking-[0em]"
+        subtitleClassName="mt-0.5 text-[11.75px] leading-[1.35]"
+        titleStyle={{ fontWeight: 700 }}
+        subtitleStyle={{ color: "rgba(15,23,42,0.42)" }}
         right={
           loading ? (
             <span className="inline-flex items-center rounded-full border border-[#e6e8ec] bg-[#fbfcfd] px-2.5 py-1 text-[10.5px] font-semibold text-black/42">
@@ -150,7 +154,7 @@ export function SalesUpcomingPayments({
                     #{payment.installment_number}
                   </td>
                   <td className="px-6 py-4 text-[13px] text-black/78 transition-colors group-hover:text-black/88 group-focus-visible:text-black/88">
-                    {fmtEur(payment.amount)}
+                    {fmtEur(payment.remaining_amount > 0 ? payment.remaining_amount : payment.amount)}
                   </td>
                   <td className="px-6 py-4 text-[13px] text-black/58 transition-colors group-hover:text-black/68 group-focus-visible:text-black/68">
                     {fmtDate(payment.due_date)}

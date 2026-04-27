@@ -31,6 +31,15 @@ export type PaymentRow = Omit<Tables<"unit_payments">, "status"> & {
   status: PaymentDbStatus;
 };
 
+export type PaymentReceiptRow = Tables<"unit_payment_receipts">;
+
+export type PaymentWithReceiptsRow = PaymentRow & {
+  receipts: PaymentReceiptRow[];
+  paid_amount: number;
+  remaining_amount: number;
+  last_receipt_date: string | null;
+};
+
 // ─── Write payload types ─────────────────────────────────────────────────────
 
 /**
@@ -40,8 +49,55 @@ export type PaymentRow = Omit<Tables<"unit_payments">, "status"> & {
  */
 export type CreatePaymentPayload = TablesInsert<"unit_payments">;
 
+export type CreatePaymentReceiptPayload = TablesInsert<"unit_payment_receipts">;
+
 /** Update patch — same contract. Partial by construction. */
 export type UpdatePaymentPatch = TablesUpdate<"unit_payments">;
+
+function withReceiptRollups(
+  rows: PaymentRow[],
+  receipts: PaymentReceiptRow[],
+): PaymentWithReceiptsRow[] {
+  const receiptsByPaymentId = new Map<string, PaymentReceiptRow[]>();
+
+  receipts.forEach((receipt) => {
+    const current = receiptsByPaymentId.get(receipt.payment_id) ?? [];
+    current.push(receipt);
+    receiptsByPaymentId.set(receipt.payment_id, current);
+  });
+
+  return rows.map((row) => {
+    const paymentReceipts = (receiptsByPaymentId.get(row.id) ?? []).sort((left, right) =>
+      left.paid_date.localeCompare(right.paid_date),
+    );
+    const paidAmount = paymentReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
+    const lastReceiptDate = paymentReceipts.at(-1)?.paid_date ?? null;
+
+    return {
+      ...row,
+      receipts: paymentReceipts,
+      paid_amount: paidAmount,
+      remaining_amount: Math.max(row.amount - paidAmount, 0),
+      last_receipt_date: lastReceiptDate,
+    };
+  });
+}
+
+async function attachReceipts(rows: PaymentRow[]): Promise<ApiResult<PaymentWithReceiptsRow[]>> {
+  if (rows.length === 0) return apiOk([]);
+
+  const { data, error } = await supabase
+    .from("unit_payment_receipts")
+    .select("*")
+    .in(
+      "payment_id",
+      rows.map((row) => row.id),
+    )
+    .order("paid_date", { ascending: true });
+
+  if (error) return apiFail(error.message);
+  return apiOk(withReceiptRollups(rows, (data ?? []) as PaymentReceiptRow[]));
+}
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
@@ -51,7 +107,7 @@ export type UpdatePaymentPatch = TablesUpdate<"unit_payments">;
  */
 export async function listPayments(
   unitId: string,
-): Promise<ApiResult<PaymentRow[]>> {
+): Promise<ApiResult<PaymentWithReceiptsRow[]>> {
   const { data, error } = await supabase
     .from("unit_payments")
     .select("*")
@@ -59,21 +115,21 @@ export async function listPayments(
     .order("installment_number", { ascending: true });
 
   if (error) return apiFail(error.message);
-  return apiOk((data ?? []) as PaymentRow[]);
+  return attachReceipts((data ?? []) as PaymentRow[]);
 }
 
 /**
  * List every payment across every unit, ordered by due date ascending.
  * Used by the portfolio-wide payments view.
  */
-export async function listAllPayments(): Promise<ApiResult<PaymentRow[]>> {
+export async function listAllPayments(): Promise<ApiResult<PaymentWithReceiptsRow[]>> {
   const { data, error } = await supabase
     .from("unit_payments")
     .select("*")
     .order("due_date", { ascending: true });
 
   if (error) return apiFail(error.message);
-  return apiOk((data ?? []) as PaymentRow[]);
+  return attachReceipts((data ?? []) as PaymentRow[]);
 }
 
 /**
@@ -109,7 +165,7 @@ export async function findActiveSaleIdForUnit(
  */
 export async function createPayment(
   payload: CreatePaymentPayload,
-): Promise<ApiResult<PaymentRow>> {
+): Promise<ApiResult<PaymentWithReceiptsRow>> {
   const { data, error } = await supabase
     .from("unit_payments")
     .insert([payload])
@@ -117,7 +173,9 @@ export async function createPayment(
     .single();
 
   if (error) return apiFail(error.message);
-  return apiOk(data as PaymentRow);
+  const enriched = await attachReceipts([data as PaymentRow]);
+  if (enriched.error !== null) return apiFail(enriched.error);
+  return apiOk(enriched.data[0]);
 }
 
 /**
@@ -128,7 +186,7 @@ export async function createPayment(
 export async function updatePayment(
   id: string,
   patch: UpdatePaymentPatch,
-): Promise<ApiResult<PaymentRow>> {
+): Promise<ApiResult<PaymentWithReceiptsRow>> {
   const { data, error } = await supabase
     .from("unit_payments")
     .update(patch)
@@ -137,7 +195,22 @@ export async function updatePayment(
     .single();
 
   if (error) return apiFail(error.message);
-  return apiOk(data as PaymentRow);
+  const enriched = await attachReceipts([data as PaymentRow]);
+  if (enriched.error !== null) return apiFail(enriched.error);
+  return apiOk(enriched.data[0]);
+}
+
+export async function createPaymentReceipt(
+  payload: CreatePaymentReceiptPayload,
+): Promise<ApiResult<PaymentReceiptRow>> {
+  const { data, error } = await supabase
+    .from("unit_payment_receipts")
+    .insert([payload])
+    .select("*")
+    .single();
+
+  if (error) return apiFail(error.message);
+  return apiOk(data as PaymentReceiptRow);
 }
 
 /**

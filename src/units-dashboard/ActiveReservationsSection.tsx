@@ -76,6 +76,17 @@ export function ActiveReservationsSection({
         <CardSectionHeader
           title="Afatet e rezervimeve"
           subtitle={subtitle}
+          titleStyle={{
+            fontSize: 16,
+            fontWeight: 700,
+            letterSpacing: "0em",
+            lineHeight: 1.18,
+          }}
+          subtitleStyle={{
+            fontSize: 11.75,
+            fontWeight: 500,
+            lineHeight: 1.35,
+          }}
           right={
             <span className="rounded-full border border-[#e7ebf2] bg-[#fbfcfe] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/32">
               {loading ? "Duke ngarkuar" : `${activeReservations.length} aktive`}

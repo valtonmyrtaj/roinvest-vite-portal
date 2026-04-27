@@ -19,12 +19,12 @@ import { SkeletonRows } from "../components/SkeletonRows";
 export function PaymentDrawerTable({
   payments,
   loading,
-  onRequestMarkPaid,
+  onRequestRegisterPayment,
   onRequestDelete,
 }: {
   payments: Payment[];
   loading: boolean;
-  onRequestMarkPaid: (payment: Payment) => void;
+  onRequestRegisterPayment: (payment: Payment) => void;
   onRequestDelete: (payment: Payment) => void;
 }) {
   return (
@@ -63,63 +63,73 @@ export function PaymentDrawerTable({
               <div className={`w-[96px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Shuma</div>
               <div className={`w-[112px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Skadon më</div>
               <div className={`w-[112px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Paguar më</div>
-              <div className={`w-[104px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Statusi</div>
-              <div className="min-w-[156px] flex-1" />
+              <div className={`w-[132px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Statusi</div>
+              <div className="min-w-[132px] flex-1" />
             </div>
 
-            {payments.map((payment) => (
-              <div
-                key={payment.id}
-                className={`group flex items-center border-b border-[#F3F4F6] px-3 py-3.5 last:border-b-0 transition-colors duration-150 ${
-                  payment.status === "E vonuar"
-                    ? "bg-[#fdf8f8]"
-                    : payment.status !== "E paguar"
-                      ? "bg-[#FAFBFC]"
-                      : "bg-white"
-                }`}
-              >
-                <div className="w-[48px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
-                  #{payment.installment_number}
-                </div>
+            {payments.map((payment) => {
+              const hasPartialReceipt = payment.paid_amount > 0 && payment.status !== "E paguar";
+              const displayedPaidDate = payment.last_receipt_date ?? payment.paid_date;
 
-                <div className="w-[96px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
-                  {fmtEur(payment.amount)}
-                </div>
+              return (
+                <div
+                  key={payment.id}
+                  className={`group flex items-center border-b border-[#F3F4F6] px-3 py-3.5 last:border-b-0 transition-colors duration-150 ${
+                    payment.status === "E vonuar"
+                      ? "bg-[#fdf8f8]"
+                      : payment.status !== "E paguar"
+                        ? "bg-[#FAFBFC]"
+                        : "bg-white"
+                  }`}
+                >
+                  <div className="w-[48px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
+                    #{payment.installment_number}
+                  </div>
 
-                <div className="w-[112px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
-                  {fmtDate(payment.due_date)}
-                </div>
+                  <div className="w-[96px] shrink-0 whitespace-nowrap">
+                    <p className="text-[12.5px] font-semibold text-black/75">{fmtEur(payment.amount)}</p>
+                    {hasPartialReceipt && (
+                      <p className="mt-0.5 text-[10.5px] font-semibold text-[#3c7a57]">
+                        {fmtEur(payment.paid_amount)} arkëtuar
+                      </p>
+                    )}
+                  </div>
 
-                <div className="w-[112px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
-                  {fmtDate(payment.paid_date)}
-                </div>
+                  <div className="w-[112px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
+                    {fmtDate(payment.due_date)}
+                  </div>
 
-                <div className="w-[104px] shrink-0">
-                  <PaymentStatusBadge status={payment.status} />
-                </div>
+                  <div className="w-[112px] shrink-0 whitespace-nowrap text-[12.5px] text-black/55">
+                    {fmtDate(displayedPaidDate)}
+                  </div>
 
-                <div className="flex min-w-[156px] flex-1 items-center justify-end gap-2">
-                  {payment.status !== "E paguar" && (
+                  <div className="w-[132px] shrink-0">
+                    <PaymentStatusBadge status={payment.status} />
+                  </div>
+
+                  <div className="flex min-w-[132px] flex-1 items-center justify-end gap-2">
+                    {payment.status !== "E paguar" && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestRegisterPayment(payment)}
+                        className="whitespace-nowrap rounded-[8px] border border-[#dbe3f2] px-3 py-1.5 text-[11px] font-semibold transition hover:bg-[#f0f5ff]"
+                        style={{ color: NAVY }}
+                      >
+                        Regjistro pagesë
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => onRequestMarkPaid(payment)}
-                      className="whitespace-nowrap rounded-[8px] border border-[#dbe3f2] px-3 py-1.5 text-[11px] font-semibold transition hover:bg-[#f0f5ff]"
-                      style={{ color: NAVY }}
+                      onClick={() => onRequestDelete(payment)}
+                      aria-label={`Fshi këstin #${payment.installment_number}`}
+                      className="rounded-[7px] p-[6px] text-black/24 opacity-55 transition-all duration-150 group-hover:opacity-100 group-hover:text-black/30 hover:bg-red-50 hover:text-red-400 focus-visible:opacity-100 focus-visible:outline-none"
                     >
-                      Shëno si të paguar
+                      <Trash2 size={13} />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onRequestDelete(payment)}
-                    aria-label={`Fshi këstin #${payment.installment_number}`}
-                    className="rounded-[7px] p-[6px] text-black/24 opacity-55 transition-all duration-150 group-hover:opacity-100 group-hover:text-black/30 hover:bg-red-50 hover:text-red-400 focus-visible:opacity-100 focus-visible:outline-none"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

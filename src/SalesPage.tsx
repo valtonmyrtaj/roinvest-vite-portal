@@ -24,7 +24,6 @@ import {
   type UpcomingPaymentRow,
 } from "./sales-page/SalesUpcomingPayments";
 import {
-  getNiceAxisStep,
   SALES_KPI_DEFS,
   SQ_MONTHS,
   TYPOLOGY_DEFS,
@@ -44,8 +43,8 @@ export default function SalesPage({
     payments,
     fetchPayments,
     createPayment,
-    updatePayment,
     deletePayment,
+    registerPaymentReceipt,
     loading: paymentsLoading,
   } = usePayments();
 
@@ -161,26 +160,6 @@ export default function SalesPage({
     pendingValue: 0,
     hasPaymentData: false,
   };
-
-  const revenueAxis = useMemo(() => {
-    const highestRevenue = Math.max(...chartData.map((item) => item.revenue), 0);
-
-    if (highestRevenue <= 0) {
-      const step = 100_000;
-      return {
-        max: step * 5,
-        ticks: Array.from({ length: 6 }, (_, index) => index * step),
-      };
-    }
-
-    const step = getNiceAxisStep(highestRevenue);
-    const max = Math.ceil(highestRevenue / step) * step;
-
-    return {
-      max,
-      ticks: Array.from({ length: Math.floor(max / step) + 1 }, (_, index) => index * step),
-    };
-  }, [chartData]);
 
   const scopedUnitsById = useMemo(
     () => new Map(typologyUnits.map((unit) => [unit.id, unit])),
@@ -352,10 +331,15 @@ export default function SalesPage({
     await refreshPayments(data.unit_id);
   };
 
-  const handleMarkPaid = async (payment: Payment, paidDate: string) => {
-    const result = await updatePayment(payment.id, {
-      status: "E paguar",
-      paid_date: paidDate,
+  const handleRegisterPayment = async (
+    payment: Payment,
+    data: { amount: number; paidDate: string; notes?: string | null },
+  ) => {
+    const result = await registerPaymentReceipt({
+      payment_id: payment.id,
+      amount: data.amount,
+      paid_date: data.paidDate,
+      notes: data.notes ?? null,
     });
     if (result.error) {
       throw new Error(result.error);
@@ -386,7 +370,7 @@ export default function SalesPage({
             loading={paymentsLoading}
             onClose={() => setActivePaymentUnit(null)}
             onCreatePayment={handleCreatePayment}
-            onMarkPaid={handleMarkPaid}
+            onRegisterPayment={handleRegisterPayment}
             onDeletePayment={handleDeletePayment}
           />
         )}
@@ -422,7 +406,6 @@ export default function SalesPage({
           loading={monthlySeriesLoading}
           error={monthlySeriesError}
           chartData={chartData}
-          revenueAxis={revenueAxis}
         />
 
         <SalesTypologyBreakdown

@@ -76,6 +76,7 @@ export function getNiceAxisStep(maxValue: number) {
 
 export function statusTone(status: PaymentStatus) {
   if (status === "E paguar") return { bg: "#edf7f1", color: GREEN, border: GREEN };
+  if (status === "Pjesërisht paguar") return { bg: "#edf7f1", color: GREEN, border: GREEN };
   if (status === "E vonuar") return { bg: "#fbeeee", color: RED, border: RED };
   return { bg: "#fff8e8", color: GOLD, border: GOLD };
 }

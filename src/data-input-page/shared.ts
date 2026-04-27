@@ -190,6 +190,7 @@ export function emptyDraft(
     toilets: undefined,
     orientation: undefined,
     floorplan_code: undefined,
+    has_storage: false,
     balcony_area: undefined,
     terrace_area: undefined,
   };

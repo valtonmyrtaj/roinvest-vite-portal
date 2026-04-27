@@ -1,6 +1,6 @@
 import { supabase } from "../supabase";
 import type { Database, Tables } from "../database.types";
-import type { PaymentRow } from "./payments";
+import type { PaymentDbStatus, PaymentWithReceiptsRow } from "./payments";
 import type { ApiResult } from "./_types";
 import { apiFail, apiOk } from "./_types";
 import { findActiveReservationLinkByUnit } from "./reservations";
@@ -30,6 +30,7 @@ export type SalesUnitRow = Pick<
   | "owner_name"
   | "created_at"
   | "updated_at"
+  | "has_storage"
 > & {
   final_price: number | null;
   sale_date: string | null;
@@ -39,12 +40,12 @@ export type SalesUnitRow = Pick<
 };
 
 export interface UpcomingSalePaymentRow {
-  payment: PaymentRow;
+  payment: PaymentWithReceiptsRow;
   unit: SalesUnitRow;
 }
 
 const SALES_UNIT_SELECT =
-  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,created_at,updated_at";
+  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,created_at,updated_at,has_storage";
 
 type UpcomingSalePaymentRpcRow =
   Database["public"]["Functions"]["list_sales_upcoming_payments"]["Returns"][number];
@@ -166,11 +167,15 @@ function mapUpcomingSalePaymentRpcRow(
       sale_id: row.payment_sale_id,
       installment_number: row.payment_installment_number,
       amount: row.payment_amount,
+      paid_amount: row.payment_paid_amount,
+      remaining_amount: row.payment_remaining_amount,
       due_date: row.payment_due_date,
       paid_date: row.payment_paid_date,
-      status: row.payment_status as PaymentRow["status"],
+      status: row.payment_status as PaymentDbStatus,
       notes: row.payment_notes,
       created_at: row.payment_created_at,
+      receipts: [],
+      last_receipt_date: row.payment_paid_date,
     },
     unit: {
       id: row.unit_id,
@@ -185,6 +190,7 @@ function mapUpcomingSalePaymentRpcRow(
       owner_name: row.unit_owner_name,
       created_at: row.unit_created_at,
       updated_at: row.unit_updated_at,
+      has_storage: false,
       final_price: row.sale_final_price,
       sale_date: row.sale_date,
       buyer_name: row.sale_buyer_name,

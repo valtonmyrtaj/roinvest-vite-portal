@@ -102,6 +102,7 @@ function mapUnitDetailSnapshot(snapshot: UnitDetailSnapshot): Unit {
     toilets: row.toilets,
     orientation: row.orientation as UnitOrientation | null,
     floorplan_code: row.floorplan_code,
+    has_storage: row.has_storage ?? false,
     balcony_area: row.balcony_area,
     terrace_area: row.terrace_area,
     final_price: snapshot.activeSale?.final_price ?? null,

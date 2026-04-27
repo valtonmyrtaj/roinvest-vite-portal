@@ -198,6 +198,10 @@ export function SalesTypologyBreakdown({
           subtitle="Hap tipologjinë për të parë njësitë e shitura dhe planin e pagesave"
           className="mb-5 border-b-0 px-0 py-0"
           bodyClassName="max-w-[460px]"
+          titleClassName="text-[16px] leading-[1.18] tracking-[0em]"
+          subtitleClassName="mt-0.5 text-[11.75px] leading-[1.35]"
+          titleStyle={{ fontWeight: 700 }}
+          subtitleStyle={{ color: "rgba(15,23,42,0.42)" }}
         />
 
         <div className="flex flex-col gap-3">

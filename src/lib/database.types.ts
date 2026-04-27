@@ -400,6 +400,41 @@ export type Database = {
           },
         ]
       }
+      unit_payment_receipts: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          paid_date: string
+          payment_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_date: string
+          payment_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_date?: string
+          payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_payment_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "unit_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unit_reservations: {
         Row: {
           contact_id: string | null
@@ -548,6 +583,7 @@ export type Database = {
           buyer_name: string | null
           created_at: string | null
           floorplan_code: string | null
+          has_storage: boolean
           id: string
           level: string
           notes: string | null
@@ -575,6 +611,7 @@ export type Database = {
           buyer_name?: string | null
           created_at?: string | null
           floorplan_code?: string | null
+          has_storage?: boolean
           id?: string
           level: string
           notes?: string | null
@@ -602,6 +639,7 @@ export type Database = {
           buyer_name?: string | null
           created_at?: string | null
           floorplan_code?: string | null
+          has_storage?: boolean
           id?: string
           level?: string
           notes?: string | null
@@ -690,6 +728,7 @@ export type Database = {
           buyer_name: string | null
           created_at: string | null
           floorplan_code: string | null
+          has_storage: boolean
           id: string
           level: string
           notes: string | null
@@ -744,7 +783,9 @@ export type Database = {
           payment_id: string
           payment_installment_number: number
           payment_notes: string | null
+          payment_paid_amount: number
           payment_paid_date: string | null
+          payment_remaining_amount: number
           payment_sale_id: string | null
           payment_status: string
           payment_unit_id: string

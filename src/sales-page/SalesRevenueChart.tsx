@@ -1,7 +1,126 @@
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Card, RevenueTooltip } from "./primitives";
+import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Card } from "./primitives";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
-import { fmtRevenueAxisTick, NAVY, type ChartPoint } from "./shared";
+import { formatEuro as fmtEur } from "../lib/formatCurrency";
+import { NAVY, SQ_MONTHS, type ChartPoint } from "./shared";
+
+function MonthlyRevenueMiniBars({
+  chartData,
+  selectedMonth,
+}: {
+  chartData: ChartPoint[];
+  selectedMonth: number | "all";
+}) {
+  const shouldReduceMotion = useReducedMotion();
+  const selectedMonthLabel = selectedMonth === "all" ? null : SQ_MONTHS[selectedMonth];
+  const selectedIndex =
+    selectedMonthLabel === null
+      ? -1
+      : chartData.findIndex((point) => point.monthIndex === selectedMonth);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const activeIndex = hoveredIndex ?? (selectedIndex >= 0 ? selectedIndex : null);
+  const activePoint = activeIndex === null ? null : chartData[activeIndex];
+  const maxRevenue = Math.max(1, ...chartData.map((point) => point.revenue));
+
+  return (
+    <div
+      className="rounded-[16px] border border-[#edf0f5] bg-[#fbfcfe] px-5 py-3.5"
+      onMouseLeave={() => setHoveredIndex(null)}
+    >
+      <div className="mb-3 flex min-h-[32px] items-center justify-between gap-3">
+        <p className="text-[11px] font-medium text-black/35">
+          Vlerë mujore e kontraktuar
+        </p>
+        <AnimatePresence mode="wait">
+          {activePoint ? (
+            <motion.div
+              key={`${activePoint.monthIndex}-${activePoint.revenue}`}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
+              className="flex items-center gap-3 rounded-[12px] border border-[#e8e8ec] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(16,24,40,0.05)]"
+            >
+              <span className="text-[11px] font-semibold" style={{ color: NAVY }}>
+                {SQ_MONTHS[activePoint.monthIndex] ?? activePoint.month}
+              </span>
+              <span className="text-[11px] text-black/35">|</span>
+              <span className="text-[11px] font-semibold" style={{ color: NAVY }}>
+                {fmtEur(activePoint.revenue)}
+              </span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      <div className="grid grid-cols-[62px_1fr] items-end gap-3">
+        <div className="flex h-[190px] items-end pb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: NAVY }} />
+            <span className="text-[11px] font-semibold text-black/42">Kontrata</span>
+          </div>
+        </div>
+        <div className="grid h-[190px] grid-cols-12 items-end gap-2 border-b border-[#eef0f4]">
+          {chartData.map((point, index) => {
+            const isSelected = selectedMonth !== "all" && point.monthIndex === selectedMonth;
+            const height =
+              point.revenue > 0 ? Math.max(8, Math.round((point.revenue / maxRevenue) * 158)) : 2;
+
+            return (
+              <div
+                key={`${point.monthIndex}-${point.month}`}
+                className="flex h-full items-end justify-center"
+                onMouseEnter={() => setHoveredIndex(index)}
+                aria-label={`${SQ_MONTHS[point.monthIndex] ?? point.month}: ${fmtEur(
+                  point.revenue,
+                )}`}
+              >
+                <motion.span
+                  className="w-[24px] rounded-t-[7px]"
+                  initial={shouldReduceMotion ? false : { height: 0 }}
+                  animate={{ height }}
+                  transition={{
+                    duration: 0.34,
+                    delay: shouldReduceMotion ? 0 : index * 0.018,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  style={{
+                    backgroundColor: point.revenue > 0 ? NAVY : "rgba(0,0,0,0.08)",
+                    opacity: point.revenue > 0 ? (isSelected ? 1 : 0.84) : 0.45,
+                    boxShadow:
+                      isSelected && point.revenue > 0 ? `0 7px 18px ${NAVY}24` : "none",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-[62px_1fr] gap-3">
+        <div />
+        <div className="grid grid-cols-12 gap-2">
+          {chartData.map((point) => {
+            const isSelected = selectedMonth !== "all" && point.monthIndex === selectedMonth;
+            return (
+              <span
+                key={point.monthIndex}
+                className="text-center text-[9px] tracking-[-0.025em]"
+                style={{
+                  color: isSelected ? NAVY : "rgba(0,0,0,0.36)",
+                  fontWeight: isSelected ? 800 : 600,
+                }}
+              >
+                {SQ_MONTHS[point.monthIndex] ?? point.month}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function SalesRevenueChart({
   selectedYear,
@@ -9,17 +128,12 @@ export function SalesRevenueChart({
   loading,
   error,
   chartData,
-  revenueAxis,
 }: {
   selectedYear: number;
   selectedMonth: number | "all";
   loading: boolean;
   error: string | null;
   chartData: ChartPoint[];
-  revenueAxis: {
-    max: number;
-    ticks: number[];
-  };
 }) {
   const hasRevenueData = chartData.some((item) => item.revenue > 0);
 
@@ -29,17 +143,21 @@ export function SalesRevenueChart({
         <CardSectionHeader
           title="Vlera e kontraktuar mujore"
           subtitle={`Ritmi i shitjeve për vitin ${selectedYear}`}
-          className="mb-5 border-b-0 px-0 py-0"
+          className="mb-3 border-b-0 px-0 py-0"
           bodyClassName="max-w-[420px]"
+          titleClassName="text-[16px] leading-[1.18] tracking-[0em]"
+          subtitleClassName="mt-0.5 text-[11.75px] leading-[1.35]"
+          titleStyle={{ fontWeight: 700 }}
+          subtitleStyle={{ color: "rgba(15,23,42,0.42)" }}
         />
 
-        <div className="h-[280px]">
+        <div className="min-h-[252px]">
           {error ? (
-            <div className="flex h-full items-center justify-center rounded-[18px] border border-dashed border-[#e6e8ec] bg-[#fafbfc] px-6 text-center text-[13px] text-[#b14b4b]/80">
+            <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e6e8ec] bg-[#fafbfc] px-6 text-center text-[13px] text-[#b14b4b]/80">
               Seria mujore nuk u ngarkua për vitin e zgjedhur.
             </div>
           ) : loading ? (
-            <div className="flex h-full flex-col justify-end gap-4 rounded-[18px] border border-dashed border-[#edf0f4] bg-[#fbfcfd] px-5 py-5">
+            <div className="flex h-[252px] flex-col justify-end gap-4 rounded-[16px] border border-dashed border-[#edf0f4] bg-[#fbfcfd] px-5 py-5">
               <div className="grid h-full grid-cols-12 items-end gap-3">
                 {Array.from({ length: 12 }, (_, index) => (
                   <div key={index} className="flex h-full flex-col justify-end gap-2">
@@ -56,7 +174,7 @@ export function SalesRevenueChart({
               </p>
             </div>
           ) : !hasRevenueData ? (
-            <div className="flex h-full items-center justify-center rounded-[18px] border border-dashed border-[#e6e8ec] bg-[#fafbfc] px-6 text-center">
+            <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e6e8ec] bg-[#fafbfc] px-6 text-center">
               <div className="max-w-[320px]">
                 <p className="text-[13px] font-medium text-black/48">
                   Nuk ka shitje të regjistruara për {selectedYear}
@@ -67,39 +185,7 @@ export function SalesRevenueChart({
               </div>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 0, left: -18, bottom: 0 }}>
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)" }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  width={64}
-                  domain={[0, revenueAxis.max]}
-                  ticks={revenueAxis.ticks}
-                  allowDecimals={false}
-                  tick={{ fontSize: 11, fill: "rgba(0,0,0,0.35)" }}
-                  tickFormatter={fmtRevenueAxisTick}
-                />
-                <Tooltip content={<RevenueTooltip />} cursor={{ fill: "rgba(0,56,131,0.04)" }} />
-                <Bar dataKey="revenue" radius={[0, 0, 0, 0]} maxBarSize={34}>
-                  {chartData.map((row) => (
-                    <Cell
-                      key={`${row.month}-${row.monthIndex}`}
-                      fill={
-                        selectedMonth === "all" || row.monthIndex === selectedMonth
-                          ? NAVY
-                          : "#d9e3f3"
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <MonthlyRevenueMiniBars chartData={chartData} selectedMonth={selectedMonth} />
           )}
         </div>
       </Card>

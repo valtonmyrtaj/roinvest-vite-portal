@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from "recharts";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSaleMonthlySeries } from "./hooks/useSaleReporting";
 import { formatEuro as fmtEur } from "./lib/formatCurrency";
 import { NAVY, SOFT_EASE } from "./ui/tokens";
@@ -20,25 +19,6 @@ const ALBANIAN_MONTH_LABELS = [
   "Dhjetor",
 ] as const;
 
-const ALBANIAN_MONTH_SHORT_LABELS = [
-  "Jan",
-  "Shk",
-  "Mar",
-  "Pri",
-  "Maj",
-  "Qer",
-  "Kor",
-  "Gus",
-  "Sht",
-  "Tet",
-  "Nën",
-  "Dhj",
-] as const;
-
-const FULL_MONTH_LABEL_MIN_WIDTH = 720;
-const BAR_INTRO_DURATION = 1.05;
-const BAR_INTRO_MAX_DELAY = 0.4;
-
 interface ChartEntry {
   month: string;
   units: number;
@@ -46,145 +26,130 @@ interface ChartEntry {
   label: string;
 }
 
-interface TooltipPayloadItem {
-  value: number;
-  payload: ChartEntry;
-}
-
-type SalesBarShapeProps = {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  fill?: string;
-  fillOpacity?: number | string;
-  stroke?: string;
-  strokeWidth?: number | string;
-  index?: number;
-  shouldAnimate?: boolean;
-};
-
-function SalesBarShape({
-  x = 0,
-  y = 0,
-  width = 0,
-  height = 0,
-  fill = NAVY,
-  fillOpacity = 1,
-  stroke,
-  strokeWidth,
-  index = 0,
-  shouldAnimate = false,
-}: SalesBarShapeProps) {
-  if (width <= 0 || height <= 0) {
-    return null;
-  }
-
-  const finalOpacity =
-    typeof fillOpacity === "number"
-      ? fillOpacity
-      : typeof fillOpacity === "string"
-        ? Number(fillOpacity)
-        : 1;
-
-  if (!shouldAnimate) {
-    return (
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        fill={fill}
-        fillOpacity={finalOpacity}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-      />
-    );
-  }
-
-  return (
-    <motion.rect
-      x={x}
-      y={y}
-      width={width}
-      height={height}
-      fill={fill}
-      fillOpacity={finalOpacity}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      initial={
-        shouldAnimate
-          ? {
-              y: y + height,
-              height: 0,
-              opacity: Math.min(finalOpacity, 0.3),
-            }
-          : false
-      }
-      animate={{ y, height, opacity: finalOpacity }}
-      transition={{
-        duration: BAR_INTRO_DURATION,
-        delay: 0.12 + Math.min(index * 0.05, 0.28),
-        ease: [0.16, 1, 0.3, 1],
-      }}
-    />
-  );
-}
-
-function SalesTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadItem[] }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
+function SalesMiniBars({
+  data,
+  selectedMonth,
+}: {
+  data: ChartEntry[];
+  selectedMonth: string | null;
+}) {
+  const shouldReduceMotion = useReducedMotion();
+  const selectedIndex = selectedMonth
+    ? data.findIndex((point) => point.month === selectedMonth)
+    : -1;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const activeIndex = hoveredIndex ?? (selectedIndex >= 0 ? selectedIndex : null);
+  const activePoint = activeIndex === null ? null : data[activeIndex];
+  const maxUnits = Math.max(1, ...data.map((point) => point.units));
 
   return (
     <div
-      className="rounded-[12px] border border-[#e8e8ec] bg-white px-3.5 py-3"
-      style={{
-        minWidth: 164,
-        boxShadow:
-          "0 1px 2px rgba(16,24,40,0.045), 0 14px 32px rgba(16,24,40,0.08)",
-      }}
+      className="rounded-[16px] border border-[#edf0f5] bg-[#fbfcfe] px-5 py-3.5"
+      onMouseLeave={() => setHoveredIndex(null)}
     >
-      <p
-        className="mb-2 text-[10px] uppercase"
-        style={{
-          color: "rgba(15,23,42,0.42)",
-          fontWeight: 600,
-          letterSpacing: "0.12em",
-        }}
-      >
-        {d.label}
-      </p>
-      <p
-        className="text-[22px] leading-none tracking-[-0.03em]"
-        style={{ color: NAVY, fontWeight: 700 }}
-      >
-        {d.units}
-        <span
-          className="ml-1.5 text-[11.5px]"
-          style={{ color: "rgba(15,23,42,0.4)", fontWeight: 500 }}
-        >
-          njësi
-        </span>
-      </p>
-      <p
-        className="mt-2 text-[12.5px]"
-        style={{ color: "rgba(15,23,42,0.58)", fontWeight: 600 }}
-      >
-        {fmtEur(d.revenue)}
-      </p>
+      <div className="mb-3 flex min-h-[32px] items-center justify-between gap-3">
+        <p className="text-[11px] font-medium text-black/35">
+          Shitje të kontraktuara sipas muajit
+        </p>
+        <AnimatePresence mode="wait">
+          {activePoint ? (
+            <motion.div
+              key={activePoint.label}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
+              className="flex items-center gap-3 rounded-[12px] border border-[#e8e8ec] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(16,24,40,0.05)]"
+            >
+              <span className="text-[11px] font-semibold" style={{ color: NAVY }}>
+                {activePoint.month}
+              </span>
+              <span className="text-[11px] text-black/35">|</span>
+              <span className="text-[11px] font-semibold" style={{ color: NAVY }}>
+                {activePoint.units} njësi
+              </span>
+              <span className="text-[11px] font-semibold text-black/45">
+                {fmtEur(activePoint.revenue)}
+              </span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      <div className="grid grid-cols-[62px_1fr] items-end gap-3">
+        <div className="flex h-[190px] items-end pb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: NAVY }} />
+            <span className="text-[11px] font-semibold text-black/42">Shitje</span>
+          </div>
+        </div>
+        <div className="grid h-[190px] grid-cols-12 items-end gap-2 border-b border-[#eef0f4]">
+          {data.map((point, index) => {
+            const isSelected = point.month === selectedMonth;
+            const height = point.units > 0 ? Math.max(8, Math.round((point.units / maxUnits) * 158)) : 2;
+
+            return (
+              <div
+                key={`sales-${point.month}`}
+                className="flex h-full items-end justify-center"
+                onMouseEnter={() => setHoveredIndex(index)}
+                aria-label={`${point.label}: ${point.units} njësi, ${fmtEur(point.revenue)}`}
+              >
+                <motion.span
+                  className="w-[24px] rounded-t-[7px]"
+                  initial={shouldReduceMotion ? false : { height: 0 }}
+                  animate={{ height }}
+                  transition={{
+                    duration: 0.34,
+                    delay: shouldReduceMotion ? 0 : index * 0.018,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  style={{
+                    backgroundColor: point.units > 0 ? NAVY : "rgba(0,0,0,0.08)",
+                    opacity: point.units > 0 ? (isSelected ? 1 : 0.84) : 0.45,
+                    boxShadow: isSelected && point.units > 0 ? `0 7px 18px ${NAVY}24` : "none",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-[62px_1fr] gap-3">
+        <div />
+        <div className="grid grid-cols-12 gap-2">
+          {data.map((point) => {
+            const isSelected = point.month === selectedMonth;
+            return (
+              <span
+                key={point.month}
+                className="text-center text-[9px] tracking-[-0.025em]"
+                style={{
+                  color: isSelected ? NAVY : "rgba(0,0,0,0.36)",
+                  fontWeight: isSelected ? 800 : 600,
+                }}
+              >
+                {point.month}
+              </span>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function OverviewMonthlySalesChart({
   chartYear,
+  selectedMonthIndex,
   started,
 }: {
-  chartYear: number;
+  chartYear: number | null;
+  selectedMonthIndex: number | null;
   started: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
-  const chartFrameRef = useRef<HTMLDivElement | null>(null);
   const {
     series: monthlySeries,
     loading,
@@ -193,88 +158,45 @@ export default function OverviewMonthlySalesChart({
     ownerScope: "Investitor",
     year: chartYear,
   });
-  const [hasPlayedIntro, setHasPlayedIntro] = useState(false);
-  const [chartWidth, setChartWidth] = useState<number>(() =>
-    typeof window === "undefined" ? FULL_MONTH_LABEL_MIN_WIDTH : window.innerWidth,
-  );
-  const shouldUseFullMonthLabels = chartWidth >= FULL_MONTH_LABEL_MIN_WIDTH;
-
-  useEffect(() => {
-    const node = chartFrameRef.current;
-    if (!node) {
-      return;
-    }
-
-    const updateWidth = (nextWidth: number) => {
-      setChartWidth((currentWidth) =>
-        Math.round(currentWidth) === Math.round(nextWidth) ? currentWidth : nextWidth,
-      );
-    };
-
-    updateWidth(node.getBoundingClientRect().width);
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const observer = new ResizeObserver(([entry]) => {
-      updateWidth(entry.contentRect.width);
-    });
-
-    observer.observe(node);
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
 
   const chartData = useMemo<ChartEntry[]>(
     () =>
       monthlySeries.map((entry) => {
         const monthIndex = Math.min(Math.max(entry.monthNumber - 1, 0), 11);
         const fullMonthLabel = ALBANIAN_MONTH_LABELS[monthIndex] ?? entry.monthLabel;
-        const shortMonthLabel = ALBANIAN_MONTH_SHORT_LABELS[monthIndex] ?? entry.monthShortLabel;
 
         return {
-          month: shouldUseFullMonthLabels ? fullMonthLabel : shortMonthLabel,
-          label: `${fullMonthLabel} ${chartYear}`,
+          month: fullMonthLabel,
+          label: chartYear === null ? fullMonthLabel : `${fullMonthLabel} ${chartYear}`,
           units: entry.soldUnits,
           revenue: entry.contractedValue,
         };
       }),
-    [chartYear, monthlySeries, shouldUseFullMonthLabels],
+    [chartYear, monthlySeries],
   );
-  const maxUnits = useMemo(
-    () => chartData.reduce((highestValue, entry) => Math.max(highestValue, entry.units), 0),
-    [chartData],
-  );
-  const yAxisMax = maxUnits >= 4 ? maxUnits + 1 : 4;
+  const selectedMonthLabel =
+    selectedMonthIndex === null ? null : ALBANIAN_MONTH_LABELS[selectedMonthIndex] ?? null;
 
   const hasChartData = monthlySeries.some((entry) => entry.soldUnits > 0);
-  const shouldPlayIntro =
-    started &&
-    !loading &&
-    !monthlySeriesError &&
-    hasChartData &&
-    !hasPlayedIntro &&
-    !shouldReduceMotion;
 
-  useEffect(() => {
-    if (!shouldPlayIntro) {
-      return;
-    }
-
-    const timeoutId = globalThis.setTimeout(() => {
-      setHasPlayedIntro(true);
-    }, (BAR_INTRO_DURATION + BAR_INTRO_MAX_DELAY) * 1000);
-
-    return () => {
-      globalThis.clearTimeout(timeoutId);
-    };
-  }, [shouldPlayIntro]);
+  if (chartYear === null) {
+    return (
+      <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
+        <div>
+          <p className="text-[13px] font-medium text-black/52">
+            Grafiku mujor kërkon një vit të zgjedhur
+          </p>
+          <p className="mt-1 text-[12px] text-black/34">
+            Zgjidh një vit sipër që KPI-të dhe grafiku të përdorin të njëjtën periudhë.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!started || loading) {
     return (
-      <div className="flex h-[180px] items-center justify-center rounded-[14px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
+      <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
         <p className="text-[12.5px] text-black/36">Duke ngarkuar grafikun...</p>
       </div>
     );
@@ -282,7 +204,7 @@ export default function OverviewMonthlySalesChart({
 
   if (monthlySeriesError) {
     return (
-      <div className="flex h-[180px] items-center justify-center rounded-[14px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
+      <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
         <p className="text-[12.5px] text-[#b14b4b]/80">
           Grafiku nuk u ngarkua për vitin e zgjedhur.
         </p>
@@ -292,7 +214,7 @@ export default function OverviewMonthlySalesChart({
 
   if (!hasChartData) {
     return (
-      <div className="flex h-[180px] items-center justify-center rounded-[14px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
+      <div className="flex h-[252px] items-center justify-center rounded-[16px] border border-dashed border-[#e1e5eb] bg-[#fbfbfc] text-center">
         <div>
           <p className="text-[13px] font-medium text-black/52">
             Asnjë shitje e regjistruar për vitin {chartYear}
@@ -307,72 +229,12 @@ export default function OverviewMonthlySalesChart({
 
   return (
     <motion.div
-      ref={chartFrameRef}
       initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.42, ease: SOFT_EASE }}
-      className="h-[166px]"
+      className="min-h-[252px]"
     >
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={chartData}
-          barSize={22}
-          barCategoryGap="26%"
-          margin={{ top: 6, right: 4, left: 0, bottom: 0 }}
-        >
-          <CartesianGrid
-            vertical={false}
-            stroke="rgba(15,23,42,0.06)"
-            strokeDasharray="3 5"
-          />
-          <XAxis
-            dataKey="month"
-            axisLine={false}
-            tickLine={false}
-            interval={0}
-            height={34}
-            tickMargin={10}
-            tick={{
-              fontSize: shouldUseFullMonthLabels ? 10.5 : 11,
-              fill: "rgba(15,23,42,0.42)",
-              fontWeight: 500,
-            }}
-          />
-          <YAxis
-            allowDecimals={false}
-            axisLine={false}
-            tickLine={false}
-            domain={[0, yAxisMax]}
-            tick={{ fontSize: 10.5, fill: "rgba(15,23,42,0.28)" }}
-            width={34}
-          />
-          <Tooltip
-            content={<SalesTooltip />}
-            cursor={{ fill: "rgba(0,56,131,0.035)", radius: 8 }}
-          />
-          <Bar
-            dataKey="units"
-            radius={[0, 0, 0, 0]}
-            maxBarSize={32}
-            shape={(props) => (
-              <SalesBarShape {...props} shouldAnimate={shouldPlayIntro} />
-            )}
-            activeBar={{
-              fillOpacity: 0.96,
-              stroke: "rgba(255,255,255,0.85)",
-              strokeWidth: 1,
-            }}
-            isAnimationActive={false}
-          >
-            {chartData.map((entry, index) => (
-              <Cell
-                key={index}
-                fill={entry.units > 0 ? NAVY : "#d9e3f3"}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <SalesMiniBars data={chartData} selectedMonth={selectedMonthLabel} />
     </motion.div>
   );
 }

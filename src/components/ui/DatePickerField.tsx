@@ -316,8 +316,8 @@ export function DatePickerField({
             </div>
 
             <div className="mb-1 grid grid-cols-7 gap-1">
-              {WEEKDAYS_SQ.map((day) => (
-                <div key={day} className={`flex ${compact ? "h-6" : "h-7"} items-center justify-center text-[10px] font-semibold text-black/32`}>
+              {WEEKDAYS_SQ.map((day, index) => (
+                <div key={`${day}-${index}`} className={`flex ${compact ? "h-6" : "h-7"} items-center justify-center text-[10px] font-semibold text-black/32`}>
                   {day}
                 </div>
               ))}
