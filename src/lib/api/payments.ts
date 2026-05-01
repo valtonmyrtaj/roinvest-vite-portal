@@ -51,6 +51,14 @@ export type CreatePaymentPayload = TablesInsert<"unit_payments">;
 
 export type CreatePaymentReceiptPayload = TablesInsert<"unit_payment_receipts">;
 
+export type RegisterPaymentReceiptWithSplitPayload = {
+  payment_id: string;
+  amount: number;
+  paid_date: string;
+  notes?: string | null;
+  remainder_due_date?: string | null;
+};
+
 /** Update patch — same contract. Partial by construction. */
 export type UpdatePaymentPatch = TablesUpdate<"unit_payments">;
 
@@ -102,8 +110,10 @@ async function attachReceipts(rows: PaymentRow[]): Promise<ApiResult<PaymentWith
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 /**
- * List every payment for a single unit, ordered by installment number
- * ascending. Empty result is not an error.
+ * List every payment for a single unit, ordered by due date ascending.
+ * The human-facing payment plan should follow the closest upcoming due
+ * date, especially after partial-payment splits create a new remainder row.
+ * Empty result is not an error.
  */
 export async function listPayments(
   unitId: string,
@@ -112,6 +122,7 @@ export async function listPayments(
     .from("unit_payments")
     .select("*")
     .eq("unit_id", unitId)
+    .order("due_date", { ascending: true })
     .order("installment_number", { ascending: true });
 
   if (error) return apiFail(error.message);
@@ -211,6 +222,24 @@ export async function createPaymentReceipt(
 
   if (error) return apiFail(error.message);
   return apiOk(data as PaymentReceiptRow);
+}
+
+export async function registerPaymentReceiptWithSplit(
+  payload: RegisterPaymentReceiptWithSplitPayload,
+): Promise<ApiResult<string | null>> {
+  const { data, error } = await supabase.rpc(
+    "register_payment_receipt_with_split",
+    {
+      p_amount: payload.amount,
+      p_paid_date: payload.paid_date,
+      p_payment_id: payload.payment_id,
+      p_notes: payload.notes ?? undefined,
+      p_remainder_due_date: payload.remainder_due_date ?? undefined,
+    },
+  );
+
+  if (error) return apiFail(error.message);
+  return apiOk((data ?? null) as string | null);
 }
 
 /**

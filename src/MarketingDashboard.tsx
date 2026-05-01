@@ -19,6 +19,7 @@ const SQ_MONTHS = [
   "Janar", "Shkurt", "Mars", "Prill", "Maj", "Qershor",
   "Korrik", "Gusht", "Shtator", "Tetor", "Nëntor", "Dhjetor",
 ];
+const ALL_MONTHS_LABEL = "Të gjithë muajt";
 const YEAR_OPTIONS = ["2026", "2027", "2028", "2029", "2030"] as const;
 const YEARS = YEAR_OPTIONS.map(Number);
 const CHANNELS = ["Billboard", "Fletushka", "Radio", "Evente", "Tjetër"] as const;
@@ -74,29 +75,58 @@ function getIsoMonth(iso: string) {
   return Number.isFinite(month) ? month : null;
 }
 
-function offlineEntryMatchesPeriod(entry: OfflineEntry, year: number, month: number | "all") {
-  if (entry.year !== year) return false;
-  if (month === "all") return true;
-
-  if (entry.period_type === "Vjetore") {
-    return getIsoMonth(entry.date) === month;
-  }
-
-  return entry.month === month;
+function getAllMonthsUpperBound(year: number, currentYear: number, currentMonth: number) {
+  return year === currentYear ? currentMonth : 12;
 }
 
-function offlineEntryMatchesKpiScope(entry: OfflineEntry, year: number, month: number | "all", scope: KpiScope) {
+function getAllMonthsPeriodLabel(year: number, upperMonth: number) {
+  if (upperMonth >= 12) return `${ALL_MONTHS_LABEL} ${year}`;
+  return `Janar - ${SQ_MONTHS[upperMonth - 1]} ${year}`;
+}
+
+function getOfflineEntryMonth(entry: OfflineEntry) {
+  return entry.period_type === "Vjetore" ? getIsoMonth(entry.date) : entry.month;
+}
+
+function offlineEntryMatchesPeriod(
+  entry: OfflineEntry,
+  year: number,
+  month: number | "all",
+  allMonthsUpperBound = 12,
+) {
+  if (entry.year !== year) return false;
+  const entryMonth = getOfflineEntryMonth(entry);
+
+  if (month === "all") {
+    return entryMonth !== null && entryMonth >= 1 && entryMonth <= allMonthsUpperBound;
+  }
+
+  return entryMonth === month;
+}
+
+function offlineEntryMatchesKpiScope(
+  entry: OfflineEntry,
+  year: number,
+  month: number | "all",
+  scope: KpiScope,
+  allMonthsUpperBound = 12,
+) {
   if (scope === "month" || month === "all") {
-    return offlineEntryMatchesPeriod(entry, year, month);
+    return offlineEntryMatchesPeriod(entry, year, month, allMonthsUpperBound);
   }
 
   if (entry.year !== year) return false;
-  const entryMonth = entry.period_type === "Vjetore" ? getIsoMonth(entry.date) : entry.month;
+  const entryMonth = getOfflineEntryMonth(entry);
   return entryMonth !== null && entryMonth >= 1 && entryMonth <= month;
 }
 
-function getKpiPeriodLabel(year: number, month: number | "all", scope: KpiScope) {
-  if (month === "all") return `${year}`;
+function getKpiPeriodLabel(
+  year: number,
+  month: number | "all",
+  scope: KpiScope,
+  allMonthsUpperBound = 12,
+) {
+  if (month === "all") return getAllMonthsPeriodLabel(year, allMonthsUpperBound);
   const monthLabel = SQ_MONTHS[month - 1];
   if (scope === "ytd" && month > 1) return `Janar - ${monthLabel} ${year}`;
   return `${monthLabel} ${year}`;
@@ -1149,7 +1179,7 @@ export default function MarketingDashboard() {
   const [filterMonth, setFilterMonth] = useState<number | "all">(currentMonth);
   const [kpiScope, setKpiScope] = useState<KpiScope>("month");
   const [offlineLogYear, setOfflineLogYear] = useState(currentYear);
-  const [offlineLogMonth, setOfflineLogMonth] = useState(currentMonth);
+  const [offlineLogMonth, setOfflineLogMonth] = useState<number | "all">(currentMonth);
 
   const [showDigitalModal, setShowDigitalModal] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
@@ -1181,28 +1211,36 @@ export default function MarketingDashboard() {
     }),
     [],
   );
+  const allMonthsUpperBound = getAllMonthsUpperBound(filterYear, currentYear, currentMonth);
+  const offlineLogAllMonthsUpperBound = getAllMonthsUpperBound(
+    offlineLogYear,
+    currentYear,
+    currentMonth,
+  );
 
   const currentDigitalRows = useMemo(
     () =>
       marketingData.filter((r) => {
         if (r.year !== filterYear) return false;
-        if (filterMonth === "all") return true;
+        if (filterMonth === "all") return r.month <= allMonthsUpperBound;
         if (kpiScope === "ytd") return r.month <= filterMonth;
         if (r.month !== filterMonth) return false;
         return true;
       }),
-    [marketingData, filterYear, filterMonth, kpiScope]
+    [marketingData, filterYear, filterMonth, kpiScope, allMonthsUpperBound]
   );
 
   const prevDigitalRows = useMemo(() => {
-    if (filterMonth === "all") return marketingData.filter((r) => r.year === filterYear - 1);
+    if (filterMonth === "all") {
+      return marketingData.filter((r) => r.year === filterYear - 1 && r.month <= allMonthsUpperBound);
+    }
     if (kpiScope === "ytd") {
       return marketingData.filter((r) => r.year === filterYear - 1 && r.month <= filterMonth);
     }
     const prevYear  = filterMonth === 1 ? filterYear - 1 : filterYear;
     const prevMonth = filterMonth === 1 ? 12 : (filterMonth as number) - 1;
     return marketingData.filter((r) => r.year === prevYear && r.month === prevMonth);
-  }, [marketingData, filterYear, filterMonth, kpiScope]);
+  }, [marketingData, filterYear, filterMonth, kpiScope, allMonthsUpperBound]);
 
   const currentDigital = useMemo(() => aggregateDigital(currentDigitalRows), [aggregateDigital, currentDigitalRows]);
   const prevDigital    = useMemo(() => aggregateDigital(prevDigitalRows),    [aggregateDigital, prevDigitalRows]);
@@ -1210,15 +1248,25 @@ export default function MarketingDashboard() {
   const offlineSpendCurrent = useMemo(
     () =>
       offlineEntries
-        .filter((entry) => offlineEntryMatchesKpiScope(entry, filterYear, filterMonth, kpiScope))
+        .filter((entry) =>
+          offlineEntryMatchesKpiScope(
+            entry,
+            filterYear,
+            filterMonth,
+            kpiScope,
+            allMonthsUpperBound,
+          ),
+        )
         .reduce((s, e) => s + e.amount, 0),
-    [offlineEntries, filterYear, filterMonth, kpiScope]
+    [offlineEntries, filterYear, filterMonth, kpiScope, allMonthsUpperBound]
   );
 
   const offlineSpendPrev = useMemo(() => {
     if (filterMonth === "all") {
       return offlineEntries
-        .filter((e) => e.year === filterYear - 1)
+        .filter((entry) =>
+          offlineEntryMatchesPeriod(entry, filterYear - 1, "all", allMonthsUpperBound),
+        )
         .reduce((s, e) => s + e.amount, 0);
     }
     if (kpiScope === "ytd") {
@@ -1231,18 +1279,23 @@ export default function MarketingDashboard() {
     return offlineEntries
       .filter((entry) => offlineEntryMatchesPeriod(entry, prevYear, prevMonth))
       .reduce((s, e) => s + e.amount, 0);
-  }, [offlineEntries, filterYear, filterMonth, kpiScope]);
+  }, [offlineEntries, filterYear, filterMonth, kpiScope, allMonthsUpperBound]);
 
   const totalSpend    = currentDigital.spend + offlineSpendCurrent;
   const prevTotalSpend = prevDigital.spend + offlineSpendPrev;
   const hasPrevPeriod  = prevDigitalRows.length > 0 || offlineSpendPrev > 0;
   const selectedChartMonthLabel = filterMonth === "all" ? null : SQ_MONTHS[(filterMonth as number) - 1];
-  const kpiPeriodLabel = getKpiPeriodLabel(filterYear, filterMonth, kpiScope);
+  const kpiPeriodLabel = getKpiPeriodLabel(
+    filterYear,
+    filterMonth,
+    kpiScope,
+    allMonthsUpperBound,
+  );
   const comparisonLabel =
     filterMonth === "all"
-      ? "viti i kaluar"
+      ? getAllMonthsPeriodLabel(filterYear - 1, allMonthsUpperBound)
       : kpiScope === "ytd"
-        ? getKpiPeriodLabel(filterYear - 1, filterMonth, "ytd")
+        ? getKpiPeriodLabel(filterYear - 1, filterMonth, "ytd", allMonthsUpperBound)
         : "muaji i kaluar";
 
   const chartData = useMemo(
@@ -1264,18 +1317,27 @@ export default function MarketingDashboard() {
       offlineEntries
         .filter((entry) => {
           if (entry.year !== offlineLogYear) return false;
-          if (entry.period_type === "Vjetore") return getIsoMonth(entry.date) === offlineLogMonth;
-          return entry.month === offlineLogMonth;
+          return offlineEntryMatchesPeriod(
+            entry,
+            offlineLogYear,
+            offlineLogMonth,
+            offlineLogAllMonthsUpperBound,
+          );
         })
         .sort((a, b) => {
           if (a.period_type !== b.period_type) return a.period_type === "Mujore" ? -1 : 1;
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         }),
-    [offlineEntries, offlineLogYear, offlineLogMonth],
+    [offlineEntries, offlineLogYear, offlineLogMonth, offlineLogAllMonthsUpperBound],
   );
 
   const offlineLogSpend = filteredOfflineLog.reduce((sum, entry) => sum + entry.amount, 0);
-  const offlineLogMonthName = SQ_MONTHS[offlineLogMonth - 1];
+  const offlineLogPeriodLabel =
+    offlineLogMonth === "all"
+      ? getAllMonthsPeriodLabel(offlineLogYear, offlineLogAllMonthsUpperBound)
+      : `${SQ_MONTHS[offlineLogMonth - 1]} ${offlineLogYear}`;
+  const offlineLogMonthName =
+    offlineLogMonth === "all" ? ALL_MONTHS_LABEL : SQ_MONTHS[offlineLogMonth - 1];
   const defaultModalMonth = filterMonth === "all" ? currentMonth : (filterMonth as number);
 
   const handleDeleteConfirm = async () => {
@@ -1313,108 +1375,109 @@ export default function MarketingDashboard() {
           }
         />
 
-        {/* Period selectors + quick actions */}
-        <motion.div {...fadeUp(0.08)} className="mb-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <CustomSelect
-              size="sm"
-              className="min-w-[100px]"
-              options={[...YEAR_OPTIONS]}
-              value={String(filterYear)}
-              onChange={(v) => {
-                setFilterYear(Number(v));
-                setOfflineLogYear(Number(v));
-              }}
-            />
-            <CustomSelect
-              size="sm"
-              className="min-w-[160px]"
-              options={SQ_MONTHS}
-              value={filterMonth === "all" ? "" : SQ_MONTHS[(filterMonth as number) - 1]}
-              placeholder="Të gjitha muajt"
-              onChange={(v) => {
-                if (v === "") {
-                  setFilterMonth("all");
-                  return;
-                }
-                const nextMonth = SQ_MONTHS.indexOf(v) + 1;
-                setFilterMonth(nextMonth);
-                setOfflineLogMonth(nextMonth);
-              }}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <MarketingActionCard
-              title="Performancë digjitale"
-              variant="primary"
-              onClick={() => setShowDigitalModal(true)}
-            />
-            <MarketingActionCard
-              title="Shpenzim offline"
-              onClick={() => setShowOfflineModal(true)}
-            />
-          </div>
-        </motion.div>
-
-        {/* KPI scope */}
-        <motion.div
-          {...fadeUp(0.1)}
-          className="mb-3 flex items-center justify-between gap-3"
+        {/* Summary */}
+        <motion.section
+          {...fadeUp(0.08)}
+          className="mb-8 rounded-[18px] border border-[#e8e8ec] bg-white p-5"
+          style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
-          <div>
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/32">
-              Përmbledhja
-            </p>
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={`${kpiScope}-${kpiPeriodLabel}`}
-                initial={{ opacity: 0, y: 3 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -3 }}
-                transition={{ duration: 0.14, ease: "easeOut" }}
-                className="mt-0.5 text-[12px] font-semibold"
-                style={{ color: NAVY }}
-              >
-                {kpiPeriodLabel}
-              </motion.p>
-            </AnimatePresence>
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <CustomSelect
+                size="sm"
+                className="min-w-[100px]"
+                options={[...YEAR_OPTIONS]}
+                value={String(filterYear)}
+                onChange={(v) => {
+                  setFilterYear(Number(v));
+                  setOfflineLogYear(Number(v));
+                }}
+              />
+              <CustomSelect
+                size="sm"
+                className="min-w-[160px]"
+                options={[ALL_MONTHS_LABEL, ...SQ_MONTHS]}
+                value={filterMonth === "all" ? ALL_MONTHS_LABEL : SQ_MONTHS[(filterMonth as number) - 1]}
+                onChange={(v) => {
+                  if (v === ALL_MONTHS_LABEL) {
+                    setFilterMonth("all");
+                    setOfflineLogMonth("all");
+                    return;
+                  }
+                  const nextMonth = SQ_MONTHS.indexOf(v) + 1;
+                  setFilterMonth(nextMonth);
+                  setOfflineLogMonth(nextMonth);
+                }}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <MarketingActionCard
+                title="Performancë digjitale"
+                variant="primary"
+                onClick={() => setShowDigitalModal(true)}
+              />
+              <MarketingActionCard
+                title="Shpenzim offline"
+                onClick={() => setShowOfflineModal(true)}
+              />
+            </div>
           </div>
-          <KpiScopeSwitch value={kpiScope} onChange={setKpiScope} />
-        </motion.div>
 
-        {/* Hero cards */}
-        <div className="mb-8 flex gap-4">
-          <HeroCard
-            label="Shpenzimet totale"
-            value={totalSpend}
-            prevValue={hasPrevPeriod ? prevTotalSpend : null}
-            format={fmtEur}
-            icon={TrendingUp}
-            comparisonLabel={comparisonLabel}
-            delay={0.1}
-            active={started}
-          />
-          <HeroCard
-            label="Shikimet totale"
-            value={currentDigital.views}
-            prevValue={prevDigitalRows.length > 0 ? prevDigital.views : null}
-            format={fmtFullNum}
-            icon={Eye}
-            comparisonLabel={comparisonLabel}
-            delay={0.17}
-            active={started}
-          />
-          <HeroCard
-            label="Kontaktet totale"
-            value={currentDigital.leads}
-            prevValue={prevDigitalRows.length > 0 ? prevDigital.leads : null}
-            format={fmtNum}
-            icon={Users}
-            comparisonLabel={comparisonLabel}
-            delay={0.24}
-            active={started}
-          />
-        </div>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-t border-[#eef0f4] pt-4">
+            <div>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/32">
+                Përmbledhja
+              </p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={`${kpiScope}-${kpiPeriodLabel}`}
+                  initial={{ opacity: 0, y: 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -3 }}
+                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  className="mt-0.5 text-[12px] font-semibold"
+                  style={{ color: NAVY }}
+                >
+                  {kpiPeriodLabel}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+            {filterMonth !== "all" && <KpiScopeSwitch value={kpiScope} onChange={setKpiScope} />}
+          </div>
+
+          <div className="flex gap-4">
+            <HeroCard
+              label="Shpenzimet totale"
+              value={totalSpend}
+              prevValue={hasPrevPeriod ? prevTotalSpend : null}
+              format={fmtEur}
+              icon={TrendingUp}
+              comparisonLabel={comparisonLabel}
+              delay={0.1}
+              active={started}
+            />
+            <HeroCard
+              label="Shikimet totale"
+              value={currentDigital.views}
+              prevValue={prevDigitalRows.length > 0 ? prevDigital.views : null}
+              format={fmtFullNum}
+              icon={Eye}
+              comparisonLabel={comparisonLabel}
+              delay={0.17}
+              active={started}
+            />
+            <HeroCard
+              label="Kontakte totale"
+              value={currentDigital.leads}
+              prevValue={prevDigitalRows.length > 0 ? prevDigital.leads : null}
+              format={fmtNum}
+              icon={Users}
+              comparisonLabel={comparisonLabel}
+              delay={0.24}
+              active={started}
+            />
+          </div>
+        </motion.section>
 
         {/* Spend mini bars */}
         <motion.div
@@ -1439,8 +1502,8 @@ export default function MarketingDashboard() {
           style={{ boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}
         >
           <CardSectionHeader
-            title="Shikimet dhe kontaktet sipas muajve"
-            subtitle={`Shikimet dhe kontaktet sipas muajve — ${filterYear}`}
+            title="Shikime dhe kontakte sipas muajve"
+            subtitle={`Shikime dhe kontakte sipas muajve — ${filterYear}`}
             className="mb-3 border-b-0 px-0 py-0"
             titleStyle={CHART_HEADER_TITLE_STYLE}
             subtitleStyle={CHART_HEADER_SUBTITLE_STYLE}
@@ -1465,9 +1528,15 @@ export default function MarketingDashboard() {
                   <CustomSelect
                     size="sm"
                     className="min-w-[112px]"
-                    options={SQ_MONTHS}
+                    options={[ALL_MONTHS_LABEL, ...SQ_MONTHS]}
                     value={offlineLogMonthName}
-                    onChange={(next) => setOfflineLogMonth(SQ_MONTHS.indexOf(next) + 1)}
+                    onChange={(next) => {
+                      if (next === ALL_MONTHS_LABEL) {
+                        setOfflineLogMonth("all");
+                        return;
+                      }
+                      setOfflineLogMonth(SQ_MONTHS.indexOf(next) + 1);
+                    }}
                   />
                 </label>
                 <label className="flex items-center gap-2">
@@ -1485,8 +1554,11 @@ export default function MarketingDashboard() {
           />
 
           <div className="mb-3 grid grid-cols-3 gap-2.5">
-            <OfflineSummaryCard label="Periudha" value={`${offlineLogMonthName} ${offlineLogYear}`} />
-            <OfflineSummaryCard label="Shpenzime të muajit" value={fmtEur(offlineLogSpend)} />
+            <OfflineSummaryCard label="Periudha" value={offlineLogPeriodLabel} />
+            <OfflineSummaryCard
+              label={offlineLogMonth === "all" ? "Shpenzime gjithsej" : "Shpenzime të muajit"}
+              value={fmtEur(offlineLogSpend)}
+            />
             <OfflineSummaryCard label="Hyrje" value={String(filteredOfflineLog.length)} />
           </div>
 
@@ -1496,7 +1568,7 @@ export default function MarketingDashboard() {
                 <p className="text-[13px] text-black/40" style={{ fontWeight: 500 }}>
                   {offlineEntries.length === 0
                     ? "Nuk ka hyrje offline të regjistruara ende"
-                    : `Nuk ka hyrje offline për ${offlineLogMonthName} ${offlineLogYear}`}
+                    : `Nuk ka hyrje offline për ${offlineLogPeriodLabel}`}
                 </p>
                 <p className="mt-1 text-[12px] text-black/28">
                   {offlineEntries.length === 0

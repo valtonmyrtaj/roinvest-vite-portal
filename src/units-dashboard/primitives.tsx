@@ -32,22 +32,26 @@ export function Card({
 export function KpiCardSurface({
   children,
   className = "",
+  active = false,
 }: {
   children: ReactNode;
   className?: string;
+  active?: boolean;
 }) {
   return (
     <motion.div
       className={`transform-gpu rounded-[18px] border bg-white p-5 will-change-transform ${className}`.trim()}
       style={{
-        background: SURFACE_BG,
-        borderColor: SURFACE_BORDER,
-        boxShadow: UNITS_KPI_BASE_SHADOW,
+        background: active ? "#fbfdff" : SURFACE_BG,
+        borderColor: active ? "#aebfdb" : SURFACE_BORDER,
+        boxShadow: active
+          ? "0 1px 2px rgba(15,23,42,0.045), 0 14px 30px rgba(15,23,42,0.06)"
+          : UNITS_KPI_BASE_SHADOW,
       }}
       whileHover={{
         y: -1.5,
         boxShadow: UNITS_KPI_HOVER_SHADOW,
-        borderColor: "#dde1e7",
+        borderColor: active ? "#9fb7dc" : "#dde1e7",
       }}
       transition={{ duration: 0.15, ease: SOFT_EASE }}
     >
@@ -60,6 +64,7 @@ export function FilterSelect({
   options,
   value,
   onChange,
+  optionMeta,
   placeholder,
   size = "lg",
   className = "min-w-[172px]",
@@ -67,6 +72,7 @@ export function FilterSelect({
   options: readonly string[];
   value: string;
   onChange: (v: string) => void;
+  optionMeta?: Record<string, string | undefined>;
   placeholder: string;
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -76,6 +82,7 @@ export function FilterSelect({
       value={value}
       onChange={onChange}
       options={[...options]}
+      optionMeta={optionMeta}
       placeholder={placeholder}
       size={size}
       className={className}

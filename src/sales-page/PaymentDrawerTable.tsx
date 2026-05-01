@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { Payment } from "../hooks/usePayments";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import {
@@ -19,19 +19,27 @@ import { SkeletonRows } from "../components/SkeletonRows";
 export function PaymentDrawerTable({
   payments,
   loading,
+  canManagePayments,
   onRequestRegisterPayment,
+  onRequestEditPayment,
   onRequestDelete,
 }: {
   payments: Payment[];
   loading: boolean;
+  canManagePayments: boolean;
   onRequestRegisterPayment: (payment: Payment) => void;
+  onRequestEditPayment: (payment: Payment) => void;
   onRequestDelete: (payment: Payment) => void;
 }) {
   return (
     <div className="mt-6 rounded-[22px] border border-[#ececf1] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
       <CardSectionHeader
         title="Lista e kësteve"
-        subtitle="Shëno këstet e paguara dhe të papaguara"
+        subtitle={
+          canManagePayments
+            ? "Shëno këstet e paguara dhe të papaguara"
+            : "Pamje vetëm për lexim e planit të pagesave"
+        }
         className="px-5 py-4"
         bodyClassName="max-w-[420px]"
         right={
@@ -53,23 +61,27 @@ export function PaymentDrawerTable({
               Plani i pagesave nuk ka këste të regjistruara ende
             </p>
             <p className="mt-1 text-[11.5px] text-black/28">
-              Përdor bllokun më poshtë për të shtuar këstin e parë.
+              {canManagePayments
+                ? "Përdor bllokun më poshtë për të shtuar këstin e parë."
+                : "Nuk ka këste për t'u shfaqur në këtë plan."}
             </p>
           </div>
         ) : (
-          <div className="min-w-[600px] sm:min-w-0">
+          <div className="min-w-[700px] sm:min-w-0">
             <div className={`flex items-center px-3 py-2.5 ${TABULAR_HEADER_ROW_CLASS}`}>
               <div className={`w-[48px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Kësti</div>
               <div className={`w-[96px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Shuma</div>
               <div className={`w-[112px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Skadon më</div>
               <div className={`w-[112px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Paguar më</div>
               <div className={`w-[132px] shrink-0 whitespace-nowrap ${TABULAR_HEADER_LABEL_CLASS}`}>Statusi</div>
-              <div className="min-w-[132px] flex-1" />
+              <div className="min-w-[220px] flex-1" />
             </div>
 
-            {payments.map((payment) => {
+            {payments.map((payment, index) => {
               const hasPartialReceipt = payment.paid_amount > 0 && payment.status !== "E paguar";
               const displayedPaidDate = payment.last_receipt_date ?? payment.paid_date;
+              const displayNumber = index + 1;
+              const canEditSchedule = payment.status !== "E paguar" && payment.paid_amount <= 0;
 
               return (
                 <div
@@ -83,7 +95,7 @@ export function PaymentDrawerTable({
                   }`}
                 >
                   <div className="w-[48px] shrink-0 whitespace-nowrap text-[12.5px] font-semibold text-black/75">
-                    #{payment.installment_number}
+                    #{displayNumber}
                   </div>
 
                   <div className="w-[96px] shrink-0 whitespace-nowrap">
@@ -107,8 +119,18 @@ export function PaymentDrawerTable({
                     <PaymentStatusBadge status={payment.status} />
                   </div>
 
-                  <div className="flex min-w-[132px] flex-1 items-center justify-end gap-2">
-                    {payment.status !== "E paguar" && (
+                  <div className="flex min-w-[220px] flex-1 items-center justify-end gap-2">
+                    {canManagePayments && canEditSchedule && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestEditPayment(payment)}
+                        className="inline-flex whitespace-nowrap rounded-[8px] border border-[#e2e6ee] px-3 py-1.5 text-[11px] font-semibold text-black/52 transition hover:bg-[#f7f8fb] hover:text-black/70"
+                      >
+                        <Pencil size={12} className="mr-1.5" />
+                        Ndrysho
+                      </button>
+                    )}
+                    {canManagePayments && payment.status !== "E paguar" && (
                       <button
                         type="button"
                         onClick={() => onRequestRegisterPayment(payment)}
@@ -118,14 +140,16 @@ export function PaymentDrawerTable({
                         Regjistro pagesë
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => onRequestDelete(payment)}
-                      aria-label={`Fshi këstin #${payment.installment_number}`}
-                      className="rounded-[7px] p-[6px] text-black/24 opacity-55 transition-all duration-150 group-hover:opacity-100 group-hover:text-black/30 hover:bg-red-50 hover:text-red-400 focus-visible:opacity-100 focus-visible:outline-none"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canManagePayments && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestDelete(payment)}
+                        aria-label={`Fshi këstin #${displayNumber}`}
+                        className="rounded-[7px] p-[6px] text-black/24 opacity-55 transition-all duration-150 group-hover:opacity-100 group-hover:text-black/30 hover:bg-red-50 hover:text-red-400 focus-visible:opacity-100 focus-visible:outline-none"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

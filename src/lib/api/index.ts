@@ -10,6 +10,7 @@ export * as crm from "./crm";
 export * as dashboard from "./dashboard";
 export * as history from "./history";
 export * as marketing from "./marketing";
+export * as operationalAlerts from "./operationalAlerts";
 export * as ownerEntities from "./ownerEntities";
 export * as payments from "./payments";
 export * as reservations from "./reservations";

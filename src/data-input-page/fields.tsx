@@ -1,6 +1,9 @@
 import { ChevronDown } from "lucide-react";
 import { DatePickerField } from "../components/ui/DatePickerField";
 
+export const FIELD_LABEL_CLASS =
+  "text-[10px] font-semibold uppercase tracking-[0.08em] text-black/30";
+
 export function SelectField({
   label,
   value,
@@ -18,9 +21,7 @@ export function SelectField({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {label}
-      </span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <div className="relative">
         <select
           value={value ?? ""}
@@ -52,19 +53,27 @@ export function NumberField({
 }: {
   label: string;
   value: number | undefined;
-  onChange: (v: number) => void;
+  onChange: (v: number | undefined) => void;
   placeholder?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {label}
-      </span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <input
         type="number"
+        min={0.01}
+        step="0.01"
         value={value ?? ""}
-        onChange={(e) => onChange(Number(e.target.value))}
-        placeholder={placeholder ?? ""}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === "") {
+            onChange(undefined);
+            return;
+          }
+          const parsed = Number(raw);
+          onChange(Number.isFinite(parsed) ? parsed : undefined);
+        }}
+        placeholder={placeholder}
         className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
       />
     </label>
@@ -84,9 +93,7 @@ export function OptionalNumberField({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {label}
-      </span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <input
         type="number"
         min={0.01}
@@ -95,7 +102,7 @@ export function OptionalNumberField({
         onChange={(e) =>
           onChange(e.target.value === "" ? undefined : Number(e.target.value))
         }
-        placeholder={placeholder ?? ""}
+        placeholder={placeholder}
         className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
       />
     </label>
@@ -106,23 +113,24 @@ export function TextField({
   label,
   value,
   onChange,
+  onBlur,
   placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {label}
-      </span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <input
         type="text"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? ""}
+        onBlur={onBlur}
+        placeholder={placeholder}
         className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
       />
     </label>
@@ -146,7 +154,8 @@ export function DateField({
       value={value ? value.slice(0, 10) : null}
       onChange={onChange}
       disabled={disabled}
-      labelClassName="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-black/35"
+      portal
+      labelClassName={`mb-1.5 block ${FIELD_LABEL_CLASS}`}
     />
   );
 }
@@ -166,9 +175,7 @@ export function RoomNumberField({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-        {label}
-      </span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <input
         type="number"
         min={1}
@@ -176,7 +183,7 @@ export function RoomNumberField({
         onChange={(e) =>
           onChange(e.target.value === "" ? undefined : Number(e.target.value))
         }
-        placeholder={placeholder ?? ""}
+        placeholder={placeholder}
         className={`h-10 rounded-[11px] border bg-white px-3 text-[13px] text-black/80 outline-none transition focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)] ${
           error
             ? "border-red-400 focus:border-red-400"

@@ -8,11 +8,11 @@ import {
 } from "./hooks/useSaleReporting";
 import { useSalesUpcomingPayments } from "./hooks/useSalesUpcomingPayments";
 import { mapSalesUnitRowToUnit, useSalesUnits } from "./hooks/useSalesUnits";
-import { useUnitsShell } from "./hooks/useUnitsShell";
 import type { Unit } from "./hooks/useUnits";
+import { useAuth } from "./context/useAuth";
 import { sales as salesApi } from "./lib/api";
 import { PaymentDrawer } from "./sales-page/PaymentDrawer";
-import { SalesHeader } from "./sales-page/SalesHeader";
+import { SalesHeader, SalesPeriodControls } from "./sales-page/SalesHeader";
 import { SalesRevenueChart } from "./sales-page/SalesRevenueChart";
 import { SalesSummary } from "./sales-page/SalesSummary";
 import {
@@ -25,7 +25,6 @@ import {
 } from "./sales-page/SalesUpcomingPayments";
 import {
   SALES_KPI_DEFS,
-  SQ_MONTHS,
   TYPOLOGY_DEFS,
   YEAR_OPTIONS,
 } from "./sales-page/shared";
@@ -33,16 +32,18 @@ import type { ChartPoint } from "./sales-page/shared";
 import { PAGE_BG } from "./ui/tokens";
 
 export default function SalesPage({
-  onNavigate,
   navigationSearch,
 }: {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, hash?: string | null) => void;
   navigationSearch?: string;
 }) {
+  const { approvedUser } = useAuth();
+  const canManagePayments = approvedUser?.role === "sales_director";
   const {
     payments,
     fetchPayments,
     createPayment,
+    updatePayment,
     deletePayment,
     registerPaymentReceipt,
     loading: paymentsLoading,
@@ -59,18 +60,8 @@ export default function SalesPage({
   const [activePaymentUnit, setActivePaymentUnit] = useState<Unit | null>(null);
   const [highlightedUnitId, setHighlightedUnitId] = useState<string | null>(null);
   const [paymentsSectionPulse, setPaymentsSectionPulse] = useState(false);
-  const [nowTs, setNowTs] = useState(() => Date.now());
   const upcomingPaymentsSectionRef = useRef<HTMLDivElement | null>(null);
   const consumedFocusSearchRef = useRef<string | null>(null);
-
-  const {
-    stockCounts,
-    activeReservations,
-    loading: shellLoading,
-    error: shellError,
-  } = useUnitsShell({
-    stockCategory: ownerScope,
-  });
 
   const {
     rows: upcomingPayments,
@@ -78,16 +69,6 @@ export default function SalesPage({
     error: upcomingPaymentsError,
     refresh: refreshUpcomingPayments,
   } = useSalesUpcomingPayments(ownerScope);
-
-  useEffect(() => {
-    const tickId = window.setInterval(() => {
-      setNowTs(Date.now());
-    }, 60_000);
-
-    return () => {
-      window.clearInterval(tickId);
-    };
-  }, []);
 
   const {
     metrics: financialMetrics,
@@ -143,13 +124,8 @@ export default function SalesPage({
     [monthlySeries],
   );
 
-  const periodContextLabel =
-    selectedMonth === "all" ? "gjatë vitit të zgjedhur" : "gjatë muajit të zgjedhur";
-  const periodChipLabel =
-    selectedMonth === "all" ? `${selectedYear}` : `${SQ_MONTHS[selectedMonth]} ${selectedYear}`;
   const financialSummaryReady =
     !financialMetricsLoading && financialMetrics !== null && !financialMetricsError;
-  const stockSnapshotReady = !shellLoading && !shellError;
   const financialMetricsValue = financialMetrics ?? {
     ownerScope,
     periodYear: selectedYear,
@@ -201,28 +177,6 @@ export default function SalesPage({
       financialMetricsValue.soldUnits,
     ],
   );
-
-  const reservationSummary = useMemo(() => {
-    if (shellLoading || shellError) return null;
-
-    const scopedActiveReservations = activeReservations.filter(
-      (unit) => unit.owner_category === ownerScope && unit.reservation_expires_at,
-    );
-
-    if (scopedActiveReservations.length === 0) return null;
-
-    const expiringThisWeek = scopedActiveReservations.filter((unit) => {
-      const days = Math.ceil(
-        (new Date(unit.reservation_expires_at!).getTime() - nowTs) / 86400000,
-      );
-      return days >= 0 && days <= 7;
-    });
-
-    return {
-      activeCount: scopedActiveReservations.length,
-      expiringThisWeekCount: expiringThisWeek.length,
-    };
-  }, [activeReservations, nowTs, ownerScope, shellError, shellLoading]);
 
   const handleOpenPaymentPlan = useCallback(
     async (unit: Unit) => {
@@ -324,6 +278,10 @@ export default function SalesPage({
     due_date: string;
     notes?: string | null;
   }) => {
+    if (!canManagePayments) {
+      throw new Error("Vetëm Sales Director mund të ndryshojë planin e pagesave.");
+    }
+
     const result = await createPayment(data);
     if (result.error) {
       throw new Error(result.error);
@@ -333,12 +291,47 @@ export default function SalesPage({
 
   const handleRegisterPayment = async (
     payment: Payment,
-    data: { amount: number; paidDate: string; notes?: string | null },
+    data: {
+      amount: number;
+      paidDate: string;
+      notes?: string | null;
+      remainderDueDate?: string | null;
+    },
   ) => {
+    if (!canManagePayments) {
+      throw new Error("Vetëm Sales Director mund të regjistrojë pagesa.");
+    }
+
     const result = await registerPaymentReceipt({
       payment_id: payment.id,
       amount: data.amount,
       paid_date: data.paidDate,
+      notes: data.notes ?? null,
+      remainder_due_date: data.remainderDueDate ?? null,
+    });
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    await refreshPayments(payment.unit_id);
+  };
+
+  const handleUpdatePayment = async (
+    payment: Payment,
+    data: {
+      dueDate: string;
+      notes?: string | null;
+    },
+  ) => {
+    if (!canManagePayments) {
+      throw new Error("Vetëm Sales Director mund të ndryshojë planin e pagesave.");
+    }
+
+    if (payment.status === "E paguar" || payment.paid_amount > 0) {
+      throw new Error("Këstet me pagesa të regjistruara nuk mund të ndryshohen këtu.");
+    }
+
+    const result = await updatePayment(payment.id, {
+      due_date: data.dueDate,
       notes: data.notes ?? null,
     });
     if (result.error) {
@@ -348,6 +341,10 @@ export default function SalesPage({
   };
 
   const handleDeletePayment = async (paymentId: string) => {
+    if (!canManagePayments) {
+      throw new Error("Vetëm Sales Director mund të fshijë këste.");
+    }
+
     const target = payments.find((payment) => payment.id === paymentId);
     const result = await deletePayment(paymentId);
     if (result.error) {
@@ -368,36 +365,32 @@ export default function SalesPage({
             unit={activePaymentUnit}
             payments={payments}
             loading={paymentsLoading}
+            canManagePayments={canManagePayments}
             onClose={() => setActivePaymentUnit(null)}
             onCreatePayment={handleCreatePayment}
             onRegisterPayment={handleRegisterPayment}
+            onUpdatePayment={handleUpdatePayment}
             onDeletePayment={handleDeletePayment}
           />
         )}
       </AnimatePresence>
 
       <div className="mx-auto max-w-[1280px] px-10 pb-9 pt-6">
-        <SalesHeader
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onMonthChange={setSelectedMonth}
-          onYearChange={setSelectedYear}
-        />
+        <SalesHeader />
 
         <SalesSummary
           financialSummaryReady={financialSummaryReady}
           financialMetricsLoading={financialMetricsLoading}
           financialMetricsError={financialMetricsError}
-          contractedValue={financialMetricsValue.contractedValue}
-          soldUnits={financialMetricsValue.soldUnits}
-          periodContextLabel={periodContextLabel}
-          periodChipLabel={periodChipLabel}
-          totalUnits={stockCounts.total}
-          availableUnits={stockCounts.available}
-          stockSnapshotReady={stockSnapshotReady}
           kpis={kpis}
-          reservationSummary={reservationSummary}
-          onNavigate={onNavigate}
+          periodControls={
+            <SalesPeriodControls
+              selectedMonth={selectedMonth}
+              selectedYear={selectedYear}
+              onMonthChange={setSelectedMonth}
+              onYearChange={setSelectedYear}
+            />
+          }
         />
 
         <SalesRevenueChart

@@ -135,6 +135,13 @@ export type EditModalSavePayload =
       sale: CompleteUnitSaleInput;
     };
 
+export type ManualUnitReservationPayload = {
+  contactName: string;
+  contactPhone: string;
+  expiresAt: string;
+  notes: string | null;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function todayIso() {
@@ -189,7 +196,6 @@ export function emptyDraft(
     bathrooms: undefined,
     toilets: undefined,
     orientation: undefined,
-    floorplan_code: undefined,
     has_storage: false,
     balcony_area: undefined,
     terrace_area: undefined,
@@ -200,14 +206,18 @@ export function emptyDraft(
  *  "Ruaj N njësi" counter label. Room metadata is optional and secondary;
  *  only the core operational fields are required to save a draft unit. */
 export function isDraftValid(d: DraftUnit): boolean {
+  const hasValidSize = typeof d.size === "number" && Number.isFinite(d.size) && d.size > 0;
+  const hasValidPrice =
+    typeof d.price === "number" && Number.isFinite(d.price) && d.price > 0;
+
   if (
     !(
       d.unit_id &&
       d.block &&
       d.type &&
       d.level &&
-      d.size &&
-      d.price &&
+      hasValidSize &&
+      hasValidPrice &&
       d.owner_name &&
       d.status
     )

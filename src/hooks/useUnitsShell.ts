@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { unitsShell as unitsShellApi } from "../lib/api";
 import type {
   ActiveReservationShellRow,
+  OwnerEntityCountsByCategory,
+  StockTypeCounts,
   UnitsShellFilters,
 } from "../lib/api/unitsShell";
 import type { Block, Level, OwnerCategory, Unit, UnitStatus } from "./useUnits";
@@ -11,6 +13,7 @@ interface UnitsShellState {
   availableUnitsCount: number;
   activeReservationsCount: number;
   ownerOptionsByCategory: Record<OwnerCategory, string[]>;
+  ownerEntityCountsByCategory: OwnerEntityCountsByCategory;
   ownershipCounts: Record<OwnerCategory, number>;
   stockCounts: {
     total: number;
@@ -18,6 +21,7 @@ interface UnitsShellState {
     reserved: number;
     sold: number;
   };
+  stockTypeCounts: StockTypeCounts;
   activeReservations: Unit[];
 }
 
@@ -30,6 +34,11 @@ const EMPTY_STATE: UnitsShellState = {
     "Pronarët e tokës": [],
     "Kompani ndërtimore": [],
   },
+  ownerEntityCountsByCategory: {
+    Investitor: {},
+    "Pronarët e tokës": {},
+    "Kompani ndërtimore": {},
+  },
   ownershipCounts: {
     Investitor: 0,
     "Pronarët e tokës": 0,
@@ -40,6 +49,12 @@ const EMPTY_STATE: UnitsShellState = {
     available: 0,
     reserved: 0,
     sold: 0,
+  },
+  stockTypeCounts: {
+    Banesë: 0,
+    Lokal: 0,
+    Garazhë: 0,
+    Penthouse: 0,
   },
   activeReservations: [],
 };
@@ -96,8 +111,10 @@ export function useUnitsShell(filters: UnitsShellFilters) {
       availableUnitsCount: result.data.availableUnitsCount,
       activeReservationsCount: result.data.activeReservationsCount,
       ownerOptionsByCategory: result.data.ownerOptionsByCategory,
+      ownerEntityCountsByCategory: result.data.ownerEntityCountsByCategory,
       ownershipCounts: result.data.ownershipCounts,
       stockCounts: result.data.stockCounts,
+      stockTypeCounts: result.data.stockTypeCounts,
       activeReservations: result.data.activeReservations.map(mapActiveReservationRowToUnit),
     });
     setLoading(false);
@@ -141,6 +158,10 @@ function mapActiveReservationRowToUnit(row: ActiveReservationShellRow): Unit {
     has_active_reservation: Boolean(row.active_reservation_id),
     active_reservation_id: row.active_reservation_id,
     active_reservation_showing_id: row.active_reservation_showing_id,
+    active_reservation_contact_name: null,
+    active_reservation_contact_phone: null,
+    active_reservation_reserved_at: null,
+    active_reservation_notes: null,
     notes: null,
     created_at: row.created_at ?? "",
     updated_at: row.updated_at ?? "",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Archive, CheckCircle2, Plus, RotateCcw, Trash2, XCircle } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, Plus, RotateCcw, Trash2, XCircle } from "lucide-react";
 import type { CRMShowing, ShowingStatus } from "../hooks/useCRM";
 import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import { Card } from "./primitives";
@@ -17,7 +17,13 @@ export type {
   ShowingSaveResult,
 } from "./showings/shared";
 
-type ReservationActivityFilter = "all" | "active" | "closed" | "archive";
+type ShowingPipelineFilter =
+  | "all"
+  | "planned"
+  | "completed"
+  | "reserved"
+  | "sold"
+  | "archive";
 
 export function ShowingsSection({
   showings,
@@ -40,9 +46,8 @@ export function ShowingsSection({
   onExtendReservation?: (showing: CRMShowing) => void;
   onReleaseReservation?: (showing: CRMShowing) => void;
 }) {
-  const [reservationFilter, setReservationFilter] =
-    useState<ReservationActivityFilter>("all");
-  const now = new Date();
+  const [showingFilter, setShowingFilter] =
+    useState<ShowingPipelineFilter>("all");
   const activeShowings = showings.filter((showing) => !showing.archived_at);
   const archivedShowings = showings
     .filter((showing) => showing.archived_at)
@@ -51,64 +56,45 @@ export function ShowingsSection({
       const bArchived = b.archived_at ? new Date(b.archived_at).getTime() : 0;
       return bArchived - aArchived;
     });
-  const isArchiveView = reservationFilter === "archive";
-  const activeReservationCount = activeShowings.filter((showing) => showing.active_reservation).length;
-  const expiringSoonCount = activeShowings.filter((showing) => {
-    const expiresAt = showing.active_reservation?.expires_at;
-    if (!expiresAt) return false;
-    const daysUntilExpiry = Math.ceil(
-      (new Date(expiresAt).getTime() - now.getTime()) / 86400000,
-    );
-    return daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
-  }).length;
-  const closedReservationCount = activeShowings.filter(
-    (showing) =>
-      showing.latest_reservation &&
-      showing.latest_reservation.status !== "Aktive",
+  const isArchiveView = showingFilter === "archive";
+  const plannedCount = activeShowings.filter(
+    (showing) => showing.status === "E planifikuar",
   ).length;
-  const recentlyClosedCount = activeShowings.filter((showing) => {
-    const reservation = showing.latest_reservation;
-    if (!reservation || reservation.status === "Aktive") return false;
-    const daysSinceUpdate = Math.floor(
-      (now.getTime() - new Date(reservation.updated_at).getTime()) / 86400000,
-    );
-    return daysSinceUpdate >= 0 && daysSinceUpdate <= 14;
-  }).length;
-  const reservationScopedShowings =
-    reservationFilter === "archive"
+  const reservedCount = activeShowings.filter(isReservedShowing).length;
+  const soldCount = activeShowings.filter(isSoldShowing).length;
+  const completedCount = activeShowings.filter(isCompletedShowing).length;
+  const showingScopedShowings =
+    showingFilter === "archive"
       ? archivedShowings
-      : reservationFilter === "active"
-        ? activeShowings.filter((showing) => showing.active_reservation)
-        : reservationFilter === "closed"
+      : showingFilter === "planned"
         ? activeShowings.filter(
-            (showing) =>
-              showing.latest_reservation &&
-              showing.latest_reservation.status !== "Aktive",
+            (showing) => showing.status === "E planifikuar",
           )
+      : showingFilter === "completed"
+        ? activeShowings.filter(isCompletedShowing)
+      : showingFilter === "reserved"
+        ? activeShowings.filter(isReservedShowing)
+      : showingFilter === "sold"
+        ? activeShowings.filter(isSoldShowing)
         : activeShowings;
-  const upcoming = isArchiveView ? [] : reservationScopedShowings
-    .filter(
-      (showing) =>
-        showing.status === "E planifikuar" &&
-        new Date(showing.scheduled_at) >= now,
-    )
-    .sort((a, b) => compareShowingsForReservationView(a, b, reservationFilter));
-  const past = isArchiveView ? archivedShowings : reservationScopedShowings
-    .filter(
-      (showing) =>
-        isArchiveView ||
-        showing.status !== "E planifikuar" ||
-        new Date(showing.scheduled_at) < now,
-    )
-    .sort((a, b) => compareShowingsForReservationView(a, b, reservationFilter));
-  const reservationFilterMeta = getReservationFilterMeta(reservationFilter);
+  const visibleShowings = isArchiveView
+    ? archivedShowings
+    : [...showingScopedShowings].sort((a, b) =>
+        compareShowingsForPipelineView(a, b, showingFilter),
+      );
+  const showingFilterMeta = getShowingFilterMeta(showingFilter);
+  const showingListEmptyMeta = getShowingListEmptyMeta(showingFilter);
 
   function ShowingRow({ showing }: { showing: CRMShowing }) {
     const [actionError, setActionError] = useState("");
-    const statusStyle = SHOWING_STYLE[showing.status];
+    const [isReservationOpen, setIsReservationOpen] = useState(false);
+    const statusMeta = getShowingPipelineMeta(showing);
     const reservationMeta = showing.latest_reservation ?? showing.active_reservation ?? null;
     const isActiveReservation = reservationMeta?.status === "Aktive";
     const isArchived = Boolean(showing.archived_at);
+    const isSold = isSoldShowing(showing);
+    const isReserved = !isSold && isReservedShowing(showing);
+    const canToggleReservation = Boolean(reservationMeta);
     const hasLinkedHistory = Boolean(reservationMeta || showing.outcome === "Bleu");
     const canArchive =
       !isArchived &&
@@ -123,103 +109,155 @@ export function ShowingsSection({
       if (result.error) setActionError(result.error);
     };
 
+    const toggleReservationDetails = () => {
+      if (!canToggleReservation) return;
+      setIsReservationOpen((open) => !open);
+    };
+
     return (
       <div className="flex items-start justify-between gap-3 border-b border-[#f0f0f2] px-4 py-3.5 last:border-0">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-semibold text-black/80">{showing.lead_name}</span>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={showing.status}
-                initial={{ opacity: 0.74, scale: 0.985, y: 1 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0.74, scale: 0.99, y: -1 }}
-                transition={{ duration: 0.18, ease: SOFT_EASE }}
-                className="rounded-full border border-white/70 px-2.5 py-0.5 text-[10.5px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
-                style={{ background: statusStyle.bg, color: statusStyle.color }}
-              >
-                {showing.status}
-              </motion.span>
-            </AnimatePresence>
-            {reservationMeta && isActiveReservation && (
-              <span className="rounded-full border border-[#eadfbd] bg-[#fff8e8] px-2.5 py-0.5 text-[10.5px] font-semibold text-[#b0892f] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-                Rezervim aktiv
-              </span>
-            )}
+          <div
+            role={canToggleReservation ? "button" : undefined}
+            tabIndex={canToggleReservation ? 0 : undefined}
+            onClick={toggleReservationDetails}
+            onKeyDown={(event) => {
+              if (!canToggleReservation) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleReservationDetails();
+              }
+            }}
+            className={
+              canToggleReservation
+                ? "cursor-pointer rounded-[12px] outline-none transition hover:bg-black/[0.015] focus-visible:ring-2 focus-visible:ring-[#dbe5f8]"
+                : ""
+            }
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] font-semibold text-black/80">{showing.lead_name}</span>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={showing.status}
+                  initial={{ opacity: 0.74, scale: 0.985, y: 1 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0.74, scale: 0.99, y: -1 }}
+                  transition={{ duration: 0.18, ease: SOFT_EASE }}
+                  className="rounded-full border border-white/70 px-2.5 py-0.5 text-[10.5px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                  style={{ background: statusMeta.bg, color: statusMeta.color }}
+                >
+                  {statusMeta.label}
+                </motion.span>
+              </AnimatePresence>
+              {isReserved && (
+                <span className="rounded-full border border-[#eadfbd] bg-[#fff8e8] px-2.5 py-0.5 text-[10.5px] font-semibold text-[#b0892f] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+                  E rezervuar
+                </span>
+              )}
+              {isSold && (
+                <span className="rounded-full border border-[#d6e8dc] bg-[#edf7f1] px-2.5 py-0.5 text-[10.5px] font-semibold text-[#3c7a57] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+                  E shitur
+                </span>
+              )}
+              {isArchived && (
+                <span className="rounded-full border border-[#dbe5f8] bg-[#f4f7fd] px-2.5 py-0.5 text-[10.5px] font-semibold text-[#003883] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+                  Arkivuar
+                </span>
+              )}
+              {reservationMeta && (
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#e8ebf1] bg-white text-black/36 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                >
+                  <motion.span
+                    animate={{ rotate: isReservationOpen ? 180 : 0 }}
+                    transition={{ duration: 0.18, ease: SOFT_EASE }}
+                    className="flex"
+                  >
+                    <ChevronDown size={12} strokeWidth={2.2} />
+                  </motion.span>
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[11.5px] text-black/45">
+              {showing.unit_id} · {fmtDateTime(showing.scheduled_at)}
+            </p>
+            {showing.notes && <p className="mt-0.5 text-[11.5px] text-black/35">{showing.notes}</p>}
             {isArchived && (
-              <span className="rounded-full border border-[#dbe5f8] bg-[#f4f7fd] px-2.5 py-0.5 text-[10.5px] font-semibold text-[#003883] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-                Arkivuar
-              </span>
+              <p className="mt-1 text-[11.5px] text-black/35">
+                Arkivuar më {fmtDate(showing.archived_at!)}
+                {showing.archive_reason ? ` · ${showing.archive_reason}` : ""}
+              </p>
             )}
           </div>
-          <p className="mt-0.5 text-[11.5px] text-black/45">
-            {showing.unit_id} · {fmtDateTime(showing.scheduled_at)}
-          </p>
-          {showing.notes && <p className="mt-0.5 text-[11.5px] text-black/35">{showing.notes}</p>}
-          {isArchived && (
-            <p className="mt-1 text-[11.5px] text-black/35">
-              Arkivuar më {fmtDate(showing.archived_at!)}
-              {showing.archive_reason ? ` · ${showing.archive_reason}` : ""}
-            </p>
-          )}
           {actionError && (
             <p className="mt-2 rounded-[10px] border border-red-100 bg-red-50 px-2.5 py-1.5 text-[11.5px] text-red-600">
               {actionError}
             </p>
           )}
-          {reservationMeta && (
-            <div
-              className="mt-2.5 rounded-[14px] border px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
-              style={{
-                borderColor: reservationTone.border,
-                background: reservationTone.bg,
-              }}
-            >
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span
-                  className="rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+          <AnimatePresence initial={false}>
+            {reservationMeta && isReservationOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0, y: -4 }}
+                animate={{ height: "auto", opacity: 1, y: 0 }}
+                exit={{ height: 0, opacity: 0, y: -4 }}
+                transition={{ duration: 0.2, ease: SOFT_EASE }}
+                className="overflow-hidden"
+              >
+                <div
+                  className="mt-2.5 rounded-[14px] border px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
                   style={{
-                    borderColor: reservationTone.badgeBorder,
-                    background: reservationTone.badgeBg,
-                    color: reservationTone.badgeText,
+                    borderColor: reservationTone.border,
+                    background: reservationTone.bg,
                   }}
                 >
-                  {reservationTone.label}
-                </span>
-                <span className="text-[11.5px] text-black/38">
-                  Përditësuar më {fmtDate(reservationMeta.updated_at)}
-                </span>
-              </div>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    Rezervuar më
-                  </p>
-                  <p className="mt-1 text-[12.5px] font-medium text-black/68">
-                    {fmtDate(reservationMeta.reserved_at)}
-                  </p>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className="rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                      style={{
+                        borderColor: reservationTone.badgeBorder,
+                        background: reservationTone.badgeBg,
+                        color: reservationTone.badgeText,
+                      }}
+                    >
+                      {reservationTone.label}
+                    </span>
+                    <span className="text-[11.5px] text-black/38">
+                      Përditësuar më {fmtDate(reservationMeta.updated_at)}
+                    </span>
+                  </div>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                        Rezervuar më
+                      </p>
+                      <p className="mt-1 text-[12.5px] font-medium text-black/68">
+                        {fmtDate(reservationMeta.reserved_at)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                        {reservationTone.secondaryLabel}
+                      </p>
+                      <p className="mt-1 text-[12.5px] font-medium text-black/68">
+                        {getReservationSecondaryValue(reservationMeta)}
+                      </p>
+                    </div>
+                  </div>
+                  {reservationMeta.notes && (
+                    <div className="mt-2.5 border-t border-black/[0.06] pt-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                        {isActiveReservation ? "Shënimi i rezervimit" : "Shënimi i fundit"}
+                      </p>
+                      <p className="mt-1 text-[11.5px] leading-5 text-black/44">
+                        {reservationMeta.notes}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    {reservationTone.secondaryLabel}
-                  </p>
-                  <p className="mt-1 text-[12.5px] font-medium text-black/68">
-                    {getReservationSecondaryValue(reservationMeta)}
-                  </p>
-                </div>
-              </div>
-              {reservationMeta.notes && (
-                <div className="mt-2.5 border-t border-black/[0.06] pt-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    {isActiveReservation ? "Shënimi i rezervimit" : "Shënimi i fundit"}
-                  </p>
-                  <p className="mt-1 text-[11.5px] leading-5 text-black/44">
-                    {reservationMeta.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         <div className="flex shrink-0 items-start gap-1.5 pt-0.5">
           {isArchived ? (
@@ -297,15 +335,11 @@ export function ShowingsSection({
   }
 
   return (
-    <div>
+    <Card className="overflow-hidden p-0">
       <CardSectionHeader
         title="Shfaqjet"
-        subtitle={
-          activeReservationCount > 0
-            ? `${activeShowings.length} aktive · ${activeReservationCount} me rezervim aktiv`
-            : `${activeShowings.length} aktive`
-        }
-        className="mb-5 border-b-0 px-0 py-0"
+        subtitle={`${activeShowings.length} shfaqje · ${plannedCount} të planifikuara`}
+        className="px-5 py-4"
         right={
           <button
             onClick={onAdd}
@@ -318,161 +352,162 @@ export function ShowingsSection({
         }
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-3">
-        <ReservationSummaryCard
-          label="Rezervime aktive"
-          value={activeReservationCount}
-          detail="me afat të hapur tani"
-          tone="active"
-        />
-        <ReservationSummaryCard
-          label="Skadojnë shpejt"
-          value={expiringSoonCount}
-          detail="brenda 7 ditëve"
-          tone="urgent"
-        />
-        <ReservationSummaryCard
-          label="Të mbyllura së fundmi"
-          value={recentlyClosedCount}
-          detail={`${closedReservationCount} gjithsej të mbyllura`}
-          tone="neutral"
-        />
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#edf0f4] bg-[#fcfcfd] px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-            Filtri i rezervimeve
-          </p>
-          <p className="mt-1 text-[12px] text-black/42">
-            {reservationFilterMeta.description}
-          </p>
+      <div className="space-y-4 px-5 py-5">
+        <div className="grid gap-2.5 md:grid-cols-4">
+          <ShowingPipelineSummaryCard
+            label="Të planifikuara"
+            value={plannedCount}
+            tone="planned"
+          />
+          <ShowingPipelineSummaryCard
+            label="Të kryera"
+            value={completedCount}
+            tone="completed"
+          />
+          <ShowingPipelineSummaryCard
+            label="Të rezervuara"
+            value={reservedCount}
+            tone="reserved"
+          />
+          <ShowingPipelineSummaryCard
+            label="Të shitura"
+            value={soldCount}
+            tone="sold"
+          />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            {
-              key: "all" as const,
-              label: "Të gjitha",
-              count: activeShowings.length,
-            },
-            {
-              key: "active" as const,
-              label: "Aktive",
-              count: activeReservationCount,
-            },
-            {
-              key: "closed" as const,
-              label: "Të mbyllura",
-              count: closedReservationCount,
-            },
-            {
-              key: "archive" as const,
-              label: "Arkivi",
-              count: archivedShowings.length,
-            },
-          ].map((option) => {
-            const isActive = reservationFilter === option.key;
-            return (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setReservationFilter(option.key)}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition ${
-                  isActive
-                    ? "border-[#dbe5f8] bg-[#f4f7fd] text-[#003883]"
-                    : "border-[#e8ebf1] bg-white text-black/46 hover:border-[#dbe5f8] hover:text-[#003883]"
-                }`}
-              >
-                <span>{option.label}</span>
-                <span
-                  className={`rounded-full px-1.5 py-[1px] text-[10px] font-semibold ${
-                    isActive ? "bg-white text-[#003883]" : "bg-[#f5f7fb] text-black/38"
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#edf0f4] bg-[#fcfcfd] px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+              Filtri i shfaqjeve
+            </p>
+            <p className="mt-1 text-[12px] text-black/42">
+              {showingFilterMeta.description}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              {
+                key: "all" as const,
+                label: "Të gjitha",
+                count: activeShowings.length,
+              },
+              {
+                key: "planned" as const,
+                label: "Të planifikuara",
+                count: plannedCount,
+              },
+              {
+                key: "completed" as const,
+                label: "Të kryera",
+                count: completedCount,
+              },
+              {
+                key: "reserved" as const,
+                label: "Të rezervuara",
+                count: reservedCount,
+              },
+              {
+                key: "sold" as const,
+                label: "Të shitura",
+                count: soldCount,
+              },
+              {
+                key: "archive" as const,
+                label: "Arkivi",
+                count: archivedShowings.length,
+              },
+            ].map((option) => {
+              const isActive = showingFilter === option.key;
+              return (
+                <motion.button
+                  key={option.key}
+                  layout
+                  type="button"
+                  onClick={() => setShowingFilter(option.key)}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.18, ease: SOFT_EASE }}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition ${
+                    isActive
+                      ? "border-[#dbe5f8] bg-[#f4f7fd] text-[#003883]"
+                      : "border-[#e8ebf1] bg-white text-black/46 hover:border-[#dbe5f8] hover:text-[#003883]"
                   }`}
                 >
-                  {option.count}
-                </span>
-              </button>
-            );
-          })}
+                  <span>{option.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-[1px] text-[10px] font-semibold ${
+                      isActive ? "bg-white text-[#003883]" : "bg-[#f5f7fb] text-black/38"
+                    }`}
+                  >
+                    {option.count}
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {isArchiveView ? (
-        <Card className="overflow-hidden p-0">
-          <CardSectionHeader
-            title="Arkivi"
-            subtitle={`${archivedShowings.length} shfaqje`}
-            className="px-4 py-3"
-          />
-          {archivedShowings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-              <p className="text-[12.5px] font-medium text-black/42">
-                Nuk ka shfaqje të arkivuara
-              </p>
-              <p className="mt-1 text-[11.5px] text-black/30">
-                Shfaqjet e arkivuara ruhen këtu pa humbur lidhjet historike.
-              </p>
-            </div>
-          ) : (
-            <div className="flex h-[360px] min-h-[360px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
-              {archivedShowings.map((showing) => (
-                <ShowingRow key={showing.id} showing={showing} />
-              ))}
-            </div>
-          )}
-        </Card>
-      ) : (
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="overflow-hidden p-0">
-          <CardSectionHeader
-            title="Të planifikuara"
-            subtitle={`${upcoming.length} shfaqje`}
-            className="px-4 py-3"
-          />
-          {upcoming.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-              <p className="text-[12.5px] font-medium text-black/42">
-                Nuk ka shfaqje të planifikuara për momentin
-              </p>
-              <p className="mt-1 text-[11.5px] text-black/30">
-                Shfaqjet e reja do të renditen këtu sapo të planifikohen.
-              </p>
-            </div>
-          ) : (
-            <div className="flex h-[320px] min-h-[320px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
-              {upcoming.map((showing) => (
-                <ShowingRow key={showing.id} showing={showing} />
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card className="overflow-hidden p-0">
-          <CardSectionHeader
-            title="Të kryera dhe të anuluara"
-            subtitle={`${past.length} shfaqje`}
-            className="px-4 py-3"
-          />
-          {past.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-              <p className="text-[12.5px] font-medium text-black/42">
-                Ende nuk ka shfaqje të mbyllura
-              </p>
-              <p className="mt-1 text-[11.5px] text-black/30">
-                Shfaqjet e kryera dhe të anuluara ruhen këtu.
-              </p>
-            </div>
-          ) : (
-            <div className="flex h-[320px] min-h-[320px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
-              {past.map((showing) => (
-                <ShowingRow key={showing.id} showing={showing} />
-              ))}
-            </div>
-          )}
-        </Card>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={showingFilter}
+            initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -4, filter: "blur(2px)" }}
+            transition={{ duration: 0.18, ease: SOFT_EASE }}
+          >
+            {isArchiveView ? (
+              <Card className="overflow-hidden p-0">
+                <CardSectionHeader
+                  title="Arkivi"
+                  subtitle={`${archivedShowings.length} shfaqje`}
+                  className="px-4 py-3"
+                />
+                {archivedShowings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+                    <p className="text-[12.5px] font-medium text-black/42">
+                      Nuk ka shfaqje të arkivuara
+                    </p>
+                    <p className="mt-1 text-[11.5px] text-black/30">
+                      Shfaqjet e arkivuara ruhen këtu pa humbur lidhjet historike.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex h-[360px] min-h-[360px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
+                    {archivedShowings.map((showing) => (
+                      <ShowingRow key={showing.id} showing={showing} />
+                    ))}
+                  </div>
+                )}
+              </Card>
+            ) : (
+              <Card className="overflow-hidden p-0">
+                <CardSectionHeader
+                  title="Lista e shfaqjeve"
+                  subtitle={`${visibleShowings.length} shfaqje`}
+                  className="px-4 py-3"
+                />
+                {visibleShowings.length === 0 ? (
+                  <div className="flex min-h-[240px] flex-col items-center justify-center px-6 py-10 text-center">
+                    <p className="text-[12.5px] font-medium text-black/42">
+                      {showingListEmptyMeta.title}
+                    </p>
+                    <p className="mt-1 text-[11.5px] text-black/30">
+                      {showingListEmptyMeta.description}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex h-[360px] min-h-[360px] flex-col overflow-y-auto overscroll-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
+                    {visibleShowings.map((showing) => (
+                      <ShowingRow key={showing.id} showing={showing} />
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
-      )}
-    </div>
+    </Card>
   );
 }
 
@@ -542,45 +577,62 @@ function getReservationSecondaryValue(reservation: NonNullable<CRMShowing["lates
   return fmtDate(reservation.updated_at);
 }
 
-function ReservationSummaryCard({
+function ShowingPipelineSummaryCard({
   label,
   value,
-  detail,
   tone,
 }: {
   label: string;
   value: number;
-  detail: string;
-  tone: "active" | "urgent" | "neutral";
+  tone: "planned" | "completed" | "reserved" | "sold";
 }) {
-  const toneStyle =
-    tone === "active"
-      ? {
-          border: "#efe6c8",
-          background: "#fffdf8",
-          value: "#b0892f",
-        }
-      : tone === "urgent"
-        ? {
-            border: "#f1dddd",
-            background: "#fffafa",
-            value: "#b14b4b",
-          }
-        : {
-            border: "#e7ebf2",
-            background: "#fbfcfe",
-            value: NAVY,
-          };
+  const toneStyle = (() => {
+    if (tone === "planned") {
+      return {
+        border: "#dbe5f8",
+        background: "#f4f7fd",
+        value: NAVY,
+      };
+    }
+    if (tone === "completed") {
+      return {
+        border: "#e7ebf2",
+        background: "#fbfcfe",
+        value: "rgba(0,0,0,0.56)",
+      };
+    }
+    if (tone === "reserved") {
+      return {
+        border: "#efe6c8",
+        background: "#fffdf8",
+        value: "#b0892f",
+      };
+    }
+    if (tone === "sold") {
+      return {
+        border: "#d6e8dc",
+        background: "#f7fbf8",
+        value: "#2f6b4f",
+      };
+    }
+    return {
+      border: "#e7ebf2",
+      background: "#fbfcfe",
+      value: NAVY,
+    };
+  })();
 
   return (
-    <div
-      className="rounded-[16px] border px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
+    <motion.div
+      whileHover={{ y: -2, boxShadow: "0 10px 22px rgba(16,24,40,0.06)" }}
+      transition={{ duration: 0.18, ease: SOFT_EASE }}
+      className="rounded-[14px] border px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
       style={{
         borderColor: toneStyle.border,
         background: toneStyle.background,
       }}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+      <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-black/28">
         {label}
       </p>
       <p
@@ -589,17 +641,46 @@ function ReservationSummaryCard({
       >
         {value}
       </p>
-      <p className="mt-1.5 text-[11.5px] text-black/38">{detail}</p>
-    </div>
+    </motion.div>
   );
 }
 
-function compareShowingsForReservationView(
+function isReservedShowing(showing: CRMShowing) {
+  return (
+    !isSoldShowing(showing) &&
+    (showing.outcome === "Rezervoi" || Boolean(showing.active_reservation))
+  );
+}
+
+function isSoldShowing(showing: CRMShowing) {
+  return showing.outcome === "Bleu";
+}
+
+function isCompletedShowing(showing: CRMShowing) {
+  return (
+    showing.status === "E kryer" &&
+    !isReservedShowing(showing) &&
+    !isSoldShowing(showing)
+  );
+}
+
+function getShowingPipelineMeta(showing: CRMShowing) {
+  return {
+    label: showing.status,
+    ...SHOWING_STYLE[showing.status],
+  };
+}
+
+function compareShowingsForPipelineView(
   a: CRMShowing,
   b: CRMShowing,
-  filter: ReservationActivityFilter,
+  filter: ShowingPipelineFilter,
 ) {
-  if (filter === "active") {
+  if (filter === "planned") {
+    return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+  }
+
+  if (filter === "reserved") {
     const aExpiry = a.active_reservation?.expires_at
       ? new Date(a.active_reservation.expires_at).getTime()
       : Number.POSITIVE_INFINITY;
@@ -610,14 +691,7 @@ function compareShowingsForReservationView(
     return new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime();
   }
 
-  if (filter === "closed") {
-    const aUpdated = a.latest_reservation?.updated_at
-      ? new Date(a.latest_reservation.updated_at).getTime()
-      : 0;
-    const bUpdated = b.latest_reservation?.updated_at
-      ? new Date(b.latest_reservation.updated_at).getTime()
-      : 0;
-    if (aUpdated !== bUpdated) return bUpdated - aUpdated;
+  if (filter === "completed" || filter === "sold") {
     return new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime();
   }
 
@@ -628,17 +702,29 @@ function compareShowingsForReservationView(
   return new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime();
 }
 
-function getReservationFilterMeta(filter: ReservationActivityFilter) {
-  if (filter === "active") {
+function getShowingFilterMeta(filter: ShowingPipelineFilter) {
+  if (filter === "planned") {
     return {
       description:
-        "Po shfaqen vetëm shfaqjet me rezervim aktiv, të renditura sipas afatit të skadimit.",
+        "Po shfaqen vetëm vizitat e planifikuara, të renditura sipas datës së afërt.",
     };
   }
-  if (filter === "closed") {
+  if (filter === "completed") {
     return {
       description:
-        "Po shfaqen vetëm shfaqjet me rezervim të mbyllur, të renditura sipas përditësimit më të fundit.",
+        "Po shfaqen vetëm vizitat e kryera pa rezultat rezervimi ose shitjeje.",
+    };
+  }
+  if (filter === "reserved") {
+    return {
+      description:
+        "Po shfaqen shfaqjet që kanë krijuar rezervim dhe lidhen me afatet e njësive.",
+    };
+  }
+  if (filter === "sold") {
+    return {
+      description:
+        "Po shfaqen shfaqjet që janë konvertuar në shitje.",
     };
   }
   if (filter === "archive") {
@@ -649,6 +735,37 @@ function getReservationFilterMeta(filter: ReservationActivityFilter) {
   }
   return {
     description:
-      "Filtroni shfaqjet sipas aktivitetit të rezervimit për të kaluar më shpejt në rastet operative.",
+      "Filtroni shfaqjet sipas fazës: planifikuar, kryer, rezervuar ose shitur.",
+  };
+}
+
+function getShowingListEmptyMeta(filter: ShowingPipelineFilter) {
+  if (filter === "planned") {
+    return {
+      title: "Nuk ka shfaqje të planifikuara",
+      description: "Vizitat e planifikuara do të shfaqen këtu sapo të regjistrohen.",
+    };
+  }
+  if (filter === "completed") {
+    return {
+      title: "Nuk ka shfaqje të kryera",
+      description: "Vizitat e kryera pa rezervim ose shitje do të renditen këtu.",
+    };
+  }
+  if (filter === "reserved") {
+    return {
+      title: "Nuk ka shfaqje të rezervuara",
+      description: "Rezervimet e krijuara nga CRM do të shfaqen këtu dhe në afatet e njësive.",
+    };
+  }
+  if (filter === "sold") {
+    return {
+      title: "Nuk ka shfaqje të shitura",
+      description: "Shitjet e krijuara nga shfaqjet do të renditen këtu.",
+    };
+  }
+  return {
+    title: "Nuk ka shfaqje të regjistruara",
+    description: "Shfaqjet e reja do të renditen këtu sapo të planifikohen.",
   };
 }

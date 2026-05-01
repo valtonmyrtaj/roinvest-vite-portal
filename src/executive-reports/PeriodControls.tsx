@@ -1,39 +1,41 @@
 import { CustomSelect } from "../components/CustomSelect";
 import { MONTH_LABELS, YEAR_OPTIONS } from "./shared";
 
-/**
- * Two month+year dropdown pairs used by Executive Reports: one for the
- * "Pasqyra e investimit" period and one for the "Marketingu" period.
- * They share the same vocabulary (months, YEAR_OPTIONS) but differ in
- * pixel widths — preserved verbatim from the original layout.
- */
+const ALL_MONTHS_OPTION = "Të gjithë muajt";
 
-export function SummaryPeriodControls({
+function PeriodControls({
   selectedMonth,
   selectedYear,
   onMonthChange,
   onYearChange,
+  className = "",
 }: {
-  selectedMonth: number;
+  selectedMonth: number | null;
   selectedYear: number;
-  onMonthChange: (month: number) => void;
+  onMonthChange: (month: number | null) => void;
   onYearChange: (year: number) => void;
+  className?: string;
 }) {
   return (
-    <div className="executive-reports-print-hide flex items-center gap-2">
-      <div className="w-[136px]">
+    <div className={`executive-reports-print-hide flex flex-wrap items-center justify-end gap-2 ${className}`.trim()}>
+      <div className="w-[168px]">
         <CustomSelect
-          value={MONTH_LABELS[selectedMonth]}
+          value={selectedMonth === null ? ALL_MONTHS_OPTION : MONTH_LABELS[selectedMonth]}
           onChange={(value) => {
+            if (value === ALL_MONTHS_OPTION) {
+              onMonthChange(null);
+              return;
+            }
+
             const nextMonth = MONTH_LABELS.findIndex((label) => label === value);
             if (nextMonth >= 0) onMonthChange(nextMonth);
           }}
-          options={[...MONTH_LABELS]}
+          options={[ALL_MONTHS_OPTION, ...MONTH_LABELS]}
           placeholder="Muaji"
           size="sm"
         />
       </div>
-      <div className="w-[108px]">
+      <div className="w-[112px]">
         <CustomSelect
           value={String(selectedYear)}
           onChange={(value) => {
@@ -49,43 +51,44 @@ export function SummaryPeriodControls({
   );
 }
 
+export function SummaryPeriodControls({
+  selectedMonth,
+  selectedYear,
+  onMonthChange,
+  onYearChange,
+}: {
+  selectedMonth: number | null;
+  selectedYear: number;
+  onMonthChange: (month: number | null) => void;
+  onYearChange: (year: number) => void;
+}) {
+  return (
+    <PeriodControls
+      selectedMonth={selectedMonth}
+      selectedYear={selectedYear}
+      onMonthChange={onMonthChange}
+      onYearChange={onYearChange}
+    />
+  );
+}
+
 export function MarketingPeriodControls({
   selectedMonth,
   selectedYear,
   onMonthChange,
   onYearChange,
 }: {
-  selectedMonth: number;
+  selectedMonth: number | null;
   selectedYear: number;
-  onMonthChange: (month: number) => void;
+  onMonthChange: (month: number | null) => void;
   onYearChange: (year: number) => void;
 }) {
   return (
-    <div className="executive-reports-print-hide flex items-center gap-2">
-      <div className="w-[130px]">
-        <CustomSelect
-          value={MONTH_LABELS[selectedMonth]}
-          onChange={(value) => {
-            const nextMonth = MONTH_LABELS.findIndex((label) => label === value);
-            if (nextMonth >= 0) onMonthChange(nextMonth);
-          }}
-          options={[...MONTH_LABELS]}
-          placeholder="Muaji"
-          size="sm"
-        />
-      </div>
-      <div className="w-[88px]">
-        <CustomSelect
-          value={String(selectedYear)}
-          onChange={(value) => {
-            const nextYear = Number(value);
-            if (Number.isFinite(nextYear)) onYearChange(nextYear);
-          }}
-          options={[...YEAR_OPTIONS]}
-          placeholder="Viti"
-          size="sm"
-        />
-      </div>
-    </div>
+    <PeriodControls
+      selectedMonth={selectedMonth}
+      selectedYear={selectedYear}
+      onMonthChange={onMonthChange}
+      onYearChange={onYearChange}
+    />
   );
 }

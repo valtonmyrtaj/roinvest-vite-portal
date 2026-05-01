@@ -50,10 +50,11 @@ function getPageFromPath(pathname: string): PageKey | null {
   return entry ? (entry[0] as PageKey) : null;
 }
 
-function buildPageUrl(page: PageKey, focusUnitId?: string | null) {
+function buildPageUrl(page: PageKey, focusUnitId?: string | null, hash?: string | null) {
   const url = new URL(window.location.href);
   url.pathname = PAGE_PATHS[page];
   url.searchParams.delete("page");
+  url.hash = hash ? (hash.startsWith("#") ? hash : `#${hash}`) : "";
 
   if (page === "sales" && focusUnitId) {
     url.searchParams.set("focusUnitId", focusUnitId);
@@ -176,8 +177,8 @@ function ProtectedApp() {
     setLocationSearch(next.normalizedUrl?.search ?? next.search);
   }, []);
 
-  const handleNavigate = (page: PageKey) => {
-    const nextUrl = buildPageUrl(page);
+  const handleNavigate = (page: PageKey, hash?: string | null) => {
+    const nextUrl = buildPageUrl(page, null, hash);
     pushUrl(nextUrl);
     setCurrentPage(page);
     setLocationSearch(nextUrl.search);
@@ -211,6 +212,7 @@ function ProtectedApp() {
   // Covers sidebar clicks, programmatic navigation, and browser back/forward.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (window.location.hash) return;
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [currentPage]);
 
@@ -246,7 +248,7 @@ function ProtectedApp() {
             {currentPage === "overview" && <OverviewPage />}
             {currentPage === "sales" && (
               <SalesPage
-                onNavigate={(page) => handleNavigate(page as PageKey)}
+                onNavigate={(page, hash) => handleNavigate(page as PageKey, hash)}
                 navigationSearch={locationSearch}
               />
             )}

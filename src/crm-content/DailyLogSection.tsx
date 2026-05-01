@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ComponentType, type CSSProperties } from "react";
 import { Eye, Phone, TrendingUp, Users } from "lucide-react";
 import type { CreateDailyLogInput, DailyLogEntry } from "../hooks/useCRM";
-import { MONTH_LABELS, MONTH_SHORT_LABELS, YEAR_OPTIONS, fmtDate } from "./shared";
+import { MONTH_LABELS, TODAY_ISO, YEAR_OPTIONS, toDateOnly } from "./shared";
 import { DailyLogSummary } from "./daily-log/DailyLogSummary";
 import { DailyLogTable } from "./daily-log/DailyLogTable";
 
@@ -47,7 +47,7 @@ export function DailyLogSection({
   onDelete: (id: string) => Promise<{ error?: string }>;
 }) {
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
-  const [selectedMonth] = useState(() => new Date().getMonth());
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [summaryStarted, setSummaryStarted] = useState(false);
 
@@ -98,28 +98,14 @@ export function DailyLogSection({
       : filteredEntries[0].id;
   }, [filteredEntries, selectedEntryId]);
 
-  const selectedEntry = useMemo(() => {
-    if (filteredEntries.length === 0) return null;
-    return filteredEntries.find((entry) => entry.id === activeSelectedEntryId) ?? filteredEntries[0];
-  }, [activeSelectedEntryId, filteredEntries]);
-
-  const previousEntry = useMemo(() => {
-    if (!selectedEntry) return null;
-    const selectedIndex = allEntriesByDate.findIndex((entry) => entry.id === selectedEntry.id);
-    return selectedIndex >= 0 ? allEntriesByDate[selectedIndex + 1] ?? null : null;
-  }, [allEntriesByDate, selectedEntry]);
-
-  const selectedDayComparisonText = previousEntry ? fmtDate(previousEntry.date) : "ditës së mëparshme";
-
-  const selectedEntryLabel = useMemo(() => {
-    if (!selectedEntry) return null;
-    const date = new Date(selectedEntry.date + "T00:00:00");
-    return `${String(date.getDate()).padStart(2, "0")} ${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`;
-  }, [selectedEntry]);
+  const todayEntry = useMemo(
+    () => allEntriesByDate.find((entry) => toDateOnly(entry.date) === TODAY_ISO) ?? null,
+    [allEntriesByDate],
+  );
 
   const annualChartData = useMemo(
     () =>
-      MONTH_SHORT_LABELS.map((label, monthIndex) => ({
+      MONTH_LABELS.map((label, monthIndex) => ({
         month: label,
         ...sumRows(
           entries.filter((entry) => {
@@ -138,7 +124,7 @@ export function DailyLogSection({
     delay: number;
   }> = [
     { key: "calls", label: "Thirrje", icon: Phone, delay: 0 },
-    { key: "contacts", label: "Kontaktet", icon: Users, delay: 0.06 },
+    { key: "contacts", label: "Kontakte", icon: Users, delay: 0.06 },
     { key: "showings", label: "Shfaqje", icon: Eye, delay: 0.12 },
     { key: "sales", label: "Shitje", icon: TrendingUp, delay: 0.18 },
   ];
@@ -148,20 +134,22 @@ export function DailyLogSection({
     label: metric.label,
     icon: metric.icon,
     delay: metric.delay,
-    curr: selectedEntry?.[metric.key] ?? 0,
-    prev: previousEntry?.[metric.key] ?? null,
+    curr: todayEntry?.[metric.key] ?? 0,
   }));
+
+  const todayDate = new Date();
+  const todayLabel = `Sot · ${String(todayDate.getDate()).padStart(2, "0")} ${
+    MONTH_LABELS[todayDate.getMonth()]
+  } ${todayDate.getFullYear()}`;
 
   return (
     <div>
       <DailyLogSummary
-        selectedEntryLabel={selectedEntryLabel}
         summaryMetrics={summaryMetrics}
         summaryStarted={summaryStarted}
-        selectedDayComparisonText={selectedDayComparisonText}
+        todayLabel={todayLabel}
+        selectedMonth={selectedMonth}
         selectedYear={activeSelectedYear}
-        yearOptions={yearOptions}
-        onYearChange={setSelectedYear}
         annualChartData={annualChartData}
       />
 
@@ -169,8 +157,11 @@ export function DailyLogSection({
         loading={loading}
         selectedMonth={selectedMonth}
         selectedYear={activeSelectedYear}
+        yearOptions={yearOptions}
         filteredEntries={filteredEntries}
         selectedEntryId={activeSelectedEntryId}
+        onMonthChange={setSelectedMonth}
+        onYearChange={setSelectedYear}
         onSelectEntry={setSelectedEntryId}
         onCreate={onCreate}
         onUpdate={onUpdate}

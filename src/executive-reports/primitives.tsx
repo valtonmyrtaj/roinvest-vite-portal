@@ -58,7 +58,7 @@ export function HeroMetricCard({
           )}
         </div>
         <p
-          className="text-[34px] leading-none tracking-[-0.04em]"
+          className="text-[34px] leading-none tracking-[-0.04em] tabular-nums"
           style={{ fontWeight: 700, color: NAVY }}
         >
           {value}
@@ -95,17 +95,17 @@ export function StatCard({
 }) {
   return (
     <motion.div {...cardMotion(delay)}>
-      <Card className="h-full px-5 py-5">
+      <Card className="executive-reports-stat-card h-full min-h-[136px] px-5 py-5">
         <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[11px] bg-[#eaf0fa]">
           <Icon size={16} style={{ color: NAVY }} strokeWidth={1.9} />
         </div>
         <p
-          className="text-[28px] leading-none tracking-[-0.03em]"
+          className="text-[28px] leading-none tracking-[-0.03em] tabular-nums"
           style={{ fontWeight: 700, color: NAVY }}
         >
           {value}
         </p>
-        <p className="mt-2.5 text-[12.5px] text-black/45" style={{ fontWeight: 600 }}>
+        <p className="mt-[5px] text-[12.5px] text-black/45" style={{ fontWeight: 600 }}>
           {label}
         </p>
       </Card>

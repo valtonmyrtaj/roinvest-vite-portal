@@ -56,8 +56,10 @@ export interface CRMLead {
 // The actual DB columns are: contact_id, unit_id, date, time, status, notes
 export interface CRMShowing {
   id: string;
-  contact_id: string;   // DB column name
-  lead_name?: string;   // joined from crm_leads
+  contact_id: string | null;   // DB column name
+  manual_contact_name: string | null;
+  manual_contact_phone: string | null;
+  lead_name?: string;   // joined from crm_leads, or manual_contact_name fallback
   unit_id: string;
   unit_record_id?: string | null;
   date: string;         // DB column: YYYY-MM-DD
@@ -82,26 +84,22 @@ export interface CreateLeadInput {
   notes?: string | null;
 }
 
+export interface ManualShowingContactInput {
+  name: string;
+  phone?: string | null;
+}
+
 // Matches what CRMContent sends (lead_id + scheduled_at)
 // The hook translates these to the actual DB columns (contact_id, date, time)
 export interface CreateShowingInput {
-  lead_id: string;       // mapped → contact_id in DB
+  lead_id?: string | null;       // mapped → contact_id in DB when linking an existing contact
+  manual_contact?: ManualShowingContactInput | null;
   unit_id: string;
   scheduled_at: string;  // ISO string, split → date + time for DB
   status: ShowingStatus;
-  notes?: string | null;
-}
-
-export interface ManualShowingContactInput {
-  first_name: string;
-  last_name: string;
-  phone: string;
-}
-
-export interface CreateShowingInput {
-  manual_contact?: ManualShowingContactInput | null;
   outcome?: ShowingOutcome;
   reservation_expires_at?: string | null;
+  notes?: string | null;
 }
 
 export interface CompleteShowingSaleInput {
@@ -120,12 +118,6 @@ function buildScheduledAt(date: string, time: string | null): string {
   return `${date}T${time ?? "00:00"}`;
 }
 
-function buildManualLeadName(input: ManualShowingContactInput): string {
-  return `${input.first_name.trim()} ${input.last_name.trim()}`.trim();
-}
-
-const MANUAL_CONTACT_ROLLBACK_ERROR =
-  "Shfaqja nuk u ruajt dot. Kontakti i ri u krijua, por nuk u fshi automatikisht. Verifikojeni manualisht.";
 const RESERVATION_EXPIRES_AT_REQUIRED_ERROR =
   "Zgjidhni datën e skadimit të rezervimit.";
 const ACTIVE_RESERVATION_CONFLICT_ERROR =
@@ -155,34 +147,6 @@ async function resolveUnitRecordId(
     return { error: "Njësia e zgjedhur nuk u gjet në regjistër." };
   }
   return { data };
-}
-
-async function createManualShowingLead(
-  input: ManualShowingContactInput,
-): Promise<{ data?: { id: string; name: string }; error?: string }> {
-  const fallbackName = buildManualLeadName(input);
-  const { data, error } = await crmApi.createLead({
-    name: fallbackName,
-    phone: input.phone.trim(),
-    source: "Shfaqje",
-    status: "I ri",
-  });
-
-  if (error || !data?.id) {
-    return { error: error ?? "Kontakti i ri nuk u krijua dot." };
-  }
-
-  return {
-    data: {
-      id: data.id,
-      name: data.name ?? fallbackName,
-    },
-  };
-}
-
-async function rollbackManualShowingLead(leadId: string): Promise<string | null> {
-  const { error } = await crmApi.deleteLead(leadId);
-  return error ? MANUAL_CONTACT_ROLLBACK_ERROR : null;
 }
 
 export async function completeShowingSale(
@@ -234,10 +198,14 @@ function mapShowingRow(row: Record<string, unknown>): CRMShowing {
     (row.active_reservation as CRMActiveReservation | null | undefined) ?? null;
   const date = (row.date as string) ?? "";
   const time = (row.time as string | null) ?? null;
+  const manualContactName = (row.manual_contact_name as string | null) ?? null;
+  const manualContactPhone = (row.manual_contact_phone as string | null) ?? null;
   return {
     id: row.id as string,
-    contact_id: row.contact_id as string,
-    lead_name: (row.crm_leads as { name: string } | null)?.name ?? "—",
+    contact_id: (row.contact_id as string | null) ?? null,
+    manual_contact_name: manualContactName,
+    manual_contact_phone: manualContactPhone,
+    lead_name: (row.crm_leads as { name: string } | null)?.name ?? manualContactName ?? "—",
     unit_id: row.unit_id as string,
     unit_record_id: (row.unit_record_id as string | null) ?? null,
     date,
@@ -313,6 +281,12 @@ export interface CreateDailyLogInput {
 
 const CACHE_TTL_MS = 60_000;
 
+interface UseCRMOptions {
+  loadLeads?: boolean;
+  loadShowings?: boolean;
+  loadDailyLog?: boolean;
+}
+
 function hasFreshCache(hasData: boolean, lastFetch: number): boolean {
   return hasData && Date.now() - lastFetch <= CACHE_TTL_MS;
 }
@@ -344,7 +318,10 @@ function toDateOnly(value: string): string {
   return value.slice(0, 10);
 }
 
-export function useCRM() {
+export function useCRM(options: UseCRMOptions = {}) {
+  const shouldLoadLeads = options.loadLeads ?? true;
+  const shouldLoadShowings = options.loadShowings ?? true;
+  const shouldLoadDailyLog = options.loadDailyLog ?? true;
   const hasFreshLeads = hasFreshCache(crmCache.hasLeads, crmCache.lastLeadsFetch);
   const hasFreshShowings = hasFreshCache(crmCache.hasShowings, crmCache.lastShowingsFetch);
   const hasFreshDailyLog = hasFreshCache(crmCache.hasDailyLog, crmCache.lastDailyLogFetch);
@@ -352,9 +329,13 @@ export function useCRM() {
   const [leads, setLeads] = useState<CRMLead[]>(() => crmCache.leads);
   const [showings, setShowings] = useState<CRMShowing[]>(() => crmCache.showings);
   const [dailyLog, setDailyLog] = useState<DailyLogEntry[]>(() => crmCache.dailyLog);
-  const [loading, setLoading] = useState(!hasFreshLeads);
-  const [showingsLoading, setShowingsLoading] = useState(!hasFreshShowings);
-  const [dailyLogLoading, setDailyLogLoading] = useState(!hasFreshDailyLog);
+  const [loading, setLoading] = useState(shouldLoadLeads && !hasFreshLeads);
+  const [showingsLoading, setShowingsLoading] = useState(
+    shouldLoadShowings && !hasFreshShowings,
+  );
+  const [dailyLogLoading, setDailyLogLoading] = useState(
+    shouldLoadDailyLog && !hasFreshDailyLog,
+  );
   const isMountedRef = useRef(true);
   const leadsVersionRef = useRef(0);
   const showingsVersionRef = useRef(0);
@@ -471,16 +452,23 @@ export function useCRM() {
     let cancelled = false;
     const timeout = window.setTimeout(() => {
       if (cancelled) return;
-      void loadLeads();
-      void loadShowings();
-      void loadDailyLog();
+      if (shouldLoadLeads) void loadLeads();
+      if (shouldLoadShowings) void loadShowings();
+      if (shouldLoadDailyLog) void loadDailyLog();
     }, 0);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [loadDailyLog, loadLeads, loadShowings]);
+  }, [
+    loadDailyLog,
+    loadLeads,
+    loadShowings,
+    shouldLoadDailyLog,
+    shouldLoadLeads,
+    shouldLoadShowings,
+  ]);
 
   const createLead = async (input: CreateLeadInput) => {
     const { data, error } = await crmApi.createLead({
@@ -572,26 +560,18 @@ export function useCRM() {
       }
     }
 
-    let leadId = input.lead_id;
-    let leadName: string | undefined;
-    let createdLeadId: string | null = null;
+    const leadId = input.manual_contact ? null : input.lead_id?.trim() || null;
+    const manualContactName = input.manual_contact?.name.trim() ?? "";
+    const manualContactPhone = input.manual_contact?.phone?.trim() || null;
 
-    if (input.manual_contact) {
-      const createdLead = await createManualShowingLead(input.manual_contact);
-      if (createdLead.error || !createdLead.data) {
-        return { error: createdLead.error ?? "Kontakti i ri nuk u krijua dot." };
-      }
-      leadId = createdLead.data.id;
-      leadName = createdLead.data.name;
-      createdLeadId = createdLead.data.id;
-    }
-
-    if (!leadId) {
-      return { error: "Kontakti mungon." };
+    if (!leadId && !manualContactName) {
+      return { error: "Shkruani klientin ose zgjidhni kontaktin." };
     }
 
     const payload = {
       contact_id: leadId, // DB column is contact_id, not lead_id
+      manual_contact_name: leadId ? null : manualContactName,
+      manual_contact_phone: leadId ? null : manualContactPhone,
       unit_id: input.unit_id,
       unit_record_id: unitResolution.data,
       date: dateStr,
@@ -604,12 +584,6 @@ export function useCRM() {
     const { data, error } = await crmApi.createShowing(payload);
 
     if (error) {
-      if (createdLeadId) {
-        const rollbackError = await rollbackManualShowingLead(createdLeadId);
-        if (rollbackError) {
-          return { error: rollbackError };
-        }
-      }
       return { error };
     }
 
@@ -631,13 +605,6 @@ export function useCRM() {
 
       if (reservationResult.error) {
         const { error: rollbackShowingError } = await crmApi.deleteShowing(data.id);
-
-        if (createdLeadId && !rollbackShowingError) {
-          const rollbackLeadError = await rollbackManualShowingLead(createdLeadId);
-          if (rollbackLeadError) {
-            return { error: rollbackLeadError };
-          }
-        }
 
         if (rollbackShowingError) {
           return { error: RESERVATION_CREATE_ROLLBACK_ERROR };
@@ -672,7 +639,9 @@ export function useCRM() {
       data: {
         ...mapped,
         contact_id: leadId,
-        lead_name: leadName ?? mapped.lead_name,
+        manual_contact_name: leadId ? null : manualContactName,
+        manual_contact_phone: leadId ? null : manualContactPhone,
+        lead_name: mapped.lead_name,
         unit_record_id: mapped.unit_record_id ?? unitResolution.data,
       },
     };
@@ -714,8 +683,8 @@ export function useCRM() {
     }
 
     const dbChanges: Record<string, string | null | undefined> = {};
-    let leadId = changes.lead_id;
-    let createdLeadId: string | null = null;
+    let leadId =
+      changes.lead_id === undefined ? undefined : changes.lead_id?.trim() || null;
     let targetUnitRecordId = changes.unit_id ? null : existingShowing.unit_record_id ?? null;
 
     if (changes.unit_id) {
@@ -752,16 +721,30 @@ export function useCRM() {
       }
     }
 
-    if (changes.manual_contact) {
-      const createdLead = await createManualShowingLead(changes.manual_contact);
-      if (createdLead.error || !createdLead.data) {
-        return { error: createdLead.error ?? "Kontakti i ri nuk u krijua dot." };
+    if (changes.manual_contact !== undefined) {
+      if (changes.manual_contact) {
+        const manualContactName = changes.manual_contact.name.trim();
+        const manualContactPhone = changes.manual_contact.phone?.trim() || null;
+
+        if (!manualContactName) {
+          return { error: "Shkruani klientin ose zgjidhni kontaktin." };
+        }
+
+        leadId = null;
+        dbChanges.contact_id = null;
+        dbChanges.manual_contact_name = manualContactName;
+        dbChanges.manual_contact_phone = manualContactPhone;
+      } else if (leadId !== undefined) {
+        dbChanges.manual_contact_name = null;
+        dbChanges.manual_contact_phone = null;
       }
-      leadId = createdLead.data.id;
-      createdLeadId = createdLead.data.id;
     }
 
-    if (leadId !== undefined) dbChanges.contact_id = leadId;
+    if (leadId !== undefined && !changes.manual_contact) {
+      dbChanges.contact_id = leadId;
+      dbChanges.manual_contact_name = null;
+      dbChanges.manual_contact_phone = null;
+    }
     if (changes.unit_id !== undefined) dbChanges.unit_id = changes.unit_id;
     if (changes.scheduled_at !== undefined) {
       dbChanges.date = changes.scheduled_at.slice(0, 10);
@@ -777,19 +760,14 @@ export function useCRM() {
     const { data, error } = await crmApi.updateShowing(id, dbChanges);
 
     if (error) {
-      if (createdLeadId) {
-        const rollbackError = await rollbackManualShowingLead(createdLeadId);
-        if (rollbackError) {
-          return { error: rollbackError };
-        }
-      }
       return { error };
     }
 
     if (isEnteringReservationOutcome && !hasLinkedActiveReservation) {
+      const nextContactId = leadId === undefined ? existingShowing.contact_id : leadId;
       const reservationResult = await reservationsApi.createUnitReservation({
         unitRecordId: targetUnitRecordId!,
-        contactId: leadId ?? existingShowing.contact_id,
+        contactId: nextContactId,
         showingId: id,
         reservedAt: nextScheduledAt,
         expiresAt: toReservationExpiryTimestamp(changes.reservation_expires_at!),
@@ -799,6 +777,8 @@ export function useCRM() {
       if (reservationResult.error) {
         const rollbackPatch = {
           contact_id: existingShowing.contact_id,
+          manual_contact_name: existingShowing.manual_contact_name ?? null,
+          manual_contact_phone: existingShowing.manual_contact_phone ?? null,
           unit_id: existingShowing.unit_id,
           unit_record_id: existingShowing.unit_record_id ?? null,
           date: existingShowing.date,
@@ -809,13 +789,6 @@ export function useCRM() {
         };
 
         const { error: rollbackShowingError } = await crmApi.updateShowing(id, rollbackPatch);
-
-        if (createdLeadId && !rollbackShowingError) {
-          const rollbackLeadError = await rollbackManualShowingLead(createdLeadId);
-          if (rollbackLeadError) {
-            return { error: rollbackLeadError };
-          }
-        }
 
         if (rollbackShowingError) {
           return { error: RESERVATION_UPDATE_ROLLBACK_ERROR };
@@ -831,7 +804,7 @@ export function useCRM() {
 
       nextActiveReservation = {
         reservation_id: reservationResult.data,
-        contact_id: leadId ?? existingShowing.contact_id,
+        contact_id: nextContactId,
         reserved_at: nextScheduledAt,
         expires_at: toReservationExpiryTimestamp(changes.reservation_expires_at!),
         notes: changes.notes ?? existingShowing.notes ?? null,

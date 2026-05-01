@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import {
   ReservationActionDialog,
@@ -7,6 +7,7 @@ import {
 import { useUnitsShell } from "./hooks/useUnitsShell";
 import { useUnitDetail } from "./hooks/useUnitDetail";
 import { useUnitsRegistry } from "./hooks/useUnitsRegistry";
+import { useAuth } from "./context/useAuth";
 import type {
   Unit,
   UnitHistory,
@@ -34,8 +35,11 @@ import {
 import type { RegistryUnitRow } from "./lib/api/unitsRegistry";
 
 const REGISTRY_PAGE_SIZE = 40;
+const RESERVATIONS_SECTION_HASH = "#afatet-e-rezervimeve";
 
 export function UnitsDashboard() {
+  const { approvedUser } = useAuth();
+  const canManageReservations = approvedUser?.role === "sales_director";
   const [blockF, setBlockF] = useState<Block | "">("");
   const [typeF, setTypeF] = useState("");
   const [levelF, setLevelF] = useState<Level | "">("");
@@ -55,16 +59,18 @@ export function UnitsDashboard() {
     unit: Unit;
     mode: ReservationActionMode;
   } | null>(null);
+  const activeReservationsSectionRef = useRef<HTMLDivElement | null>(null);
+  const consumedReservationsDeepLinkRef = useRef(false);
 
   const deferredSearch = useDeferredValue(search);
 
   const {
     totalUnits,
-    availableUnitsCount,
-    activeReservationsCount,
     ownerOptionsByCategory,
+    ownerEntityCountsByCategory,
     ownershipCounts,
     stockCounts,
+    stockTypeCounts,
     activeReservations,
     loading: shellLoading,
     error: shellError,
@@ -75,6 +81,7 @@ export function UnitsDashboard() {
   });
 
   const ownerNames = ownerOptionsByCategory[selectedOwnerCategory];
+  const ownerEntityCounts = ownerEntityCountsByCategory[selectedOwnerCategory];
   const activeSelectedOwnerEntity =
     selectedOwnerEntity && ownerNames.includes(selectedOwnerEntity)
       ? selectedOwnerEntity
@@ -158,8 +165,39 @@ export function UnitsDashboard() {
   };
 
   const openReservationAction = (unit: Unit, mode: ReservationActionMode) => {
+    if (!canManageReservations) return;
     setReservationAction({ unit, mode });
   };
+
+  const handleStockStatusFilterChange = (status: UnitStatus | "") => {
+    setStatusF((current) => (status && current === status ? "" : status));
+    setRegistryCategoryF(selectedOwnerCategory);
+    setRegistryEntityF(activeSelectedOwnerEntity);
+    setRegistryPage(1);
+  };
+
+  useEffect(() => {
+    if (
+      consumedReservationsDeepLinkRef.current ||
+      typeof window === "undefined" ||
+      window.location.hash !== RESERVATIONS_SECTION_HASH ||
+      shellLoading ||
+      registryLoading
+    ) {
+      return;
+    }
+
+    const target = activeReservationsSectionRef.current;
+    if (!target) return;
+
+    const timeout = window.setTimeout(() => {
+      if (consumedReservationsDeepLinkRef.current) return;
+      target.scrollIntoView({ behavior: "auto", block: "start" });
+      consumedReservationsDeepLinkRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeReservations.length, registryLoading, shellLoading]);
 
   const handleReservationActionSubmit = async ({
     expiresAt,
@@ -168,6 +206,10 @@ export function UnitsDashboard() {
     expiresAt?: string;
     notes?: string;
   }) => {
+    if (!canManageReservations) {
+      throw new Error("Vetëm Sales Director mund të ndryshojë rezervimet.");
+    }
+
     if (!reservationAction?.unit.active_reservation_id) {
       throw new Error("Rezervimi aktiv nuk u gjet.");
     }
@@ -214,8 +256,12 @@ export function UnitsDashboard() {
           initialTab={activeUnitDrawer.initialTab}
           onClose={() => setActiveUnitDrawer(null)}
           fetchHistory={fetchUnitHistory as (id: string) => Promise<UnitHistory[]>}
-          onExtendReservation={(unit) => openReservationAction(unit, "extend")}
-          onReleaseReservation={(unit) => openReservationAction(unit, "release")}
+          onExtendReservation={
+            canManageReservations ? (unit) => openReservationAction(unit, "extend") : undefined
+          }
+          onReleaseReservation={
+            canManageReservations ? (unit) => openReservationAction(unit, "release") : undefined
+          }
         />
       )}
 
@@ -223,49 +269,12 @@ export function UnitsDashboard() {
         <PageHeader
           tone="brand"
           title="Njësitë"
-          subtitle="Inventari i plotë i njësive me status, pronësi, rezervime aktive dhe histori ndryshimesh."
-          className="!mb-3 items-start gap-x-8 gap-y-2.5"
+          subtitle="Inventari i plotë i njësive me status, pronësi, njësi të rezervuara dhe histori ndryshimesh."
+          className="!mb-[44px] items-start gap-x-8 gap-y-2.5"
           bodyClassName="min-w-[320px] flex-[1_1_560px] sm:self-center"
-          contentClassName="max-w-[620px]"
+          contentClassName="max-w-[620px] translate-y-[20px]"
           titleClassName="leading-none"
           subtitleClassName="!mt-0 max-w-[620px]"
-          rightClassName="w-full sm:w-auto sm:self-start"
-          right={
-            <div className="w-full rounded-[16px] border border-black/[0.05] bg-[#fcfcfd] px-3 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.03)] sm:min-w-[404px] sm:max-w-[428px]">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="rounded-[12px] border border-[#edf0f4] bg-white px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    Gjithsej njësi
-                  </p>
-                  {shellLoading ? (
-                    <div className="mt-2 h-6 w-16 animate-pulse rounded-full bg-[#eef1f5]" />
-                  ) : (
-                    <p className="mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.04em] text-[#003883]">
-                      {totalUnits}
-                    </p>
-                  )}
-                </div>
-
-                <div className="rounded-[12px] border border-[#edf0f4] bg-white px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                    Rezervime aktive
-                  </p>
-                  {shellLoading ? (
-                    <div className="mt-2 h-6 w-16 animate-pulse rounded-full bg-[#eef1f5]" />
-                  ) : (
-                    <p className="mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.04em] text-[#003883]">
-                      {activeReservationsCount}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {!shellLoading && (
-                <p className="mt-2 px-0.5 text-[11.5px] text-black/34">
-                  {availableUnitsCount} në dispozicion në regjistrin aktual.
-                </p>
-              )}
-            </div>
-          }
         />
 
         {inventoryError && (
@@ -295,12 +304,16 @@ export function UnitsDashboard() {
           selectedOwnerCategory={selectedOwnerCategory}
           selectedOwnerEntity={activeSelectedOwnerEntity}
           ownerNames={ownerNames}
+          ownerEntityCounts={ownerEntityCounts}
           stockCounts={stockCounts}
+          stockTypeCounts={stockTypeCounts}
+          activeStatusFilter={statusF}
           onOwnerCategoryChange={(category) => {
             setSelectedOwnerCategory(category);
             setSelectedOwnerEntity("");
           }}
           onOwnerEntityChange={setSelectedOwnerEntity}
+          onStatusFilterChange={handleStockStatusFilterChange}
         />
 
         <UnitsRegistrySection
@@ -363,12 +376,25 @@ export function UnitsDashboard() {
           }
         />
 
-        <ActiveReservationsSection
-          units={activeReservations}
-          loading={shellLoading}
-          onExtendReservation={(unit) => openReservationAction(unit, "extend")}
-          onReleaseReservation={(unit) => openReservationAction(unit, "release")}
-        />
+        <div
+          id="afatet-e-rezervimeve"
+          ref={activeReservationsSectionRef}
+          className="scroll-mt-8"
+        >
+          <ActiveReservationsSection
+            units={activeReservations}
+            loading={shellLoading}
+            onExtendReservation={
+              canManageReservations ? (unit) => openReservationAction(unit, "extend") : undefined
+            }
+            onReleaseReservation={
+              canManageReservations ? (unit) => openReservationAction(unit, "release") : undefined
+            }
+            onOpenUnitDetails={(unit) =>
+              setActiveUnitDrawer({ unitId: unit.id, initialTab: "summary", unit })
+            }
+          />
+        </div>
       </div>
     </div>
   );
@@ -393,10 +419,14 @@ function mapRegistryRowToUnit(row: RegistryUnitRow): Unit {
     status: row.status as UnitStatus,
     owner_category: row.owner_category as OwnerCategory,
     owner_name: row.owner_name,
-    has_active_reservation: false,
-    active_reservation_id: null,
-    active_reservation_showing_id: null,
-    reservation_expires_at: null,
+    has_active_reservation: Boolean(row.active_reservation_id),
+    active_reservation_id: row.active_reservation_id,
+    active_reservation_showing_id: row.active_reservation_showing_id,
+    active_reservation_contact_name: null,
+    active_reservation_contact_phone: null,
+    active_reservation_reserved_at: null,
+    active_reservation_notes: null,
+    reservation_expires_at: row.reservation_expires_at,
     notes: null,
     created_at: row.created_at ?? "",
     updated_at: row.updated_at ?? "",

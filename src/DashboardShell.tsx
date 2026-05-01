@@ -13,13 +13,16 @@ import {
   BadgeCheck,
   Clock3,
   AlertCircle,
-  Pencil,
+  CreditCard,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "./context/useAuth";
-import { history } from "./lib/api";
-import type { NotificationHistoryRow } from "./lib/api/history";
+import { operationalAlerts } from "./lib/api";
+import type {
+  OperationalAlert,
+  OperationalAlertType,
+} from "./lib/api/operationalAlerts";
 
 const ACCENT = "#003883";
 
@@ -52,18 +55,6 @@ const navItems: { key: PageKey; label: string; icon: LucideIcon }[] = [
   { key: "input",     label: "Të dhënat",          icon: Database   },
 ];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type NotifType = "sold" | "reserved" | "expired" | "released" | "other";
-
-interface Notification {
-  id: string;
-  type: NotifType;
-  unitDisplay: string;
-  changed_at: string;
-  change_reason: string;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string, nowTs: number): string {
@@ -78,49 +69,120 @@ function timeAgo(iso: string, nowTs: number): string {
   return `${days} ditë më parë`;
 }
 
-function notifType(rec: {
-  new_data: Record<string, unknown>;
-  previous_data: Record<string, unknown>;
-  change_reason: string;
-}): NotifType {
-  const newStatus  = rec.new_data?.status  as string | undefined;
-  const prevStatus = rec.previous_data?.status as string | undefined;
-  if (rec.change_reason === "Rezervimi u anulua") {
-    return "released";
-  }
-  if (rec.change_reason === "Rezervimi skadoi") {
-    return "expired";
-  }
-  if (newStatus === "E shitur")    return "sold";
-  if (newStatus === "E rezervuar") return "reserved";
-  if (newStatus === "Në dispozicion" && prevStatus === "E rezervuar") return "expired";
-  return "other";
+function formatAlertDate(iso: string | null) {
+  if (!iso) return null;
+  const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.${year}`;
 }
 
-const NOTIF_META: Record<NotifType, { icon: LucideIcon; color: string; bg: string; title: string }> = {
-  sold:     { icon: BadgeCheck,  color: "#3c7a57", bg: "#edf7f1", title: "Njësi e shitur"       },
-  reserved: { icon: Clock3,      color: "#b0892f", bg: "#fff8e8", title: "Njësi e rezervuar"    },
-  expired:  { icon: AlertCircle, color: "#b14b4b", bg: "#fbeeee", title: "Rezervimi skadoi"     },
-  released: { icon: X,           color: "#8e4a4a", bg: "#fbeeee", title: "Rezervimi u anulua"   },
-  other:    { icon: Pencil,      color: "#003883", bg: "#eaf0fa", title: "Ndryshim i të dhënave" },
+function alertFooter(alert: OperationalAlert, nowTs: number): string {
+  const dueDate = formatAlertDate(alert.dueDate);
+  if (dueDate) return `Afati: ${dueDate}`;
+  return timeAgo(alert.occurredAt, nowTs);
+}
+
+const ALERT_META: Record<
+  OperationalAlertType,
+  { icon: LucideIcon; color: string; bg: string; title: string }
+> = {
+  sale_completed: {
+    icon: BadgeCheck,
+    color: "#3c7a57",
+    bg: "#edf7f1",
+    title: "Shitje e re",
+  },
+  reservation_created: {
+    icon: Clock3,
+    color: "#b0892f",
+    bg: "#fff8e8",
+    title: "Rezervim i ri",
+  },
+  reservation_due_week: {
+    icon: Clock3,
+    color: "#b0892f",
+    bg: "#fff8e8",
+    title: "Afat rezervimi",
+  },
+  reservation_due_day: {
+    icon: AlertCircle,
+    color: "#b14b4b",
+    bg: "#fbeeee",
+    title: "Rezervim nesër",
+  },
+  reservation_due_today: {
+    icon: AlertCircle,
+    color: "#b14b4b",
+    bg: "#fbeeee",
+    title: "Rezervim sot",
+  },
+  reservation_overdue: {
+    icon: AlertCircle,
+    color: "#b14b4b",
+    bg: "#fbeeee",
+    title: "Rezervim i vonuar",
+  },
+  payment_due_week: {
+    icon: CreditCard,
+    color: "#b0892f",
+    bg: "#fff8e8",
+    title: "Afat pagese",
+  },
+  payment_due_day: {
+    icon: CreditCard,
+    color: "#b14b4b",
+    bg: "#fbeeee",
+    title: "Pagesë nesër",
+  },
+  payment_due_today: {
+    icon: CreditCard,
+    color: "#b14b4b",
+    bg: "#fbeeee",
+    title: "Pagesë sot",
+  },
+  payment_overdue: {
+    icon: AlertCircle,
+    color: "#b14b4b",
+    bg: "#fbeeee",
+    title: "Pagesë e vonuar",
+  },
 };
 
-const LS_READ_KEY = "roinvest_notif_read_at";
+const LS_ALERT_READ_IDS_KEY = "roinvest_operational_alert_read_ids";
+
+function readStoredAlertIds(): string[] {
+  try {
+    const rawValue = localStorage.getItem(LS_ALERT_READ_IDS_KEY);
+    if (!rawValue) return [];
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredAlertIds(ids: string[]) {
+  localStorage.setItem(LS_ALERT_READ_IDS_KEY, JSON.stringify(ids.slice(-200)));
+}
 
 type IdleWindow = Window & {
   requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
   cancelIdleCallback?: (handle: number) => void;
 };
 
-// ─── NotificationPanel ────────────────────────────────────────────────────────
+// ─── OperationalAlertsPanel ───────────────────────────────────────────────────
 
-function NotificationPanel({
-  notifications,
+function OperationalAlertsPanel({
+  alerts,
+  sourceErrors,
   nowTs,
   onMarkRead,
   onClose,
 }: {
-  notifications: Notification[];
+  alerts: OperationalAlert[];
+  sourceErrors: string[];
   nowTs: number;
   onMarkRead: () => void;
   onClose: () => void;
@@ -135,7 +197,7 @@ function NotificationPanel({
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3.5">
-        <span className="text-[13px] font-semibold text-black/80">Njoftimet</span>
+        <span className="text-[13px] font-semibold text-black/80">Sinjalet operative</span>
         <div className="flex items-center gap-2">
           <button
             onClick={onMarkRead}
@@ -152,23 +214,31 @@ function NotificationPanel({
 
       {/* List */}
       <div className="max-h-[400px] overflow-y-auto">
-        {notifications.length === 0 ? (
+        {sourceErrors.length > 0 && (
+          <div className="border-b border-[#f1dddd] bg-[#fdf8f8] px-4 py-3">
+            <p className="text-[11.5px] font-medium text-[#b14b4b]">
+              Disa sinjale nuk u ngarkuan.
+            </p>
+          </div>
+        )}
+
+        {alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
             <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/[0.03]">
               <Bell size={15} className="text-black/30" strokeWidth={2} />
             </div>
-            <p className="text-[12.5px] font-medium text-black/55">Nuk ka njoftime të reja</p>
+            <p className="text-[12.5px] font-medium text-black/55">Nuk ka sinjale aktive</p>
             <p className="mt-1 text-[11.5px] text-black/32">
-              Ndryshimet e fundit do të shfaqen këtu sapo të regjistrohen.
+              Shitjet, rezervimet dhe afatet kritike do të shfaqen këtu.
             </p>
           </div>
         ) : (
-          notifications.map((n) => {
-            const meta = NOTIF_META[n.type];
+          alerts.map((alert) => {
+            const meta = ALERT_META[alert.type];
             const Icon = meta.icon;
             return (
               <div
-                key={n.id}
+                key={alert.id}
                 className="flex gap-3 border-b border-black/[0.04] px-4 py-3 last:border-0 hover:bg-[#f8f8fa]"
               >
                 <div
@@ -180,10 +250,10 @@ function NotificationPanel({
                 <div className="min-w-0 flex-1">
                   <p className="text-[12.5px] font-semibold text-black/80">{meta.title}</p>
                   <p className="mt-0.5 text-[12px] text-black/45">
-                    Njësia <span className="font-medium text-black/65">{n.unitDisplay}</span>
-                    {n.change_reason ? ` · ${n.change_reason}` : ""}
+                    Njësia <span className="font-medium text-black/65">{alert.unitDisplay}</span>
+                    {` · ${alert.detail}`}
                   </p>
-                  <p className="mt-1 text-[11px] text-black/28">{timeAgo(n.changed_at, nowTs)}</p>
+                  <p className="mt-1 text-[11px] text-black/28">{alertFooter(alert, nowTs)}</p>
                 </div>
               </div>
             );
@@ -260,16 +330,15 @@ export default function DashboardShell({
 }: DashboardShellProps) {
   const { signOut } = useAuth();
 
-  // Bell state
+  // Operational alerts state
   const [bellOpen, setBellOpen]           = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [lastReadAt, setLastReadAt]       = useState<number>(
-    () => Number(localStorage.getItem(LS_READ_KEY) ?? 0)
-  );
+  const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
+  const [alertSourceErrors, setAlertSourceErrors] = useState<string[]>([]);
+  const [readAlertIds, setReadAlertIds] = useState<string[]>(readStoredAlertIds);
   const [nowTs, setNowTs] = useState(() => Date.now());
   const bellRef = useRef<HTMLDivElement>(null);
-  const hasRequestedNotificationsRef = useRef(false);
-  const notificationsPrefetchHandleRef = useRef<number | null>(null);
+  const hasRequestedAlertsRef = useRef(false);
+  const alertsPrefetchHandleRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
 
   // Avatar state
@@ -288,39 +357,21 @@ export default function DashboardShell({
     .split(" ").filter(Boolean).slice(0, 2)
     .map((p) => p[0]?.toUpperCase()).join("");
 
-  const loadNotifications = useCallback(() => {
-    if (hasRequestedNotificationsRef.current) return;
-    hasRequestedNotificationsRef.current = true;
+  const loadAlerts = useCallback((force = false) => {
+    if (userRole !== "sales_director" || (hasRequestedAlertsRef.current && !force)) return;
+    hasRequestedAlertsRef.current = true;
 
-    void history.listRecentNotificationHistory({ limit: 20 }).then(({ data, error }) => {
-      if (!isMountedRef.current || error || !data) return;
+    void operationalAlerts.listOperationalAlerts({ limit: 24 }).then(({ data, error }) => {
+      if (!isMountedRef.current) return;
+      if (error || !data) {
+        setAlertSourceErrors([error ?? "Sinjalet operative nuk u ngarkuan."]);
+        return;
+      }
 
-      const rows: NotificationHistoryRow[] = data;
-      const mapped: Notification[] = rows.map((rec) => {
-        const previousData =
-          rec.previous_data && typeof rec.previous_data === "object" && !Array.isArray(rec.previous_data)
-            ? (rec.previous_data as Record<string, unknown>)
-            : {};
-        const newData =
-          rec.new_data && typeof rec.new_data === "object" && !Array.isArray(rec.new_data)
-            ? (rec.new_data as Record<string, unknown>)
-            : {};
-        return {
-          id: rec.id,
-          type: notifType({
-            previous_data: previousData,
-            new_data: newData,
-            change_reason: rec.change_reason ?? "",
-          }),
-          unitDisplay: rec.units?.unit_id ?? rec.id.slice(0, 8),
-          changed_at: rec.changed_at ?? "",
-          change_reason: rec.change_reason ?? "",
-        };
-      });
-
-      setNotifications(mapped);
+      setAlerts(data.alerts);
+      setAlertSourceErrors(data.sourceErrors);
     });
-  }, []);
+  }, [userRole]);
 
   // Redirect if page not allowed
   useEffect(() => {
@@ -328,36 +379,39 @@ export default function DashboardShell({
     if (!allowed.includes(currentPage)) onNavigate("overview");
   }, [currentPage, onNavigate, userRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Notifications are secondary shell work, so prefetch them after first paint.
+  // Operational alerts are secondary shell work, so prefetch them after first paint.
   useEffect(() => {
+    isMountedRef.current = true;
+    if (userRole !== "sales_director") return undefined;
+
     const idleWindow = window as IdleWindow;
     let usedIdleCallback = false;
 
     if (idleWindow.requestIdleCallback) {
       usedIdleCallback = true;
-      notificationsPrefetchHandleRef.current = idleWindow.requestIdleCallback(() => {
-        notificationsPrefetchHandleRef.current = null;
-        loadNotifications();
+      alertsPrefetchHandleRef.current = idleWindow.requestIdleCallback(() => {
+        alertsPrefetchHandleRef.current = null;
+        loadAlerts();
       }, { timeout: 1200 });
     } else {
-      notificationsPrefetchHandleRef.current = window.setTimeout(() => {
-        notificationsPrefetchHandleRef.current = null;
-        loadNotifications();
+      alertsPrefetchHandleRef.current = window.setTimeout(() => {
+        alertsPrefetchHandleRef.current = null;
+        loadAlerts();
       }, 250);
     }
 
     return () => {
       isMountedRef.current = false;
-      if (notificationsPrefetchHandleRef.current === null) return;
+      if (alertsPrefetchHandleRef.current === null) return;
 
       if (usedIdleCallback && idleWindow.cancelIdleCallback) {
-        idleWindow.cancelIdleCallback(notificationsPrefetchHandleRef.current);
+        idleWindow.cancelIdleCallback(alertsPrefetchHandleRef.current);
         return;
       }
 
-      window.clearTimeout(notificationsPrefetchHandleRef.current);
+      window.clearTimeout(alertsPrefetchHandleRef.current);
     };
-  }, [loadNotifications]);
+  }, [loadAlerts, userRole]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -377,15 +431,13 @@ export default function DashboardShell({
   }, []);
 
   const handleMarkRead = () => {
-    const now = Date.now();
-    setLastReadAt(now);
-    localStorage.setItem(LS_READ_KEY, String(now));
+    const mergedIds = Array.from(new Set([...readAlertIds, ...alerts.map((alert) => alert.id)]));
+    setReadAlertIds(mergedIds);
+    writeStoredAlertIds(mergedIds);
   };
 
-  const unreadCount = notifications.filter(
-    (n) => new Date(n.changed_at).getTime() > lastReadAt &&
-           nowTs - new Date(n.changed_at).getTime() < 86_400_000
-  ).length;
+  const readAlertIdSet = new Set(readAlertIds);
+  const unreadCount = alerts.filter((alert) => !readAlertIdSet.has(alert.id)).length;
 
   return (
     <div className="min-h-screen bg-[#f8f8fa] text-black">
@@ -433,8 +485,13 @@ export default function DashboardShell({
               <img src="/R003883.png" alt="Roinvest logo" className="h-6 w-6 object-contain" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-[15px] text-black/88" style={{ fontWeight: 600 }}>Roinvest</span>
-              <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-black/34">UF Partners Portal</span>
+              <span className="text-[15px]" style={{ color: ACCENT, fontWeight: 600 }}>Roinvest</span>
+              <span
+                className="mt-1 text-[10px] uppercase tracking-[0.18em]"
+                style={{ color: "rgba(0,56,131,0.68)", fontWeight: 500 }}
+              >
+                UF Partners Portal
+              </span>
             </div>
           </div>
 
@@ -442,37 +499,41 @@ export default function DashboardShell({
           <div className="flex items-center gap-3">
 
             {/* Bell */}
-            <div className="relative" ref={bellRef}>
-              <button
-                onClick={() => {
-                  loadNotifications();
-                  setBellOpen((o) => !o);
-                  setAvatarOpen(false);
-                }}
-                className="relative rounded-lg p-2 text-black/35 transition hover:bg-black/[0.04] hover:text-black/60"
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span
-                    className="absolute right-1 top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
-                    style={{ backgroundColor: "#b14b4b", lineHeight: 1 }}
-                  >
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
+            {userRole === "sales_director" && (
+              <div className="relative" ref={bellRef}>
+                <button
+                  onClick={() => {
+                    loadAlerts(true);
+                    setBellOpen((o) => !o);
+                    setAvatarOpen(false);
+                  }}
+                  className="relative rounded-lg p-2 text-black/35 transition hover:bg-black/[0.04] hover:text-black/60"
+                  aria-label="Sinjalet operative"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span
+                      className="absolute right-1 top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                      style={{ backgroundColor: "#b14b4b", lineHeight: 1 }}
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
 
-              <AnimatePresence>
-                {bellOpen && (
-                  <NotificationPanel
-                    notifications={notifications}
-                    nowTs={nowTs}
-                    onMarkRead={handleMarkRead}
-                    onClose={() => setBellOpen(false)}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
+                <AnimatePresence>
+                  {bellOpen && (
+                    <OperationalAlertsPanel
+                      alerts={alerts}
+                      sourceErrors={alertSourceErrors}
+                      nowTs={nowTs}
+                      onMarkRead={handleMarkRead}
+                      onClose={() => setBellOpen(false)}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Avatar */}
             <div className="relative" ref={avatarRef}>

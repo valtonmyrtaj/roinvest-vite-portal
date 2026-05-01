@@ -2,13 +2,13 @@ import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { PillBadge } from "./ui/PillBadge";
-import { SectionHeader } from "./ui/SectionHeader";
+import { CardSectionHeader } from "./ui/CardSectionHeader";
+import { SectionEyebrow } from "./ui/Eyebrow";
 import {
   TABULAR_HEADER_LABEL_CLASS,
   TABULAR_HEADER_ROW_CLASS,
 } from "./ui/tabularHeader";
 import { LEVELS } from "../lib/unitLevel";
-import { getOwnerCategoryStyle } from "../lib/ownerColors";
 import type { Payment } from "../hooks/usePayments";
 import { getUnitContractValue, getUnitFinalSalePrice } from "../lib/unitFinancials";
 import { normalizeCompatibleUnitFields } from "../lib/unitCompatibility";
@@ -68,6 +68,11 @@ const ALL_LEVELS = "Të gjitha nivelet";
 const ALL_STATUSES = "Të gjitha statuset";
 
 const TYPE_FILTER_OPTIONS = [ALL_TYPES, ...CANONICAL_UNIT_TYPES] as const;
+const registryCategoryPillStyle = {
+  background: "#f7f7f8",
+  color: "rgba(15,23,42,0.66)",
+  border: "1px solid #e5e7eb",
+} as const;
 
 const currencyFormatter = new Intl.NumberFormat("de-DE", {
   style: "currency",
@@ -139,33 +144,6 @@ const statusStyleFor = (status: string) => {
   };
 };
 
-const actionStyleFor = (status: string) => {
-  if (status === "E rezervuar") {
-    return {
-      background: "#fff8ea",
-      color: "#b0892f",
-      border: "1px solid transparent",
-      fontWeight: 400,
-    };
-  }
-
-  if (status === "E shitur") {
-    return {
-      background: "#fcf0f0",
-      color: "#b66262",
-      border: "1px solid transparent",
-      fontWeight: 400,
-    };
-  }
-
-  return {
-    background: "#f6f7f9",
-    color: "rgba(0,0,0,0.42)",
-    border: "1px solid transparent",
-    fontWeight: 400,
-  };
-};
-
 const formatCurrency = (value: number | null) => {
   if (value === null) {
     return "-";
@@ -182,9 +160,6 @@ const formatArea = (value: number | null) => {
   return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value)} m²`;
 };
 
-const soldStatLabel = (count: number) => (count === 1 ? "e shitur" : "të shitura");
-
-const reservedStatLabel = (count: number) => (count === 1 ? "e rezervuar" : "të rezervuara");
 const SQ_MONTHS = [
   "Janar",
   "Shkurt",
@@ -328,14 +303,14 @@ const FilterSelect = ({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative min-w-[176px]">
+    <div ref={rootRef} className="relative min-w-0">
       <button
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={placeholder}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-[46px] w-full items-center justify-between rounded-[14px] border border-[#e8e8ec] bg-white px-3 text-[13px] font-normal text-black/66 shadow-none outline-none transition hover:border-[#dcdce2] focus-visible:border-[#003883]/30 focus-visible:ring-2 focus-visible:ring-[#003883]/8"
+        className="flex h-[42px] w-full items-center justify-between rounded-[13px] border border-[#e4e7ed] bg-white px-3 text-[13px] font-normal text-black/66 shadow-none outline-none transition hover:border-[#dcdce2] focus-visible:border-[#c8d3e8] focus-visible:ring-2 focus-visible:ring-[#003883]/8"
       >
         <span className="truncate font-normal">{value || placeholder}</span>
         <ChevronDown
@@ -388,7 +363,6 @@ export function DataInputOperationalRegistry({
   flashUnitId = null,
   onPaymentNavigate,
 }: DataInputOperationalRegistryProps) {
-  const registrySectionRef = useRef<HTMLElement | null>(null);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const [searchTerm, setSearchTerm] = useState("");
   const [ownershipFilter, setOwnershipFilter] = useState(ALL_OWNERSHIP);
@@ -526,97 +500,30 @@ export function DataInputOperationalRegistry({
     typeFilter,
   ]);
 
-  const progressSummary = useMemo(
-    () => ({
-      total: filteredRows.length,
-      available: filteredRows.filter((row) => row.status === "Në dispozicion").length,
-      reserved: filteredRows.filter((row) => row.status === "E rezervuar").length,
-      sold: filteredRows.filter((row) => row.status === "E shitur").length,
-    }),
-    [filteredRows],
-  );
+  const activeFilterCount = [
+    searchTerm.trim(),
+    ownershipFilter !== ALL_OWNERSHIP ? ownershipFilter : "",
+    ownerFilter !== ALL_OWNERS ? ownerFilter : "",
+    blockFilter !== ALL_BLOCKS ? blockFilter : "",
+    typeFilter !== ALL_TYPES ? typeFilter : "",
+    levelFilter !== ALL_LEVELS ? levelFilter : "",
+    statusFilter !== ALL_STATUSES ? statusFilter : "",
+  ].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
+  const toolbarPrimaryMeta = `${filteredRows.length} njësi në listë`;
+  const toolbarSecondaryMeta = hasActiveFilters
+    ? `${activeFilterCount} filtra aktivë`
+    : "Pa filtra shtesë";
 
-  const statItems = useMemo(
-    () => [
-      {
-        key: "total",
-        label: `${progressSummary.total} njësi`,
-        className: "border-transparent bg-[#f9f9fb] text-black/56",
-      },
-      {
-        key: "available",
-        label: `${progressSummary.available} në dispozicion`,
-        className: "border-transparent bg-[#eef7f1] text-[#6a9a7f]",
-      },
-      {
-        key: "reserved",
-        label: `${progressSummary.reserved} ${reservedStatLabel(progressSummary.reserved)}`,
-        className: "border-transparent bg-[#fff8e8] text-[#c39a38]",
-      },
-      {
-        key: "sold",
-        label: `${progressSummary.sold} ${soldStatLabel(progressSummary.sold)}`,
-        className: "border-transparent bg-[#fbeeee] text-[#cf7272]",
-      },
-    ],
-    [progressSummary],
-  );
-
-  useEffect(() => {
-    const registrySection = registrySectionRef.current;
-    if (!registrySection || typeof document === "undefined") {
-      return undefined;
-    }
-
-    const normalizeText = (value: string) => value.replace(/\s+/g, " ").trim().toLowerCase();
-
-    const removeLegacyExistingUnitsBlock = () => {
-      const nodes = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3, h4, div, span, p"));
-
-      for (const node of nodes) {
-        if (registrySection.contains(node)) {
-          continue;
-        }
-
-        if (normalizeText(node.textContent || "") !== normalizeText("Njësitë ekzistuese")) {
-          continue;
-        }
-
-        let container = node.parentElement;
-        while (container && container !== document.body) {
-          if (registrySection.contains(container)) {
-            break;
-          }
-
-          const text = normalizeText(container.textContent || "");
-          const hasLegacySignals =
-            text.includes("njësitë ekzistuese") &&
-            text.includes("gjithsej") &&
-            text.includes("fshi") &&
-            text.includes("ndrysho");
-
-          const buttonCount = container.querySelectorAll("button").length;
-          const containsEntityManager = text.includes("menaxhimi i entiteteve");
-
-          if (hasLegacySignals && buttonCount >= 4 && !containsEntityManager) {
-            container.remove();
-            return;
-          }
-
-          container = container.parentElement;
-        }
-      }
-    };
-
-    const frame = requestAnimationFrame(removeLegacyExistingUnitsBlock);
-    const observer = new MutationObserver(() => removeLegacyExistingUnitsBlock());
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, [units.length]);
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setOwnershipFilter(ALL_OWNERSHIP);
+    setOwnerFilter(ALL_OWNERS);
+    setBlockFilter(ALL_BLOCKS);
+    setTypeFilter(ALL_TYPES);
+    setLevelFilter(ALL_LEVELS);
+    setStatusFilter(ALL_STATUSES);
+  };
 
   useEffect(() => {
     if (!highlightedUnitId) return;
@@ -627,112 +534,175 @@ export function DataInputOperationalRegistry({
 
   return (
     <section
-      ref={registrySectionRef}
       data-operational-registry="true"
       className="mx-auto max-w-[1280px] px-10 py-8"
     >
-      <div className="rounded-[22px] border border-[#ededf0] bg-white px-10 py-9 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
-        <div className="mb-6">
-          <SectionHeader
-            title="Njësitë ekzistuese"
-            className="mb-0"
-            titleClassName="text-[18px]"
-          />
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {statItems.map((item) => (
-              <span
-                key={item.key}
-                className={`inline-flex items-center rounded-full border px-2.5 py-[5px] text-[12px] font-medium ${item.className}`}
-              >
-                {item.label}
+      <SectionEyebrow
+        className="mb-4"
+        label="Regjistri i njësive"
+        detail="lista e plotë e stokut"
+      />
+
+      <div className="overflow-hidden rounded-[20px] border border-[#e6e8ee] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_42px_rgba(15,23,42,0.035)]">
+        <CardSectionHeader
+          title="Regjistri"
+          subtitle={`${filteredRows.length} nga ${rows.length} njësi në listë`}
+          className="bg-[linear-gradient(180deg,#fbfcfe_0%,#f6f9ff_100%)] px-6 pb-5 pt-4"
+          titleStyle={{
+            fontSize: 16,
+            fontWeight: 700,
+            letterSpacing: "0em",
+            lineHeight: 1.18,
+          }}
+          subtitleStyle={{
+            fontSize: 11.75,
+            fontWeight: 500,
+            lineHeight: 1.35,
+          }}
+          right={
+            <span className="rounded-full border border-[#e7ebf2] bg-[#fbfcfe] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/32">
+              {hasActiveFilters ? `${activeFilterCount} filtra aktivë` : "Pamje e plotë"}
+            </span>
+          }
+        />
+
+        <div className="border-b border-[#eef0f4] bg-[#fcfcfd] px-5 pb-3 pt-4">
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.65fr)_repeat(6,minmax(0,0.95fr))]">
+            <label className="md:col-span-2 xl:col-span-1">
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Kërko sipas ID-së
               </span>
-            ))}
-          </div>
-        </div>
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30"
+                />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="h-[42px] w-full rounded-[13px] border border-[#e4e7ed] bg-white pl-9 pr-3 text-[13px] font-normal text-black/70 outline-none transition placeholder:font-normal placeholder:text-black/24 focus:border-[#c8d3e8] focus:shadow-[0_0_0_3px_rgba(0,56,131,0.05)]"
+                />
+              </div>
+            </label>
 
-        <div className="mb-5 flex flex-col gap-2">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30"
+            <label>
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Blloku
+              </span>
+              <FilterSelect
+                options={blockOptions}
+                value={blockFilter}
+                onChange={setBlockFilter}
+                placeholder="Të gjitha blloqet"
               />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Kërko sipas ID-së së njësisë"
-                className="h-[46px] w-[248px] rounded-[14px] border border-[#e8e8ec] bg-white pl-9 pr-3 text-[13px] font-normal text-black/70 outline-none transition placeholder:font-normal placeholder:text-black/30 focus:border-[#d8d8df]"
+            </label>
+
+            <label>
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Lloji
+              </span>
+              <FilterSelect
+                options={typeOptions}
+                value={typeFilter}
+                onChange={setTypeFilter}
+                placeholder="Të gjitha llojet"
               />
+            </label>
+
+            <label>
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Niveli
+              </span>
+              <FilterSelect
+                options={levelOptions}
+                value={levelFilter}
+                onChange={setLevelFilter}
+                placeholder="Të gjitha nivelet"
+              />
+            </label>
+
+            <label>
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Statusi
+              </span>
+              <FilterSelect
+                options={statusOptions}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                placeholder="Të gjitha statuset"
+              />
+            </label>
+
+            <label>
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Pronësia
+              </span>
+              <FilterSelect
+                options={ownershipOptions}
+                value={ownershipFilter}
+                onChange={(next) => {
+                  setOwnershipFilter(next);
+                  setOwnerFilter(ALL_OWNERS);
+                }}
+                placeholder="Të gjitha pronësitë"
+              />
+            </label>
+
+            <label>
+              <span className="mb-1.5 block pl-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
+                Pronari
+              </span>
+              <FilterSelect
+                options={ownerOptions}
+                value={ownerFilter}
+                onChange={setOwnerFilter}
+                placeholder="Të gjithë pronarët"
+              />
+            </label>
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[#eef0f4] pt-2.5">
+            <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+              <span className="font-medium text-black/48">{toolbarPrimaryMeta}</span>
+              <span className="inline-block h-[4px] w-[4px] rounded-full bg-black/[0.14]" />
+              <span className="text-black/34">{toolbarSecondaryMeta}</span>
             </div>
-
-            <FilterSelect
-              options={ownershipOptions}
-              value={ownershipFilter}
-              onChange={(next) => {
-                setOwnershipFilter(next);
-                setOwnerFilter(ALL_OWNERS);
-              }}
-              placeholder="Të gjitha kategoritë"
-            />
-            <FilterSelect
-              options={ownerOptions}
-              value={ownerFilter}
-              onChange={setOwnerFilter}
-              placeholder="Të gjithë pronarët"
-            />
-            <FilterSelect
-              options={statusOptions}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              placeholder="Të gjitha statuset"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-end gap-2">
-            <FilterSelect
-              options={blockOptions}
-              value={blockFilter}
-              onChange={setBlockFilter}
-              placeholder="Të gjitha blloqet"
-            />
-            <FilterSelect
-              options={typeOptions}
-              value={typeFilter}
-              onChange={setTypeFilter}
-              placeholder="Të gjitha llojet"
-            />
-            <FilterSelect
-              options={levelOptions}
-              value={levelFilter}
-              onChange={setLevelFilter}
-              placeholder="Të gjitha nivelet"
-            />
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="rounded-[10px] border border-[#dbe3f2] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[#003883] transition hover:bg-[#f8fbff]"
+              >
+                Pastro filtrat
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[18px] border border-[#ededf0] bg-white">
           <div className="max-h-[560px] overflow-auto">
             <table className="w-full min-w-[1160px] text-[12px] font-normal">
               <thead className="sticky top-0 z-10">
                 <tr className={TABULAR_HEADER_ROW_CLASS}>
                   {[
-                    "ID e njësisë",
+                    "Njësia",
                     "Blloku",
                     "Lloji",
                     "Niveli",
-                    "Kategoria e pronësisë",
+                    "Pronësia",
                     "Pronari",
-                    "Sipërfaqja (m²)",
+                    "Sipërfaqja",
                     "Statusi",
                     "Pagesa",
                     "Çmimi",
-                    "Historia",
+                    "Veprim",
                   ].map((heading, index) => (
                     <th
                       key={heading}
-                      className={`py-3 ${TABULAR_HEADER_LABEL_CLASS} ${
+                      className={`whitespace-nowrap py-3 ${TABULAR_HEADER_LABEL_CLASS} ${
                         index === 0
                           ? "pl-6 pr-3 text-left"
+                          : index === 4
+                            ? "pl-4 pr-3 text-left"
                           : index === 8
                             ? "px-3 text-left"
                             : index === 9
@@ -768,14 +738,11 @@ export function DataInputOperationalRegistry({
                   </tr>
                 ) : (
                   filteredRows.map((row) => {
-                    const ownerStyle = getOwnerCategoryStyle(row.ownerCategory);
                     const paymentFollowUp = getPaymentFollowUp(row);
                     const isHighlighted = highlightedUnitId === row.unit.id;
                     const isFlashing = flashUnitId === row.unit.id;
                     const hasInteractivePaymentContext =
-                      row.status === "E shitur" &&
-                      !!onPaymentNavigate &&
-                      (row.paymentType !== null || row.paymentCount > 0);
+                      row.status === "E shitur" && !!onPaymentNavigate;
 
                     const rowRefCallback = (node: HTMLTableRowElement | null) => {
                       if (node) {
@@ -787,30 +754,29 @@ export function DataInputOperationalRegistry({
 
                     const commonCells = (
                       <>
-                        <td className="py-3 pl-6 pr-3 text-black/72">{row.unitId}</td>
-                        <td className="px-3 py-3 text-black/66">{row.block}</td>
-                        <td className="px-3 py-3 text-black/74">{row.type}</td>
-                        <td className="px-3 py-3 text-black/66">{row.level}</td>
-                        <td className="px-3 py-3 text-center">
-                          <PillBadge
-                            weight="normal"
-                            style={{
-                              background: ownerStyle.bg,
-                              color: ownerStyle.color,
-                              border: `1px solid ${ownerStyle.border}`,
-                            }}
-                          >
+                        <td className="whitespace-nowrap py-4 pl-6 pr-3 text-[13px] font-normal text-black/78">
+                          {row.unitId}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-black/60">{row.block}</td>
+                        <td className="whitespace-nowrap px-3 py-4 text-black/70">{row.type}</td>
+                        <td className="whitespace-nowrap px-3 py-4 text-black/60">{row.level}</td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-left">
+                          <PillBadge weight="medium" style={registryCategoryPillStyle}>
                             {row.ownerCategory}
                           </PillBadge>
                         </td>
-                        <td className="px-3 py-3 text-black/66">{row.ownerName}</td>
-                        <td className="px-3 py-3 text-left text-black/66">{formatArea(row.area)}</td>
-                        <td className="px-3 py-3 text-center">
+                        <td className="max-w-[220px] truncate whitespace-nowrap px-3 py-4 text-black/60">
+                          {row.ownerName}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-left text-black/60">
+                          {formatArea(row.area)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-center">
                           <PillBadge weight="normal" style={statusStyleFor(row.status)}>
                             {row.status}
                           </PillBadge>
                         </td>
-                        <td className="px-3 py-3 text-left">
+                        <td className="px-3 py-4 text-left">
                           {hasInteractivePaymentContext ? (
                             <button
                               type="button"
@@ -842,15 +808,14 @@ export function DataInputOperationalRegistry({
                             </div>
                           )}
                         </td>
-                        <td className="py-3 pl-3 pr-3 text-right text-black/72">
+                        <td className="whitespace-nowrap py-4 pl-3 pr-3 text-right text-[13px] font-semibold text-black/75">
                           {formatCurrency(row.price)}
                         </td>
-                        <td className="py-3 pl-3 pr-6 text-center">
+                        <td className="whitespace-nowrap py-4 pl-3 pr-6 text-center">
                           <button
                             type="button"
                             onClick={() => onEdit(row.unit)}
-                            className="rounded-[8px] px-2.5 py-1 text-[11px] font-normal transition"
-                            style={actionStyleFor(row.status)}
+                            className="rounded-[8px] border border-[#e8e8ec] bg-[#fbfcfe] px-2.5 py-1 text-[11px] font-medium text-black/42 transition hover:border-[#003883] hover:text-[#003883]"
                           >
                             Ndrysho
                           </button>
@@ -891,7 +856,6 @@ export function DataInputOperationalRegistry({
               </tbody>
             </table>
           </div>
-        </div>
       </div>
     </section>
   );

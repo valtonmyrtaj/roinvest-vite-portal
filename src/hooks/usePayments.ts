@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { payments as paymentsApi } from "../lib/api";
 import type {
-  CreatePaymentReceiptPayload,
   CreatePaymentPayload,
   PaymentDbStatus,
   PaymentReceiptRow,
   PaymentWithReceiptsRow,
+  RegisterPaymentReceiptWithSplitPayload,
   UpdatePaymentPatch,
 } from "../lib/api/payments";
 
@@ -59,6 +59,7 @@ type RegisterPaymentReceiptInput = {
   amount: number;
   paid_date: string;
   notes?: string | null;
+  remainder_due_date?: string | null;
 };
 
 function todayIso() {
@@ -127,6 +128,16 @@ function normalizePayment(row: PaymentWithReceiptsRow): Payment {
   };
 }
 
+function comparePaymentsBySchedule(left: Payment, right: Payment): number {
+  const dueDateOrder = left.due_date.localeCompare(right.due_date);
+  if (dueDateOrder !== 0) return dueDateOrder;
+
+  const installmentOrder = left.installment_number - right.installment_number;
+  if (installmentOrder !== 0) return installmentOrder;
+
+  return left.created_at.localeCompare(right.created_at);
+}
+
 export function usePayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
@@ -159,7 +170,7 @@ export function usePayments() {
       return { error: result.error };
     }
 
-    const nextPayments = result.data.map(normalizePayment);
+    const nextPayments = result.data.map(normalizePayment).sort(comparePaymentsBySchedule);
     if (isStaleRequest) {
       return { data: nextPayments, error: null };
     }
@@ -226,9 +237,7 @@ export function usePayments() {
     const nextPayment = normalizePayment(result.data);
 
     setPayments((prev) =>
-      [...prev, nextPayment].sort(
-        (a, b) => a.installment_number - b.installment_number,
-      ),
+      [...prev, nextPayment].sort(comparePaymentsBySchedule),
     );
     setAllPayments((prev) =>
       [...prev, nextPayment].sort((a, b) =>
@@ -268,7 +277,7 @@ export function usePayments() {
       setPayments((prev) =>
         prev
           .map((payment) => (payment.id === id ? nextPayment : payment))
-          .sort((a, b) => a.installment_number - b.installment_number),
+          .sort(comparePaymentsBySchedule),
       );
       setAllPayments((prev) =>
         prev
@@ -295,20 +304,21 @@ export function usePayments() {
   }, []);
 
   const registerPaymentReceipt = useCallback(async (input: RegisterPaymentReceiptInput) => {
-    const payload: CreatePaymentReceiptPayload = {
+    const payload: RegisterPaymentReceiptWithSplitPayload = {
       payment_id: input.payment_id,
       amount: input.amount,
       paid_date: input.paid_date,
       notes: input.notes ?? null,
+      remainder_due_date: input.remainder_due_date ?? null,
     };
 
-    const result = await paymentsApi.createPaymentReceipt(payload);
+    const result = await paymentsApi.registerPaymentReceiptWithSplit(payload);
 
     if (result.error !== null) {
       return { error: result.error };
     }
 
-    return { data: normalizeReceipt(result.data), error: null };
+    return { data: result.data, error: null };
   }, []);
 
   return {

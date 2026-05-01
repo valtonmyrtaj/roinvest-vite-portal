@@ -35,6 +35,7 @@ export type SalesUnitRow = Pick<
   final_price: number | null;
   sale_date: string | null;
   buyer_name: string | null;
+  buyer_phone: string | null;
   payment_type: string | null;
   crm_lead_id: string | null;
 };
@@ -86,7 +87,7 @@ export async function listSaleUnitsByIds(
       .in("id", normalizedUnitIds),
     supabase
       .from("unit_sales")
-      .select("unit_id,final_price,sale_date,buyer_name,payment_type,crm_lead_id")
+      .select("unit_id,final_price,sale_date,buyer_name,buyer_phone,payment_type,crm_lead_id")
       .eq("status", "active")
       .in("unit_id", normalizedUnitIds),
   ]);
@@ -104,6 +105,7 @@ export async function listSaleUnitsByIds(
         final_price: row.final_price,
         sale_date: row.sale_date,
         buyer_name: row.buyer_name,
+        buyer_phone: row.buyer_phone,
         payment_type: row.payment_type,
         crm_lead_id: row.crm_lead_id,
       },
@@ -124,6 +126,7 @@ export async function listSaleUnitsByIds(
         final_price: activeSale?.final_price ?? null,
         sale_date: activeSale?.sale_date ?? null,
         buyer_name: activeSale?.buyer_name ?? null,
+        buyer_phone: activeSale?.buyer_phone ?? null,
         payment_type: activeSale?.payment_type ?? null,
         crm_lead_id: activeSale?.crm_lead_id ?? null,
       };
@@ -194,6 +197,7 @@ function mapUpcomingSalePaymentRpcRow(
       final_price: row.sale_final_price,
       sale_date: row.sale_date,
       buyer_name: row.sale_buyer_name,
+      buyer_phone: row.sale_buyer_phone,
       payment_type: row.sale_payment_type,
       crm_lead_id: row.sale_crm_lead_id,
     },
@@ -216,6 +220,7 @@ export interface CompleteUnitSaleInput {
   sale_date: string;
   final_price: number;
   buyer_name: string;
+  buyer_phone?: string | null;
   payment_type: SalePaymentType;
   notes?: string | null;
   crm_lead_id?: string | null;
@@ -251,6 +256,7 @@ export async function completeUnitSale(
     p_sale_date: input.sale_date,
     p_final_price: input.final_price,
     p_buyer_name: input.buyer_name,
+    p_buyer_phone: input.buyer_phone ?? undefined,
     p_payment_type: input.payment_type,
     p_notes: input.notes ?? undefined,
     p_crm_lead_id: input.crm_lead_id ?? undefined,
