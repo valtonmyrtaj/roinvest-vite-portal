@@ -16,14 +16,14 @@ export default function LoginPage() {
   function getFriendlyError(message: string) {
     const n = message.toLowerCase();
     if (n.includes("rate limit") || n.includes("too many requests") || n.includes("email rate limit exceeded"))
-      return "Please wait a moment before requesting another secure link.";
+      return "Prisni pak para se të kërkoni një link tjetër të sigurt.";
     if (n.includes("invalid email"))
-      return "Please enter a valid email address.";
+      return "Vendosni një adresë emaili të vlefshme.";
     if (n.includes("invalid login credentials") || n.includes("invalid password") || n.includes("wrong password"))
-      return "Incorrect email or password.";
+      return "Emaili ose fjalëkalimi nuk është i saktë.";
     if (n.includes("email not confirmed"))
-      return "Please confirm your email address first.";
-    return "Sign-in failed. Please try again.";
+      return "Konfirmoni fillimisht adresën tuaj të emailit.";
+    return "Hyrja dështoi. Provoni përsëri.";
   }
 
   async function handleMagicLink(e: React.FormEvent) {
@@ -72,9 +72,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <h1 className="text-[24px] font-semibold text-black/90">Private access</h1>
+        <h1 className="text-[24px] font-semibold text-black/90">Qasje private</h1>
         <p className="mt-2 text-[14px] text-black/55">
-          Sign in with your approved email to access the investor dashboard.
+          Hyni me emailin e aprovuar për të hapur panelin e investitorit.
         </p>
 
         {/* Tab switcher */}
@@ -89,7 +89,7 @@ export default function LoginPage() {
               boxShadow: tab === "password" ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
             }}
           >
-            Password
+            Fjalëkalimi
           </button>
           <button
             type="button"
@@ -101,7 +101,7 @@ export default function LoginPage() {
               boxShadow: tab === "magic" ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
             }}
           >
-            Magic link
+            Link me email
           </button>
         </div>
 
@@ -110,7 +110,7 @@ export default function LoginPage() {
           <form onSubmit={handlePassword} className="mt-5 space-y-3">
             <input
               type="email"
-              placeholder="name@company.com"
+              placeholder="email@kompania.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-black/[0.08] bg-white px-4 py-3 text-[14px] outline-none transition focus:border-[#003883]"
@@ -118,7 +118,7 @@ export default function LoginPage() {
             />
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Fjalëkalimi"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-2xl border border-black/[0.08] bg-white px-4 py-3 text-[14px] outline-none transition focus:border-[#003883]"
@@ -129,7 +129,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-2xl bg-[#003883] px-4 py-3 text-[14px] font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "Duke hyrë..." : "Hyr"}
             </button>
           </form>
         )}
@@ -139,7 +139,7 @@ export default function LoginPage() {
           <form onSubmit={handleMagicLink} className="mt-5 space-y-3">
             <input
               type="email"
-              placeholder="name@company.com"
+              placeholder="email@kompania.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-black/[0.08] bg-white px-4 py-3 text-[14px] outline-none transition focus:border-[#003883]"
@@ -150,14 +150,14 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-2xl bg-[#003883] px-4 py-3 text-[14px] font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? "Sending…" : "Send magic link"}
+              {loading ? "Duke dërguar..." : "Dërgo linkun në email"}
             </button>
           </form>
         )}
 
         {sent && (
           <div className="mt-4 rounded-2xl border border-black/[0.06] bg-black/[0.025] px-4 py-3">
-            <p className="text-[13px] text-black/55">Check your email for the secure sign-in link.</p>
+            <p className="text-[13px] text-black/55">Kontrolloni emailin për linkun e sigurt të hyrjes.</p>
           </div>
         )}
 
