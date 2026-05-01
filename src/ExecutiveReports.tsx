@@ -139,7 +139,7 @@ export default function ExecutiveReports() {
     >
       <ExecutiveReportsPrintStyle />
 
-      <div className="executive-report-content executive-reports-root mx-auto max-w-[1280px] px-10 py-9">
+      <div className="executive-report-content executive-reports-root mx-auto max-w-[1280px] px-5 py-7 sm:px-6 md:px-10 md:py-9">
         <motion.div
           {...sectionMotion()}
           className="mb-[30px]"

@@ -193,7 +193,7 @@ function OperationalAlertsPanel({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97, y: -6 }}
       transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[360px] overflow-hidden rounded-[16px] border border-black/[0.07] bg-white shadow-xl"
+      className="fixed left-4 right-4 top-[72px] z-50 w-auto overflow-hidden rounded-[16px] border border-black/[0.07] bg-white shadow-xl md:absolute md:left-auto md:right-0 md:top-[calc(100%+10px)] md:w-[360px]"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3.5">
@@ -285,7 +285,7 @@ function AvatarPanel({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97, y: -6 }}
       transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[210px] overflow-hidden rounded-[14px] border border-black/[0.07] bg-white shadow-xl"
+      className="fixed left-4 right-4 top-[72px] z-50 w-auto overflow-hidden rounded-[14px] border border-black/[0.07] bg-white shadow-xl md:absolute md:left-auto md:right-0 md:top-[calc(100%+10px)] md:w-[210px]"
     >
       {/* User info */}
       <div className="flex items-center gap-3 px-4 py-3.5">
@@ -447,7 +447,7 @@ export default function DashboardShell({
   return (
     <div className="min-h-screen bg-[#f8f8fa] text-black">
       {/* ── Sidebar ── */}
-      <aside className="fixed left-0 top-0 flex h-screen w-[260px] flex-col border-r border-black/[0.05] bg-[#fcfcfd]">
+      <aside className="fixed left-0 top-0 hidden h-screen w-[260px] flex-col border-r border-black/[0.05] bg-[#fcfcfd] md:flex">
         <div className="flex h-[74px] items-center border-b border-black/[0.05] px-4">
           <img src="/selesta-logo-blue.png" alt="Selesta Living logo" className="h-6 w-[42px] object-contain" />
         </div>
@@ -480,11 +480,11 @@ export default function DashboardShell({
       </aside>
 
       {/* ── Main ── */}
-      <div className="ml-[260px] min-h-screen">
-        <header className="flex h-[74px] items-center justify-between border-b border-black/[0.05] bg-[#fcfcfd] px-7">
+      <div className="min-h-screen md:ml-[260px]">
+        <header className="sticky top-0 z-30 flex h-[64px] items-center justify-between border-b border-black/[0.05] bg-[#fcfcfd] px-4 md:static md:h-[74px] md:px-7">
           {/* Left: brand */}
           <div className="flex flex-col items-start">
-            <img src="/selesta-living-full.png" alt="Selesta Living" className="h-6 w-[184px] object-contain object-left" />
+            <img src="/selesta-living-full.png" alt="Selesta Living" className="h-5 w-[154px] object-contain object-left md:h-6 md:w-[184px]" />
           </div>
 
           {/* Right: bell + avatar */}
@@ -539,7 +539,7 @@ export default function DashboardShell({
                 >
                   <span className="text-[11px] font-semibold">{userInitials || "U"}</span>
                 </div>
-                <div className="leading-tight">
+                <div className="hidden leading-tight sm:block">
                   <div className="text-[12.5px] text-black/82" style={{ fontWeight: 550 }}>{userName}</div>
                   <div className="mt-0.5 text-[11px] text-black/34">{userLabel}</div>
                 </div>
@@ -561,8 +561,32 @@ export default function DashboardShell({
           </div>
         </header>
 
-        <main className="min-h-[calc(100vh-74px)]">{children}</main>
+        <main className="min-h-[calc(100vh-64px)] pb-[calc(env(safe-area-inset-bottom)+86px)] md:min-h-[calc(100vh-74px)] md:pb-0">{children}</main>
       </div>
+
+      <nav className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 flex gap-1 overflow-x-auto border-t border-black/[0.07] bg-white/95 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+10px)] shadow-[0_-10px_30px_rgba(16,24,40,0.08)] backdrop-blur md:hidden">
+        {visibleNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPage === item.key;
+          return (
+            <button
+              key={item.key}
+              onClick={() => {
+                onNavigate(item.key);
+                setBellOpen(false);
+                setAvatarOpen(false);
+              }}
+              className={`flex min-w-[72px] flex-1 flex-col items-center justify-center gap-1 rounded-[14px] px-2 py-2 text-[10.5px] leading-none transition ${
+                isActive ? "bg-[#eef3fb] text-[#003883]" : "text-black/38"
+              }`}
+              style={{ fontWeight: isActive ? 650 : 520 }}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="whitespace-nowrap">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

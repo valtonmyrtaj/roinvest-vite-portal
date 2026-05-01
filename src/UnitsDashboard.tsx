@@ -265,14 +265,14 @@ export function UnitsDashboard() {
         />
       )}
 
-      <div className="mx-auto max-w-[1280px] px-10 pt-6 pb-10">
+      <div className="mx-auto max-w-[1280px] px-5 pt-5 pb-10 sm:px-6 md:px-10 md:pt-6">
         <PageHeader
           tone="brand"
           title="Njësitë"
           subtitle="Inventari i plotë i njësive me status, pronësi, njësi të rezervuara dhe histori ndryshimesh."
           className="!mb-[44px] items-start gap-x-8 gap-y-2.5"
-          bodyClassName="min-w-[320px] flex-[1_1_560px] sm:self-center"
-          contentClassName="max-w-[620px] translate-y-[20px]"
+          bodyClassName="min-w-0 flex-[1_1_560px] sm:min-w-[320px] sm:self-center"
+          contentClassName="max-w-[620px] md:translate-y-[20px]"
           titleClassName="leading-none"
           subtitleClassName="!mt-0 max-w-[620px]"
         />

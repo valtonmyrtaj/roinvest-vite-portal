@@ -375,7 +375,7 @@ export default function SalesPage({
         )}
       </AnimatePresence>
 
-      <div className="mx-auto max-w-[1280px] px-10 pb-9 pt-6">
+      <div className="mx-auto max-w-[1280px] px-5 pb-9 pt-5 sm:px-6 md:px-10 md:pt-6">
         <SalesHeader />
 
         <SalesSummary

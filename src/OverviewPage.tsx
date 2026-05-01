@@ -508,7 +508,7 @@ export default function OverviewPage() {
 
   return (
     <div style={{ backgroundColor: "#f8f8fa" }}>
-      <div className="mx-auto max-w-[1100px] px-10 py-10">
+      <div className="mx-auto max-w-[1100px] px-5 py-6 sm:px-6 md:px-10 md:py-10">
 
         {/* Header */}
         <PageHeader
@@ -528,7 +528,7 @@ export default function OverviewPage() {
         />
 
         {/* Period filter — right-aligned above hero card */}
-        <motion.div {...fadeUp(0.08)} className="mb-1 flex justify-end gap-2">
+        <motion.div {...fadeUp(0.08)} className="mb-1 flex flex-wrap justify-start gap-2 sm:justify-end">
           <CustomSelect
             size="sm"
             className="min-w-[148px]"
@@ -574,7 +574,7 @@ export default function OverviewPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.44, delay: 0.05, ease: SOFT_EASE }}
-          className="mb-8 flex items-end justify-between rounded-[24px] border border-[#E8E8EC] bg-white px-8 py-7"
+          className="mb-8 flex flex-col items-start justify-between gap-5 rounded-[24px] border border-[#E8E8EC] bg-white px-5 py-5 sm:flex-row sm:items-end sm:px-8 sm:py-7"
           style={{ boxShadow: OVERVIEW_HERO_SHADOW }}
         >
           {/* Left: label tightly above revenue */}
@@ -589,7 +589,7 @@ export default function OverviewPage() {
               <AnimatedPeriodBadge label={heroRevenueBadgeLabel} />
             </div>
             <p
-              className="text-[52px] leading-none tracking-[-2px]"
+              className="text-[34px] leading-none tracking-[-1px] sm:text-[52px] sm:tracking-[-2px]"
               style={{ color: NAVY, fontWeight: 700 }}
             >
               {fmtEur(animatedRevenue)}
@@ -602,7 +602,7 @@ export default function OverviewPage() {
           </div>
 
           {/* Right: completion stats */}
-          <div className="flex flex-col items-end gap-1 text-right">
+          <div className="flex flex-col items-start gap-1 text-left sm:items-end sm:text-right">
             <p className="text-[13px] text-black/50" style={{ fontWeight: 400 }}>
               {soldSummaryLabel}
             </p>
@@ -619,7 +619,7 @@ export default function OverviewPage() {
         </motion.div>
 
         {/* KPI cards */}
-        <div className="mb-8 flex gap-4">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row">
           {kpis.map((k, i) => (
             <KpiCard key={k.key} kpi={k} delay={0.1 + i * 0.07} active={started} />
           ))}

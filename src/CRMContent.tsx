@@ -22,7 +22,7 @@ export default function CRMContent() {
       transition={{ duration: 0.24, ease: SOFT_EASE }}
       style={{ background: PAGE_BG }}
     >
-      <div className="mx-auto max-w-[1220px] px-10 py-9">
+      <div className="mx-auto max-w-[1220px] px-5 py-7 sm:px-6 md:px-10 md:py-9">
         <motion.div {...sectionMotion()} className="mb-7">
           <PageHeader
             tone="brand"

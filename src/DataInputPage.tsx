@@ -389,7 +389,7 @@ export default function DataInputPage({
         />
       )}
 
-      <div className="mx-auto max-w-[1280px] px-10 py-10">
+      <div className="mx-auto max-w-[1280px] px-5 py-7 sm:px-6 md:px-10 md:py-10">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -620,7 +620,7 @@ export default function DataInputPage({
         }
       />
 
-      <div className="mx-auto max-w-[1280px] px-10 pb-10 pt-6">
+      <div className="mx-auto max-w-[1280px] px-5 pb-10 pt-5 sm:px-6 md:px-10 md:pt-6">
         <OwnerContactsSection
           units={units}
           ownerEntities={ownerEntities}

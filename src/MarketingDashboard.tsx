@@ -1355,7 +1355,7 @@ export default function MarketingDashboard() {
 
   return (
     <div style={{ backgroundColor: "#f8f8fa" }}>
-      <div className="mx-auto max-w-[1100px] px-10 py-10">
+      <div className="mx-auto max-w-[1100px] px-5 py-7 sm:px-6 md:px-10 md:py-10">
 
         {/* Header */}
         <PageHeader

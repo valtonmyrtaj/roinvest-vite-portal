@@ -535,7 +535,7 @@ export function DataInputOperationalRegistry({
   return (
     <section
       data-operational-registry="true"
-      className="mx-auto max-w-[1280px] px-10 py-8"
+      className="mx-auto max-w-[1280px] px-5 py-7 sm:px-6 md:px-10 md:py-8"
     >
       <SectionEyebrow
         className="mb-4"

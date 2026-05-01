@@ -135,7 +135,7 @@ function PageFallback() {
     >
       <span className="sr-only">Loading page</span>
 
-      <div className="mx-auto max-w-[1280px] px-10 py-9">
+      <div className="mx-auto max-w-[1280px] px-5 py-7 md:px-10 md:py-9">
         <div className="max-w-[560px]">
           <div className="h-2.5 w-24 rounded-full bg-black/[0.05]" />
           <div className="mt-4 h-8 w-full max-w-[320px] rounded-[10px] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)]" />
