@@ -191,6 +191,13 @@ function ProtectedApp() {
     setLocationSearch(nextUrl.search);
   };
 
+  const handleLoginSuccess = useCallback(() => {
+    const nextUrl = buildPageUrl("overview");
+    replaceUrl(nextUrl);
+    setCurrentPage("overview");
+    setLocationSearch(nextUrl.search);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined" || !initialRoutingState.normalizedUrl) return;
     replaceUrl(initialRoutingState.normalizedUrl);
@@ -221,7 +228,7 @@ function ProtectedApp() {
   }
 
   if (!session) {
-    return <LoginPage />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
   if (!approvedUser) {

@@ -3,7 +3,11 @@ import { useAuth } from "./context/useAuth";
 
 type Tab = "magic" | "password";
 
-export default function LoginPage() {
+type LoginPageProps = {
+  onLoginSuccess: () => void;
+};
+
+export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const { signInWithMagicLink, signInWithPassword } = useAuth();
 
   const [tab, setTab] = useState<Tab>("password");
@@ -47,6 +51,8 @@ export default function LoginPage() {
     const result = await signInWithPassword(email.trim().toLowerCase(), password);
     if (result.error) {
       setError(getFriendlyError(result.error));
+    } else {
+      onLoginSuccess();
     }
     setLoading(false);
   }
