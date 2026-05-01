@@ -484,13 +484,7 @@ export default function DashboardShell({
         <header className="flex h-[74px] items-center justify-between border-b border-black/[0.05] bg-[#fcfcfd] px-7">
           {/* Left: brand */}
           <div className="flex flex-col items-start">
-            <img src="/selesta-living-full.png" alt="Selesta Living" className="h-7 w-[214px] object-contain object-left" />
-            <span
-              className="mt-1 text-[10px] uppercase tracking-[0.18em]"
-              style={{ color: "rgba(0,56,131,0.68)", fontWeight: 500 }}
-            >
-              UF Partners Portal
-            </span>
+            <img src="/selesta-living-full.png" alt="Selesta Living" className="h-6 w-[184px] object-contain object-left" />
           </div>
 
           {/* Right: bell + avatar */}
