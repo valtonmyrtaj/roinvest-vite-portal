@@ -450,7 +450,7 @@ export default function DashboardShell({
       <aside className="fixed left-0 top-0 flex h-screen w-[260px] flex-col border-r border-black/[0.05] bg-[#fcfcfd]">
         <div className="flex h-[74px] items-center border-b border-black/[0.05] px-4">
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5">
-            <img src="/R003883.png" alt="Roinvest logo" className="h-6 w-6 object-contain" />
+            <img src="/selesta-mark.png" alt="Selesta Living logo" className="h-7 w-7 rounded-lg object-cover" />
           </div>
         </div>
 
@@ -476,7 +476,7 @@ export default function DashboardShell({
         </nav>
 
         <div className="mt-auto border-t border-black/[0.05] px-4 py-4">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-black/22">UF Partners Portal</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-black/22">Selesta Living</div>
           <div className="mt-1 text-[11px] text-black/32">v1.0</div>
         </div>
       </aside>
@@ -487,10 +487,10 @@ export default function DashboardShell({
           {/* Left: brand */}
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5">
-              <img src="/R003883.png" alt="Roinvest logo" className="h-6 w-6 object-contain" />
+              <img src="/selesta-mark.png" alt="Selesta Living logo" className="h-7 w-7 rounded-lg object-cover" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-[15px]" style={{ color: ACCENT, fontWeight: 600 }}>Roinvest</span>
+              <span className="text-[15px]" style={{ color: ACCENT, fontWeight: 600 }}>Selesta Living</span>
               <span
                 className="mt-1 text-[10px] uppercase tracking-[0.18em]"
                 style={{ color: "rgba(0,56,131,0.68)", fontWeight: 500 }}

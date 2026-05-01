@@ -70,10 +70,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         {/* Logo */}
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-black/5 shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
-            <img src="/R003883.png" alt="Roinvest logo" className="h-6 w-6 object-contain" />
+            <img src="/selesta-mark.png" alt="Selesta Living logo" className="h-7 w-7 rounded-lg object-cover" />
           </div>
           <div>
-            <div className="text-[15px] font-semibold text-black/90">Roinvest</div>
+            <div className="text-[15px] font-semibold text-black/90">Selesta Living</div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-black/38">UF PARTNERS PORTAL</div>
           </div>
         </div>
