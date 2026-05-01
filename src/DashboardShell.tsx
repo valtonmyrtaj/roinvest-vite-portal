@@ -35,7 +35,7 @@ export type PageKey =
   | "reports"
   | "input";
 
-type UserRole = "sales_director" | "investor";
+type UserRole = "sales_director" | "investor" | "cfo";
 
 type DashboardShellProps = {
   children: ReactNode;
@@ -346,13 +346,18 @@ export default function DashboardShell({
   const avatarRef = useRef<HTMLDivElement>(null);
 
   const visibleNavItems = navItems.filter((item) => {
-    if (userRole === "investor") {
+    if (userRole !== "sales_director") {
       return ["overview", "sales", "units", "reports"].includes(item.key);
     }
     return true;
   });
 
-  const userLabel    = userRole === "sales_director" ? "Sales Director" : "Investor Access";
+  const userLabel =
+    userRole === "sales_director"
+      ? "Sales Director"
+      : userRole === "cfo"
+        ? "CFO Access"
+        : "Investor Access";
   const userInitials = userName
     .split(" ").filter(Boolean).slice(0, 2)
     .map((p) => p[0]?.toUpperCase()).join("");

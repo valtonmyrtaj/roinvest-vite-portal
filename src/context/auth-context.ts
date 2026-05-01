@@ -4,7 +4,7 @@ import type { Session, User } from "@supabase/supabase-js";
 export type ApprovedUser = {
   email: string;
   full_name: string | null;
-  role: "sales_director" | "investor";
+  role: "sales_director" | "investor" | "cfo";
   status: "active" | "inactive";
 };
 
