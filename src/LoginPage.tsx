@@ -72,7 +72,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <img src="/selesta-living-full.png" alt="Selesta Living" className="h-7 w-[214px] max-w-full object-contain object-left" />
         </div>
 
-        <h1 className="text-[24px] font-semibold text-black/90">Qasje private</h1>
+        <h1 className="text-[24px] font-semibold text-[#333333]">Qasje private</h1>
         <p className="mt-2 text-[14px] text-black/55">
           Hyni me emailin e aprovuar për të hapur panelin e investitorit.
         </p>
@@ -110,7 +110,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <form onSubmit={handlePassword} className="mt-5 space-y-3">
             <input
               type="email"
-              placeholder="email@kompania.com"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-black/[0.08] bg-white px-4 py-3 text-[14px] outline-none transition focus:border-[#003883]"
@@ -139,7 +139,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <form onSubmit={handleMagicLink} className="mt-5 space-y-3">
             <input
               type="email"
-              placeholder="email@kompania.com"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-black/[0.08] bg-white px-4 py-3 text-[14px] outline-none transition focus:border-[#003883]"
