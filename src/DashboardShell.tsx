@@ -449,9 +449,7 @@ export default function DashboardShell({
       {/* ── Sidebar ── */}
       <aside className="fixed left-0 top-0 flex h-screen w-[260px] flex-col border-r border-black/[0.05] bg-[#fcfcfd]">
         <div className="flex h-[74px] items-center border-b border-black/[0.05] px-4">
-          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5">
-            <img src="/selesta-mark.png" alt="Selesta Living logo" className="h-7 w-7 rounded-lg object-cover" />
-          </div>
+          <img src="/selesta-logo-blue.png" alt="Selesta Living logo" className="h-8 w-[54px] object-contain" />
         </div>
 
         <nav className="flex flex-col gap-2.5 px-5 py-7">
@@ -486,9 +484,7 @@ export default function DashboardShell({
         <header className="flex h-[74px] items-center justify-between border-b border-black/[0.05] bg-[#fcfcfd] px-7">
           {/* Left: brand */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5">
-              <img src="/selesta-mark.png" alt="Selesta Living logo" className="h-7 w-7 rounded-lg object-cover" />
-            </div>
+            <img src="/selesta-logo-blue.png" alt="Selesta Living logo" className="h-8 w-[54px] object-contain" />
             <div className="flex flex-col leading-none">
               <span className="text-[15px]" style={{ color: ACCENT, fontWeight: 600 }}>Selesta Living</span>
               <span
