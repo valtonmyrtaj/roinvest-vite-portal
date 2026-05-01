@@ -68,12 +68,9 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       <div className="w-full max-w-md rounded-3xl border border-black/[0.06] bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
 
         {/* Logo */}
-        <div className="mb-6 flex items-center gap-3">
-          <img src="/selesta-logo-blue.png" alt="Selesta Living logo" className="h-7 w-[48px] shrink-0 object-contain" />
-          <div>
-            <div className="text-[15px] font-semibold text-black/90">Selesta Living</div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-black/38">UF PARTNERS PORTAL</div>
-          </div>
+        <div className="mb-6 flex flex-col items-start">
+          <img src="/selesta-living-full.png" alt="Selesta Living" className="h-8 w-[244px] max-w-full object-contain object-left" />
+          <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-black/38">UF PARTNERS PORTAL</div>
         </div>
 
         <h1 className="text-[24px] font-semibold text-black/90">Qasje private</h1>
