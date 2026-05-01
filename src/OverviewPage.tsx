@@ -517,22 +517,8 @@ export default function OverviewPage() {
           subtitleStyle={{ color: "rgba(15,23,42,0.5)" }}
           title={
             <motion.span {...fadeUp(0)} className="block">
-              UF Partners Residence
+              Selesta Living
             </motion.span>
-          }
-          subtitle={
-            <>
-              <motion.span {...fadeUp(0.06)} className="block">
-                Rr. Agron Selenica, Gjilan
-              </motion.span>
-              <motion.span
-                {...fadeUp(0.07)}
-                className="mt-0.5 block text-[12.5px]"
-                style={{ color: "rgba(15,23,42,0.4)" }}
-              >
-                Pronësia Investitor · pamje financiare sipas periudhës së zgjedhur
-              </motion.span>
-            </>
           }
           right={
             <motion.span {...fadeUp(0.08)} className="mt-1 text-[13px] text-black/28">
@@ -575,6 +561,13 @@ export default function OverviewPage() {
             )}
           </AnimatePresence>
         </motion.div>
+
+        <motion.p
+          {...fadeUp(0.1)}
+          className="-mt-5 mb-3 px-1 text-[12.5px] text-black/38"
+        >
+          Pamje financiare sipas periudhës së zgjedhur
+        </motion.p>
 
         {/* Hero card */}
         <motion.div

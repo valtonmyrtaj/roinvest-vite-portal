@@ -19,8 +19,14 @@ export type OwnerEntityCategory =
 
 /** The narrow projection the consumer actually reads. */
 export interface OwnerEntityRow {
+  id: string;
   category: string;
   name: string;
+  contact_person: string | null;
+  phone: string | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 // ─── Write-result contract (structured, code-preserving) ─────────────────────
@@ -42,9 +48,9 @@ export interface OwnerEntityWriteError {
  * ApiResult<null> because the hook needs `error.code` to distinguish
  * unique-violation from a genuine failure.
  */
-export type OwnerEntityWriteResult =
-  | { error: null }
-  | { error: OwnerEntityWriteError };
+export type OwnerEntityWriteResult<TData = null> =
+  | { data: TData; error: null }
+  | { data: null; error: OwnerEntityWriteError };
 
 /**
  * Named Postgres error code for a unique-constraint violation. Exposed
@@ -59,13 +65,55 @@ export const POSTGRES_UNIQUE_VIOLATION_CODE = "23505";
  * List all owner entities, ordered by creation time ascending.
  * Returns the narrow { category, name } projection the consumer uses.
  */
+const OWNER_ENTITY_DETAIL_SELECT =
+  "id, category, name, contact_person, phone, notes, created_at, updated_at";
+const OWNER_ENTITY_LEGACY_SELECT = "id, category, name, created_at, updated_at";
+
+function toLegacyOwnerEntityRows(
+  rows: Array<{
+    id: string;
+    category: string;
+    name: string;
+    created_at: string | null;
+    updated_at: string | null;
+  }>,
+): OwnerEntityRow[] {
+  return rows.map((row) => ({
+    ...row,
+    contact_person: null,
+    phone: null,
+    notes: null,
+  }));
+}
+
+function isMissingContactColumnError(message: string): boolean {
+  return (
+    message.includes("contact_person") ||
+    message.includes("phone") ||
+    message.includes("notes")
+  );
+}
+
 export async function listOwnerEntities(): Promise<ApiResult<OwnerEntityRow[]>> {
   const { data, error } = await supabase
     .from("owner_entities")
-    .select("category, name")
+    .select(OWNER_ENTITY_DETAIL_SELECT)
     .order("created_at", { ascending: true });
 
-  if (error) return apiFail(error.message);
+  if (error) {
+    if (!isMissingContactColumnError(error.message)) {
+      return apiFail(error.message);
+    }
+
+    const legacyResult = await supabase
+      .from("owner_entities")
+      .select(OWNER_ENTITY_LEGACY_SELECT)
+      .order("created_at", { ascending: true });
+
+    if (legacyResult.error) return apiFail(legacyResult.error.message);
+    return apiOk(toLegacyOwnerEntityRows(legacyResult.data ?? []));
+  }
+
   return apiOk((data ?? []) as OwnerEntityRow[]);
 }
 
@@ -79,18 +127,32 @@ export async function listOwnerEntities(): Promise<ApiResult<OwnerEntityRow[]>> 
 export async function createOwnerEntity({
   category,
   name,
+  contactPerson,
+  phone,
+  notes,
 }: {
   category: OwnerEntityCategory;
   name: string;
-}): Promise<OwnerEntityWriteResult> {
-  const { error } = await supabase
+  contactPerson?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+}): Promise<OwnerEntityWriteResult<OwnerEntityRow>> {
+  const { data, error } = await supabase
     .from("owner_entities")
-    .insert({ category, name });
+    .insert({
+      category,
+      name,
+      contact_person: contactPerson || null,
+      phone: phone || null,
+      notes: notes || null,
+    })
+    .select(OWNER_ENTITY_DETAIL_SELECT)
+    .single();
 
   if (error) {
-    return { error: { message: error.message, code: error.code ?? null } };
+    return { data: null, error: { message: error.message, code: error.code ?? null } };
   }
-  return { error: null };
+  return { data: data as OwnerEntityRow, error: null };
 }
 
 /**
@@ -108,17 +170,66 @@ export async function renameOwnerEntity({
   currentName: string;
   nextName: string;
   updatedAt: string;
-}): Promise<OwnerEntityWriteResult> {
-  const { error } = await supabase
+}): Promise<OwnerEntityWriteResult<OwnerEntityRow>> {
+  const { data, error } = await supabase
     .from("owner_entities")
     .update({ name: nextName, updated_at: updatedAt })
     .eq("category", category)
-    .eq("name", currentName);
+    .eq("name", currentName)
+    .select(OWNER_ENTITY_DETAIL_SELECT)
+    .single();
 
   if (error) {
-    return { error: { message: error.message, code: error.code ?? null } };
+    return { data: null, error: { message: error.message, code: error.code ?? null } };
   }
-  return { error: null };
+  return { data: data as OwnerEntityRow, error: null };
+}
+
+/** Upsert editable contact details for an owner entity. */
+export async function saveOwnerEntityDetails({
+  id,
+  category,
+  name,
+  contactPerson,
+  phone,
+  notes,
+  updatedAt,
+}: {
+  id?: string | null;
+  category: OwnerEntityCategory;
+  name: string;
+  contactPerson?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+  updatedAt: string;
+}): Promise<OwnerEntityWriteResult<OwnerEntityRow>> {
+  if (id && !id.startsWith("temp:")) {
+    const { data, error } = await supabase
+      .from("owner_entities")
+      .update({
+        contact_person: contactPerson || null,
+        phone: phone || null,
+        notes: notes || null,
+        updated_at: updatedAt,
+      })
+      .eq("id", id)
+      .select(OWNER_ENTITY_DETAIL_SELECT)
+      .single();
+
+    if (error) {
+      return { data: null, error: { message: error.message, code: error.code ?? null } };
+    }
+
+    return { data: data as OwnerEntityRow, error: null };
+  }
+
+  return createOwnerEntity({
+    category,
+    name,
+    contactPerson,
+    phone,
+    notes,
+  });
 }
 
 /** Delete an owner entity identified by (category, name). */
@@ -136,7 +247,7 @@ export async function deleteOwnerEntity({
     .eq("name", name);
 
   if (error) {
-    return { error: { message: error.message, code: error.code ?? null } };
+    return { data: null, error: { message: error.message, code: error.code ?? null } };
   }
-  return { error: null };
+  return { data: null, error: null };
 }

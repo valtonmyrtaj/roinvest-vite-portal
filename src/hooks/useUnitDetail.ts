@@ -94,6 +94,10 @@ function mapUnitDetailSnapshot(snapshot: UnitDetailSnapshot): Unit {
     has_active_reservation: Boolean(snapshot.activeReservation),
     active_reservation_id: snapshot.activeReservation?.reservation_id ?? null,
     active_reservation_showing_id: snapshot.activeReservation?.showing_id ?? null,
+    active_reservation_contact_name: snapshot.activeReservation?.contact_name ?? null,
+    active_reservation_contact_phone: snapshot.activeReservation?.contact_phone ?? null,
+    active_reservation_reserved_at: snapshot.activeReservation?.reserved_at ?? null,
+    active_reservation_notes: snapshot.activeReservation?.notes ?? null,
     notes: row.notes,
     created_at: row.created_at ?? "",
     updated_at: row.updated_at ?? "",
@@ -108,6 +112,7 @@ function mapUnitDetailSnapshot(snapshot: UnitDetailSnapshot): Unit {
     final_price: snapshot.activeSale?.final_price ?? null,
     sale_date: snapshot.activeSale?.sale_date || row.sale_date,
     buyer_name: snapshot.activeSale?.buyer_name ?? row.buyer_name,
+    buyer_phone: snapshot.activeSale?.buyer_phone ?? null,
     payment_type: snapshot.activeSale?.payment_type ?? null,
     crm_lead_id: snapshot.activeSale?.crm_lead_id ?? null,
   };

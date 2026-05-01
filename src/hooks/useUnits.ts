@@ -48,6 +48,10 @@ export interface Unit {
   has_active_reservation?: boolean;
   active_reservation_id?: string | null;
   active_reservation_showing_id?: string | null;
+  active_reservation_contact_name?: string | null;
+  active_reservation_contact_phone?: string | null;
+  active_reservation_reserved_at?: string | null;
+  active_reservation_notes?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
@@ -76,6 +80,8 @@ export interface Unit {
    * Buyer name from unit_sales. Falls back to units.buyer_name for legacy units.
    */
   buyer_name?: string | null;
+  /** Buyer phone from unit_sales. */
+  buyer_phone?: string | null;
   /** Payment type from unit_sales only (units table has no payment_type column). */
   payment_type?: string | null;
   /** CRM lead linked to this sale, from unit_sales.crm_lead_id. */
@@ -152,6 +158,10 @@ function mapDbUnit(row: UnitRow): Unit {
     has_active_reservation: false,
     active_reservation_id: null,
     active_reservation_showing_id: null,
+    active_reservation_contact_name: null,
+    active_reservation_contact_phone: null,
+    active_reservation_reserved_at: null,
+    active_reservation_notes: null,
     notes: row.notes,
     created_at: row.created_at ?? "",
     updated_at: row.updated_at ?? "",
@@ -166,6 +176,7 @@ function mapDbUnit(row: UnitRow): Unit {
     // Legacy compat fallbacks — overridden by sale truth overlay when active unit_sales exists.
     sale_date: row.sale_date,
     buyer_name: row.buyer_name,
+    buyer_phone: null,
     // Sale truth fields — populated exclusively from unit_sales via the overlay.
     final_price: null,
     payment_type: null,
@@ -238,6 +249,7 @@ interface SaleTruth {
   final_price: number;
   sale_date: string;
   buyer_name: string | null;
+  buyer_phone: string | null;
   payment_type: string | null;
   crm_lead_id: string | null;
 }
@@ -251,6 +263,8 @@ interface UseUnitsOptions {
 interface ReservationTruth {
   reservation_id: string;
   showing_id: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
 }
 
 function mapSaleTruth(row: UnitSaleRow): SaleTruth {
@@ -258,6 +272,7 @@ function mapSaleTruth(row: UnitSaleRow): SaleTruth {
     final_price: row.final_price,
     sale_date: row.sale_date,
     buyer_name: row.buyer_name,
+    buyer_phone: row.buyer_phone,
     payment_type: row.payment_type,
     crm_lead_id: row.crm_lead_id,
   };
@@ -268,12 +283,16 @@ function indexReservationTruth(
     reservation_id: string;
     unit_id: string;
     showing_id: string | null;
+    contact_name: string | null;
+    contact_phone: string | null;
   }>,
 ): Record<string, ReservationTruth> {
   return rows.reduce<Record<string, ReservationTruth>>((acc, row) => {
     acc[row.unit_id] = {
       reservation_id: row.reservation_id,
       showing_id: row.showing_id,
+      contact_name: row.contact_name,
+      contact_phone: row.contact_phone,
     };
     return acc;
   }, {});
@@ -709,6 +728,8 @@ export function useUnits(options: UseUnitsOptions = {}) {
           has_active_reservation: Boolean(reservationTruth),
           active_reservation_id: reservationTruth?.reservation_id ?? null,
           active_reservation_showing_id: reservationTruth?.showing_id ?? null,
+          active_reservation_contact_name: reservationTruth?.contact_name ?? null,
+          active_reservation_contact_phone: reservationTruth?.contact_phone ?? null,
           // ── Sale truth overlay from unit_sales ───────────────────────────
           // `units.price` is intentionally preserved as the listing/asking price.
           final_price: saleTruth?.final_price ?? unit.final_price,
@@ -718,6 +739,8 @@ export function useUnits(options: UseUnitsOptions = {}) {
           // `buyer_name` prefers unit_sales; falls back to units.buyer_name for
           // the same legacy reason.
           buyer_name: saleTruth?.buyer_name ?? unit.buyer_name,
+          // `buyer_phone` comes from unit_sales only.
+          buyer_phone: saleTruth?.buyer_phone ?? unit.buyer_phone,
           // `payment_type` comes from unit_sales only — units table has no such column.
           payment_type: saleTruth?.payment_type ?? unit.payment_type,
           // `crm_lead_id` comes from unit_sales only.

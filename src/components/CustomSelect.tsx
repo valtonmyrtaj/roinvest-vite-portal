@@ -6,6 +6,7 @@ interface CustomSelectProps {
   options: string[];
   value: string;
   onChange: (v: string) => void;
+  optionMeta?: Record<string, string | undefined>;
   placeholder?: string;
   /** sm = 34px, md = 40px (default), lg = 46px */
   size?: "sm" | "md" | "lg";
@@ -22,6 +23,7 @@ export function CustomSelect({
   options,
   value,
   onChange,
+  optionMeta,
   placeholder,
   size = "md",
   className = "",
@@ -96,6 +98,7 @@ export function CustomSelect({
             {/* Regular options */}
             {safeOptions.map((opt) => {
               const selected = opt === value;
+              const meta = optionMeta?.[opt];
               return (
                 <button
                   key={opt}
@@ -108,9 +111,16 @@ export function CustomSelect({
                   }}
                 >
                   <span className="flex-1 whitespace-normal text-left leading-[1.35]">{opt}</span>
-                  {selected && (
-                    <Check size={12} strokeWidth={2.5} className="mt-[1px] shrink-0" style={{ color: "#003883" }} />
-                  )}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {meta && (
+                      <span className="text-[11px] font-medium text-black/32">
+                        {meta}
+                      </span>
+                    )}
+                    {selected && (
+                      <Check size={12} strokeWidth={2.5} className="mt-[1px] shrink-0" style={{ color: "#003883" }} />
+                    )}
+                  </span>
                 </button>
               );
             })}

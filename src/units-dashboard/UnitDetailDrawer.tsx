@@ -5,6 +5,8 @@ import { EyebrowLabel } from "../components/ui/Eyebrow";
 import { PillBadge } from "../components/ui/PillBadge";
 import { SkeletonRows } from "../components/SkeletonRows";
 import type { Unit, UnitHistory } from "../hooks/useUnits";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { formatContactPhone } from "../lib/phoneFormat";
 import { getUnitTypeDisplay } from "../lib/unitType";
 import { NAVY } from "../ui/tokens";
 import { fmtDateShort, fmtPrice, SQ_MONTHS_LONG, statusStyleFor } from "./shared";
@@ -22,6 +24,7 @@ const HIDDEN_HISTORY_FIELDS = new Set([
   "active_reservation_id",
   "active_reservation_showing_id",
   "has_active_reservation",
+  "floorplan_code",
   "id",
   "created_at",
   "updated_at",
@@ -35,27 +38,37 @@ function DetailSectionCard({
   title,
   items,
   className = "",
+  compact = false,
+  gridClassName = "sm:grid-cols-2 md:grid-cols-3",
 }: {
   title: string;
   items: DetailItem[];
   className?: string;
+  compact?: boolean;
+  gridClassName?: string;
 }) {
   if (items.length === 0) return null;
 
+  const shellSpacingClass = compact ? "px-5 py-4" : "px-5 py-4";
+  const gridSpacingClass = compact ? "mt-3.5 gap-x-5 gap-y-3" : "mt-4 gap-x-5 gap-y-3";
+
   return (
     <div
-      className={`rounded-[20px] border border-[#e7ebf2] bg-white/92 px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)] ${className}`.trim()}
+      className={`rounded-[18px] border border-[#e7ecf3] bg-white ${shellSpacingClass} shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`.trim()}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-        {title}
-      </p>
-      <div className="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
+      <div className="flex items-center gap-2.5">
+        <span className="h-4 w-[3px] rounded-full bg-[#003883]" />
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#003883]">
+          {title}
+        </p>
+      </div>
+      <div className={`grid ${gridSpacingClass} ${gridClassName}`}>
         {items.map((item) => (
           <div key={item.label}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/26">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/30">
               {item.label}
             </p>
-            <div className="mt-1.5 text-[13px] leading-[1.4] text-black/72" style={{ fontWeight: 600 }}>
+            <div className="mt-1.5 text-[13px] leading-[1.4] text-[#003883]" style={{ fontWeight: 650 }}>
               {item.value}
             </div>
           </div>
@@ -94,11 +107,6 @@ function formatOptionalNumber(value: number | null | undefined): string {
   return String(value);
 }
 
-function formatOptionalArea(value: number | null | undefined): string {
-  if (value == null || value <= 0) return "—";
-  return `${value.toLocaleString("de-DE")} m²`;
-}
-
 function formatUpdatedFieldsCount(count: number): string {
   return count === 1 ? "1 fushë e përditësuar" : `${count} fusha të përditësuara`;
 }
@@ -123,6 +131,8 @@ export function UnitDetailDrawer({
   const [history, setHistory] = useState<UnitHistory[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const loadingHistory = activeTab === "history" && !historyLoaded;
+
+  useBodyScrollLock();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -159,6 +169,8 @@ export function UnitDetailDrawer({
 
   const typeLabel = getUnitTypeDisplay(unit.type, unit.level);
   const noteText = unit.notes?.trim() ?? "";
+  const activeReservationContactPhone = formatContactPhone(unit.active_reservation_contact_phone);
+  const activeReservationNote = unit.active_reservation_notes?.trim() ?? "";
 
   const unitProfileDetails = useMemo<DetailItem[]>(
     () =>
@@ -172,7 +184,6 @@ export function UnitDetailDrawer({
         { label: "Tualete", value: formatOptionalNumber(unit.toilets) },
         { label: "Orientimi", value: unit.orientation || "—" },
         { label: "Depo", value: unit.has_storage ? "Po" : "Jo" },
-        { label: "Ballkon", value: formatOptionalArea(unit.balcony_area) },
       ],
     [
       typeLabel,
@@ -183,7 +194,6 @@ export function UnitDetailDrawer({
       unit.orientation,
       unit.has_storage,
       unit.size,
-      unit.balcony_area,
       unit.toilets,
     ],
   );
@@ -200,16 +210,34 @@ export function UnitDetailDrawer({
   );
 
   const reservationDetails = useMemo<DetailItem[]>(
-    () =>
-      [
-        unit.status === "E rezervuar" || unit.reservation_expires_at
-          ? { label: "Gjendja", value: "Rezervim aktiv" }
-          : null,
+    () => {
+      const hasReservation = unit.status === "E rezervuar" || Boolean(unit.reservation_expires_at);
+      if (!hasReservation) return [];
+
+      return [
+        { label: "Gjendja", value: "Rezervim aktiv" },
+        { label: "Klienti", value: unit.active_reservation_contact_name || "—" },
+        { label: "Telefoni", value: activeReservationContactPhone || "—" },
+        {
+          label: "Rezervuar më",
+          value: unit.active_reservation_reserved_at
+            ? formatDateTime(unit.active_reservation_reserved_at)
+            : "—",
+        },
         unit.reservation_expires_at
           ? { label: "Skadon më", value: fmtDateShort(unit.reservation_expires_at) }
           : null,
-      ].filter(notNull),
-    [unit.reservation_expires_at, unit.status],
+        activeReservationNote ? { label: "Shënim", value: activeReservationNote } : null,
+      ].filter(notNull);
+    },
+    [
+      activeReservationContactPhone,
+      activeReservationNote,
+      unit.active_reservation_contact_name,
+      unit.active_reservation_reserved_at,
+      unit.reservation_expires_at,
+      unit.status,
+    ],
   );
 
   const formatFieldValue = (val: unknown, field?: string, snapshot?: Partial<Unit>): string => {
@@ -256,7 +284,6 @@ export function UnitDetailDrawer({
     bathrooms: "Banjo",
     toilets: "Tualete",
     orientation: "Orientimi",
-    floorplan_code: "Planimetria",
     has_storage: "Depo",
     balcony_area: "Ballkoni",
     terrace_area: "Terrasa",
@@ -341,85 +368,85 @@ export function UnitDetailDrawer({
         onClick={onClose}
       />
 
-      <motion.aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={drawerTitleId}
-        initial={{ x: 48, opacity: 0, scale: 0.985 }}
-        animate={{ x: 0, opacity: 1, scale: 1 }}
-        exit={{ x: 48, opacity: 0, scale: 0.985 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed bottom-3 left-3 right-3 top-3 z-[80] flex flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-[#fbfbfc] shadow-[-12px_28px_80px_rgba(15,23,42,0.18),0_10px_28px_rgba(15,23,42,0.08)] sm:bottom-5 sm:left-5 sm:right-5 sm:top-5 sm:rounded-[32px] md:left-auto md:w-[min(760px,calc(100vw-2.5rem))]"
-      >
-        <div className="flex items-start justify-between border-b border-[#eef0f4] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] px-6 py-5">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/30">
-              Detajet e njësisë
-            </p>
-            <p
-              id={drawerTitleId}
-              className="mt-2 text-[20px] font-semibold tracking-[-0.03em]"
-              style={{ color: NAVY }}
-            >
-              {unit.unit_id}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Mbyll"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.06] bg-white/90 text-black/35 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:bg-white hover:text-black/58"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="border-b border-[#eef0f4] bg-white/82 px-6 py-3 backdrop-blur-xl">
-          <div className="inline-flex items-center gap-1 rounded-full border border-black/[0.06] bg-[#f8f9fc] p-1 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-            <button
-              type="button"
-              onClick={() => setActiveTab("summary")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition ${
-                activeTab === "summary"
-                  ? "bg-white text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-                  : "text-black/46 hover:text-black/72"
-              }`}
-            >
-              <LayoutList size={14} />
-              Përmbledhje
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("history")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition ${
-                activeTab === "history"
-                  ? "bg-white text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-                  : "text-black/46 hover:text-black/72"
-              }`}
-            >
-              <ScrollText size={14} />
-              Histori
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto bg-[#fbfbfc] px-6 py-5">
-          <AnimatePresence mode="wait" initial={false}>
-            {activeTab === "summary" ? (
-              <motion.div
-                key="summary"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-4"
+      <div className="pointer-events-none fixed inset-0 z-[80] flex items-center justify-center px-4 py-4 sm:px-6 sm:py-8">
+        <motion.aside
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={drawerTitleId}
+          initial={{ y: 18, opacity: 0, scale: 0.975 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 18, opacity: 0, scale: 0.975 }}
+          transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+          className="pointer-events-auto flex max-h-[calc(100vh-32px)] w-full max-w-[680px] flex-col overflow-hidden rounded-[24px] border border-black/[0.06] bg-[#fbfbfc] shadow-[0_28px_90px_rgba(15,23,42,0.22),0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-[calc(100vh-64px)] sm:rounded-[28px]"
+        >
+          <div className="flex items-start justify-between border-b border-[#eef0f4] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] px-6 py-4">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/32">
+                Detajet e njësisë
+              </p>
+              <p
+                id={drawerTitleId}
+                className="mt-1.5 text-[20px] font-semibold tracking-[-0.03em]"
+                style={{ color: NAVY }}
               >
-                <div className="overflow-hidden rounded-[26px] border border-[#e7ebf2] bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
-                  <div className="flex flex-col gap-5 px-5 py-5 md:flex-row md:items-stretch">
-                    <div className="flex min-w-0 flex-1 flex-col justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
+                {unit.unit_id}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              aria-label="Mbyll"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.06] bg-white/90 text-black/40 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:bg-white hover:text-black/64"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          <div className="border-b border-[#eef0f4] bg-white/90 px-6 py-2.5 backdrop-blur-xl">
+            <div className="inline-flex items-center gap-1 rounded-full border border-black/[0.06] bg-[#f8f9fc] p-1 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+              <button
+                type="button"
+                onClick={() => setActiveTab("summary")}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition ${
+                  activeTab === "summary"
+                    ? "bg-white text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                    : "text-black/46 hover:text-black/72"
+                }`}
+              >
+                <LayoutList size={14} />
+                Përmbledhje
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition ${
+                  activeTab === "history"
+                    ? "bg-white text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                    : "text-black/46 hover:text-black/72"
+                }`}
+              >
+                <ScrollText size={14} />
+                Histori
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto overscroll-contain bg-[#fbfbfc] px-5 py-5 sm:px-6 sm:py-5">
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === "summary" ? (
+                <motion.div
+                  key="summary"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-3.5"
+                >
+                  <div className="overflow-hidden rounded-[20px] border border-[#e7ecf3] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9fc_100%)] shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                    <div className="grid gap-3.5 p-4 md:grid-cols-2 md:items-stretch md:gap-4">
+                      <div className="flex min-w-0 flex-col">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <PillBadge weight="medium" style={statusStyleFor(unit.status)}>
                             {unit.status}
                           </PillBadge>
@@ -430,50 +457,49 @@ export function UnitDetailDrawer({
                           )}
                         </div>
 
-                        <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.15em] text-black/28">
-                          Pronari
-                        </p>
-                        <p
-                          className="mt-2 truncate text-[24px] leading-none tracking-[-0.04em]"
-                          style={{ color: NAVY, fontWeight: 700 }}
-                        >
-                          {unit.owner_name || "—"}
-                        </p>
-                        <p className="mt-2 text-[13px] leading-[1.45] text-black/44">
-                          {unit.owner_category}
-                        </p>
-
+                        <div className="mt-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/32">
+                            Pronari
+                          </p>
+                          <p
+                            className="mt-1.5 truncate text-[22px] leading-[1.1] tracking-[-0.035em]"
+                            style={{ color: NAVY, fontWeight: 700 }}
+                          >
+                            {unit.owner_name || "—"}
+                          </p>
+                          <p className="mt-1.5 text-[12.5px] leading-[1.45] text-black/48">
+                            {unit.owner_category}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="w-full md:w-[270px]">
-                      <div className="rounded-[20px] border border-[#dfe6f1] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/30">
+                      <div className="flex flex-col rounded-[16px] border border-[#dde4f0] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/32">
                           {primaryPriceLabel}
                         </p>
                         <p
-                          className="mt-2 text-[32px] leading-none tracking-[-0.05em]"
+                          className="mt-1.5 text-[28px] leading-none tracking-[-0.045em]"
                           style={{ color: NAVY, fontWeight: 700 }}
                         >
                           {fmtPrice(primaryPriceValue)}
                         </p>
 
                         {unit.final_price != null && (
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-1">
-                            <div className="rounded-[14px] bg-[#f5f7fb] px-3 py-2.5">
-                              <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/28">
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div className="rounded-[12px] bg-[#f5f7fb] px-2.5 py-2">
+                              <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/30">
                                 Çmimi i listës
                               </p>
-                              <p className="mt-1 text-[13px] leading-none tracking-[-0.03em] text-black/66">
+                              <p className="mt-1 text-[12px] leading-none tracking-[-0.02em] text-black/68">
                                 {fmtPrice(unit.price)}
                               </p>
                             </div>
                             {priceDeltaLabel && (
-                              <div className="rounded-[14px] bg-[#f5f7fb] px-3 py-2.5">
-                                <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/28">
+                              <div className="rounded-[12px] bg-[#f5f7fb] px-2.5 py-2">
+                                <p className="text-[8.5px] font-semibold uppercase tracking-[0.16em] text-black/30">
                                   Diferenca
                                 </p>
-                                <p className="mt-1 text-[13px] leading-none tracking-[-0.03em] text-black/66">
+                                <p className="mt-1 text-[12px] leading-none tracking-[-0.02em] text-black/68">
                                   {priceDeltaLabel}
                                 </p>
                               </div>
@@ -482,7 +508,7 @@ export function UnitDetailDrawer({
                         )}
 
                         {statusContext && (
-                          <p className="mt-3 text-[11.5px] text-black/42">{statusContext}</p>
+                          <p className="mt-3 text-[11.5px] text-black/44">{statusContext}</p>
                         )}
 
                         {unit.status === "E rezervuar" &&
@@ -508,135 +534,153 @@ export function UnitDetailDrawer({
                                 </button>
                               )}
                             </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                <DetailSectionCard title="Profili i njësisë" items={unitProfileDetails} />
-
-                {(unit.created_at || unit.updated_at) && (
-                  <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-1 text-[10.5px] font-medium text-black/34">
-                    {unit.created_at && (
-                      <span>Krijuar më {formatDateTime(unit.created_at)}</span>
-                    )}
-                    {unit.updated_at && (
-                      <span>Përditësuar më {formatDateTime(unit.updated_at)}</span>
-                    )}
-                  </div>
-                )}
-
-                {saleDetails.length > 0 && (
-                  <DetailSectionCard title="Detajet e shitjes" items={saleDetails} />
-                )}
-
-                {saleDetails.length === 0 && reservationDetails.length > 0 && (
-                  <DetailSectionCard title="Detajet e rezervimit" items={reservationDetails} />
-                )}
-
-                {noteText && (
-                  <div className="rounded-[20px] border border-[#e7ebf2] bg-white/92 px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                      Shënime
-                    </p>
-                    <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-black/54">
-                      {noteText}
-                    </p>
-                  </div>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="history"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                  <EyebrowLabel as="p" className="text-black/32">
-                    Historia e ndryshimeve
-                  </EyebrowLabel>
-                  <span className="rounded-full border border-black/[0.06] bg-white/84 px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/34 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-                    {loadingHistory ? "Duke ngarkuar" : `${visibleHistory.length} hyrje`}
-                  </span>
-                </div>
-
-                {loadingHistory ? (
-                  <SkeletonRows rows={4} />
-                ) : visibleHistory.length === 0 ? (
-                  <div className="flex min-h-[280px] items-center justify-center rounded-[24px] border border-dashed border-[#e6ebf2] bg-white/72 px-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
-                    <div className="max-w-[280px]">
-                      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-black/[0.06] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                        <Clock3 size={18} className="text-black/34" />
-                      </div>
-                      <p className="mt-4 text-[15px] font-medium tracking-[-0.02em] text-black/50">
-                        Pa histori ndryshimesh
-                      </p>
-                      <p className="mt-1.5 text-[12.5px] leading-6 text-black/32">
-                        Ndryshimet do të shfaqen këtu sapo të ruhen përditësime.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3.5">
-                    {visibleHistory.map(({ entry: h, prev, next, changedFields }) => (
-                      <div
-                        key={h.id}
-                        className="rounded-[20px] border border-black/[0.05] bg-white/88 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
-                      >
-                        <div className="mb-3 flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-[11px] font-medium text-black/42">
-                              {formatDateTime(h.changed_at)}
-                            </p>
-                            <p className="mt-1 text-[11.5px] text-black/32">
-                              {formatUpdatedFieldsCount(changedFields.length)}
-                            </p>
-                          </div>
-                          {h.change_reason && (
-                            <span
-                              className="rounded-full border border-black/[0.04] px-2.5 py-1 text-[10.5px] font-medium shadow-[0_1px_1px_rgba(16,24,40,0.03)]"
-                              style={changeReasonStyle(h.change_reason)}
-                            >
-                              {formatChangeReason(h.change_reason)}
-                            </span>
                           )}
-                        </div>
-
-                        <div className="flex flex-col gap-2.5">
-                          {changedFields.map((field) => (
-                            <div
-                              key={field}
-                              className="grid gap-2.5 text-[12px] sm:grid-cols-[minmax(98px,116px)_minmax(0,1fr)_12px_minmax(0,1fr)] sm:items-start"
-                            >
-                              <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/34 sm:pt-3">
-                                {fieldLabels[field] ?? field.replace(/_/g, " ")}:
-                              </span>
-                              <span className="break-words rounded-[14px] border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2.5 text-black/42 line-through decoration-black/24">
-                                {formatFieldValue(prev[field as keyof Unit], field, prev)}
-                              </span>
-                              <ChevronRight size={12} className="mt-3 hidden text-black/24 sm:block" />
-                              <span
-                                className="break-words rounded-[14px] border border-[#e3e8ef] bg-[#fbfcfe] px-3 py-2.5"
-                                style={{ color: changedValueColor(next, field) }}
-                              >
-                                {formatFieldValue(next[field as keyof Unit], field, next)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.aside>
+
+                  <DetailSectionCard
+                    title="Profili i njësisë"
+                    items={unitProfileDetails}
+                    compact
+                    gridClassName="sm:grid-cols-3"
+                  />
+
+                  {saleDetails.length > 0 && (
+                    <DetailSectionCard
+                      title="Detajet e shitjes"
+                      items={saleDetails}
+                      gridClassName="sm:grid-cols-2"
+                    />
+                  )}
+
+                  {saleDetails.length === 0 && reservationDetails.length > 0 && (
+                    <DetailSectionCard
+                      title="Detajet e rezervimit"
+                      items={reservationDetails}
+                      gridClassName="sm:grid-cols-2"
+                    />
+                  )}
+
+                  {noteText && (
+                    <div className="rounded-[18px] border border-[#e7ecf3] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+                      <div className="flex items-center gap-2.5">
+                        <span className="h-4 w-[3px] rounded-full bg-[#003883]" />
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#003883]">
+                          Shënime
+                        </p>
+                      </div>
+                      <p className="mt-3 whitespace-pre-wrap text-[13px] leading-[1.55] text-black/56">
+                        {noteText}
+                      </p>
+                    </div>
+                  )}
+
+                  {(unit.created_at || unit.updated_at) && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1 pt-1 text-[10.5px] font-medium text-black/38">
+                      {unit.created_at && (
+                        <span>Krijuar më {formatDateTime(unit.created_at)}</span>
+                      )}
+                      {unit.created_at && unit.updated_at && (
+                        <span className="h-1 w-1 rounded-full bg-black/20" aria-hidden />
+                      )}
+                      {unit.updated_at && (
+                        <span>Përditësuar më {formatDateTime(unit.updated_at)}</span>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="history"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <EyebrowLabel as="p" className="text-black/32">
+                      Historia e ndryshimeve
+                    </EyebrowLabel>
+                    <span className="rounded-full border border-black/[0.06] bg-white/84 px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/34 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+                      {loadingHistory ? "Duke ngarkuar" : `${visibleHistory.length} hyrje`}
+                    </span>
+                  </div>
+
+                  {loadingHistory ? (
+                    <SkeletonRows rows={4} />
+                  ) : visibleHistory.length === 0 ? (
+                    <div className="flex min-h-[280px] items-center justify-center rounded-[24px] border border-dashed border-[#e6ebf2] bg-white/72 px-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+                      <div className="max-w-[280px]">
+                        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-black/[0.06] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                          <Clock3 size={18} className="text-black/34" />
+                        </div>
+                        <p className="mt-4 text-[15px] font-medium tracking-[-0.02em] text-black/50">
+                          Pa histori ndryshimesh
+                        </p>
+                        <p className="mt-1.5 text-[12.5px] leading-6 text-black/32">
+                          Ndryshimet do të shfaqen këtu sapo të ruhen përditësime.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3.5">
+                      {visibleHistory.map(({ entry: h, prev, next, changedFields }) => (
+                        <div
+                          key={h.id}
+                          className="rounded-[20px] border border-black/[0.05] bg-white/88 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
+                        >
+                          <div className="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-medium text-black/42">
+                                {formatDateTime(h.changed_at)}
+                              </p>
+                              <p className="mt-1 text-[11.5px] text-black/32">
+                                {formatUpdatedFieldsCount(changedFields.length)}
+                              </p>
+                            </div>
+                            {h.change_reason && (
+                              <span
+                                className="rounded-full border border-black/[0.04] px-2.5 py-1 text-[10.5px] font-medium shadow-[0_1px_1px_rgba(16,24,40,0.03)]"
+                                style={changeReasonStyle(h.change_reason)}
+                              >
+                                {formatChangeReason(h.change_reason)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-2.5">
+                            {changedFields.map((field) => (
+                              <div
+                                key={field}
+                                className="grid gap-2.5 text-[12px] sm:grid-cols-[minmax(98px,116px)_minmax(0,1fr)_12px_minmax(0,1fr)] sm:items-start"
+                              >
+                                <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-black/34 sm:pt-3">
+                                  {fieldLabels[field] ?? field.replace(/_/g, " ")}:
+                                </span>
+                                <span className="break-words rounded-[14px] border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2.5 text-black/42 line-through decoration-black/24">
+                                  {formatFieldValue(prev[field as keyof Unit], field, prev)}
+                                </span>
+                                <ChevronRight size={12} className="mt-3 hidden text-black/24 sm:block" />
+                                <span
+                                  className="break-words rounded-[14px] border border-[#e3e8ef] bg-[#fbfcfe] px-3 py-2.5"
+                                  style={{ color: changedValueColor(next, field) }}
+                                >
+                                  {formatFieldValue(next[field as keyof Unit], field, next)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.aside>
+      </div>
     </>
   );
 }

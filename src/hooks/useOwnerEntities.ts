@@ -1,16 +1,27 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ownerEntities as ownerEntitiesApi } from "../lib/api";
 import { POSTGRES_UNIQUE_VIOLATION_CODE } from "../lib/api/ownerEntities";
+import type { OwnerEntityRow } from "../lib/api/ownerEntities";
 import type { OwnerCategory, Unit } from "./useUnits";
 
 export type OwnerEntitiesByCategory = Record<OwnerCategory, string[]>;
+export type OwnerEntityRowsByCategory = Record<OwnerCategory, OwnerEntityRow[]>;
 
 type OwnerEntityResult = { data?: string; error?: string };
+type OwnerEntityDetailsResult = { data?: OwnerEntityRow; error?: string };
 
 const OWNER_CATEGORIES: OwnerCategory[] = ["Investitor", "Pronarët e tokës", "Kompani ndërtimore"];
 const RESERVED_OWNER_ENTITY_LABELS = ["Shto entitet të ri", "Zgjidh pronarin"];
 
 function emptyRegistry(): OwnerEntitiesByCategory {
+  return {
+    Investitor: [],
+    "Pronarët e tokës": [],
+    "Kompani ndërtimore": [],
+  };
+}
+
+function emptyRowsRegistry(): OwnerEntityRowsByCategory {
   return {
     Investitor: [],
     "Pronarët e tokës": [],
@@ -85,6 +96,8 @@ function safeOwnerCategory(category: unknown): OwnerCategory {
 
 function rowsToRegistry(rows: Array<{ category: string; name: string }>): OwnerEntitiesByCategory {
   const registry = emptyRegistry();
+  if (!Array.isArray(rows)) return registry;
+
   for (const row of rows) {
     const cat = row.category as OwnerCategory;
     if (!OWNER_CATEGORIES.includes(cat)) continue;
@@ -93,16 +106,57 @@ function rowsToRegistry(rows: Array<{ category: string; name: string }>): OwnerE
   return registry;
 }
 
+function rowsToDetailedRegistry(rows: OwnerEntityRow[]): OwnerEntityRowsByCategory {
+  const registry = emptyRowsRegistry();
+  if (!Array.isArray(rows)) return registry;
+
+  rows.forEach((row) => {
+    const cat = row.category as OwnerCategory;
+    if (!OWNER_CATEGORIES.includes(cat)) return;
+    registry[cat].push(row);
+  });
+
+  return registry;
+}
+
+function createOptimisticOwnerEntityRow(
+  category: OwnerCategory,
+  name: string,
+): OwnerEntityRow {
+  const now = new Date().toISOString();
+
+  return {
+    id: `temp:${category}:${name.toLocaleLowerCase("sq")}`,
+    category,
+    name,
+    contact_person: null,
+    phone: null,
+    notes: null,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
 export function useOwnerEntities(units: Unit[]) {
-  const [storedEntities, setStoredEntities] = useState<OwnerEntitiesByCategory>(emptyRegistry);
+  const [storedEntityRows, setStoredEntityRows] = useState<OwnerEntityRow[]>([]);
 
   useEffect(() => {
     void ownerEntitiesApi.listOwnerEntities().then((result) => {
       if (result.error === null) {
-        setStoredEntities(rowsToRegistry(result.data));
+        setStoredEntityRows(result.data);
       }
     });
   }, []);
+
+  const storedEntities = useMemo(
+    () => rowsToRegistry(storedEntityRows),
+    [storedEntityRows],
+  );
+
+  const storedEntityRowsByCategory = useMemo(
+    () => rowsToDetailedRegistry(storedEntityRows),
+    [storedEntityRows],
+  );
 
   const ownerEntities = useMemo(
     () => mergeRegistries(storedEntities, ownerEntitiesFromUnits(units)),
@@ -124,10 +178,8 @@ export function useOwnerEntities(units: Unit[]) {
       if (alreadyInMerged) return { data: name };
 
       // Optimistic update
-      setStoredEntities((prev) => ({
-        ...prev,
-        [ownerCategory]: mergeNames(prev[ownerCategory], [name]),
-      }));
+      const optimisticRow = createOptimisticOwnerEntityRow(ownerCategory, name);
+      setStoredEntityRows((prev) => [...prev, optimisticRow]);
 
       // Background insert — a unique-constraint violation means the entity
       // already exists, which is a benign race for this product (two tabs
@@ -137,10 +189,16 @@ export function useOwnerEntities(units: Unit[]) {
         .then((result) => {
           if (result.error && result.error.code !== POSTGRES_UNIQUE_VIOLATION_CODE) {
             // Rollback optimistic update on unexpected error
-            setStoredEntities((prev) => ({
-              ...prev,
-              [ownerCategory]: prev[ownerCategory].filter((e) => !sameOwnerEntityName(e, name)),
-            }));
+            setStoredEntityRows((prev) =>
+              prev.filter((row) => row.id !== optimisticRow.id),
+            );
+            return;
+          }
+
+          if (result.data) {
+            setStoredEntityRows((prev) =>
+              prev.map((row) => (row.id === optimisticRow.id ? result.data : row)),
+            );
           }
         });
 
@@ -172,12 +230,13 @@ export function useOwnerEntities(units: Unit[]) {
       if (!isStored) return { data: nextName };
 
       // Optimistic update
-      setStoredEntities((prev) => ({
-        ...prev,
-        [ownerCategory]: mergeNames(
-          prev[ownerCategory].map((e) => (sameOwnerEntityName(e, currentName) ? nextName : e)),
+      setStoredEntityRows((prev) =>
+        prev.map((row) =>
+          row.category === ownerCategory && sameOwnerEntityName(row.name, currentName)
+            ? { ...row, name: nextName, updated_at: new Date().toISOString() }
+            : row,
         ),
-      }));
+      );
 
       // Background rename
       void ownerEntitiesApi
@@ -190,12 +249,24 @@ export function useOwnerEntities(units: Unit[]) {
         .then((result) => {
           if (result.error) {
             // Rollback optimistic update
-            setStoredEntities((prev) => ({
-              ...prev,
-              [ownerCategory]: mergeNames(
-                prev[ownerCategory].map((e) => (sameOwnerEntityName(e, nextName) ? currentName : e)),
+            setStoredEntityRows((prev) =>
+              prev.map((row) =>
+                row.category === ownerCategory && sameOwnerEntityName(row.name, nextName)
+                  ? { ...row, name: currentName, updated_at: new Date().toISOString() }
+                  : row,
               ),
-            }));
+            );
+            return;
+          }
+
+          if (result.data) {
+            setStoredEntityRows((prev) =>
+              prev.map((row) =>
+                row.category === ownerCategory && sameOwnerEntityName(row.name, nextName)
+                  ? result.data
+                  : row,
+              ),
+            );
           }
         });
 
@@ -219,10 +290,14 @@ export function useOwnerEntities(units: Unit[]) {
       if (!isStored) return { data: name };
 
       // Optimistic update
-      setStoredEntities((prev) => ({
-        ...prev,
-        [ownerCategory]: prev[ownerCategory].filter((e) => !sameOwnerEntityName(e, name)),
-      }));
+      const removedRows = storedEntityRows.filter(
+        (row) => row.category === ownerCategory && sameOwnerEntityName(row.name, name),
+      );
+      setStoredEntityRows((prev) =>
+        prev.filter(
+          (row) => !(row.category === ownerCategory && sameOwnerEntityName(row.name, name)),
+        ),
+      );
 
       // Background delete
       void ownerEntitiesApi
@@ -230,23 +305,101 @@ export function useOwnerEntities(units: Unit[]) {
         .then((result) => {
           if (result.error) {
             // Rollback optimistic update
-            setStoredEntities((prev) => ({
-              ...prev,
-              [ownerCategory]: mergeNames(prev[ownerCategory], [name]),
-            }));
+            setStoredEntityRows((prev) => [...prev, ...removedRows]);
           }
         });
 
       return { data: name };
     },
-    [ownerEntities, storedEntities],
+    [ownerEntities, storedEntities, storedEntityRows],
+  );
+
+  const saveOwnerEntityDetails = useCallback(
+    async ({
+      category,
+      name: rawName,
+      contactPerson,
+      phone,
+      notes,
+    }: {
+      category: OwnerCategory;
+      name: string;
+      contactPerson?: string | null;
+      phone?: string | null;
+      notes?: string | null;
+    }): Promise<OwnerEntityDetailsResult> => {
+      const ownerCategory = safeOwnerCategory(category);
+      const name = normalizeOwnerEntityName(rawName);
+
+      if (!name) return { error: "Shkruani emrin e entitetit." };
+      if (isReservedOwnerEntityKey(name)) {
+        return { error: "Ky tekst përdoret vetëm si veprim i UI-së." };
+      }
+
+      const existingRow = storedEntityRows.find(
+        (row) => row.category === ownerCategory && sameOwnerEntityName(row.name, name),
+      );
+      const updatedAt = new Date().toISOString();
+      const optimisticRow: OwnerEntityRow = {
+        id: existingRow?.id ?? `temp:${ownerCategory}:${name.toLocaleLowerCase("sq")}`,
+        category: ownerCategory,
+        name,
+        contact_person: contactPerson?.trim() || null,
+        phone: phone?.trim() || null,
+        notes: notes?.trim() || null,
+        created_at: existingRow?.created_at ?? updatedAt,
+        updated_at: updatedAt,
+      };
+
+      setStoredEntityRows((prev) => {
+        if (existingRow) {
+          return prev.map((row) => (row.id === existingRow.id ? optimisticRow : row));
+        }
+
+        return [...prev, optimisticRow];
+      });
+
+      const result = await ownerEntitiesApi.saveOwnerEntityDetails({
+        id: existingRow?.id,
+        category: ownerCategory,
+        name,
+        contactPerson: optimisticRow.contact_person,
+        phone: optimisticRow.phone,
+        notes: optimisticRow.notes,
+        updatedAt,
+      });
+
+      if (result.error) {
+        setStoredEntityRows((prev) => {
+          if (existingRow) {
+            return prev.map((row) => (row.id === existingRow.id ? existingRow : row));
+          }
+
+          return prev.filter((row) => row.id !== optimisticRow.id);
+        });
+
+        return { error: result.error.message };
+      }
+
+      if (result.data) {
+        setStoredEntityRows((prev) =>
+          prev.map((row) => (row.id === optimisticRow.id ? result.data : row)),
+        );
+        return { data: result.data };
+      }
+
+      return { data: optimisticRow };
+    },
+    [storedEntityRows],
   );
 
   return {
     ownerEntities,
+    storedEntityRowsByCategory,
     getOptionsForCategory,
     addOwnerEntity,
     renameOwnerEntity,
     deleteOwnerEntity,
+    saveOwnerEntityDetails,
   };
 }

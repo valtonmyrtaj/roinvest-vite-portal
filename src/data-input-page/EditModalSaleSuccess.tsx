@@ -7,6 +7,7 @@ export type SaleSuccessSnapshot = {
   unitRecordId: string;
   unitId: string;
   buyerName: string;
+  buyerPhone: string;
   finalPrice: number;
   paymentType: SalePaymentType;
   saleDate: string;
@@ -34,6 +35,7 @@ export function EditModalSaleSuccess({
   const successRows = [
     { label: "Njësia", value: success.unitId },
     { label: "Blerësi", value: success.buyerName || "—" },
+    { label: "Telefoni", value: success.buyerPhone || "—" },
     { label: "Çmimi final", value: formatEuroCompact(success.finalPrice) },
     { label: "Lloji i pagesës", value: success.paymentType },
     { label: "Data e shitjes", value: formatAlbanianDate(success.saleDate) },

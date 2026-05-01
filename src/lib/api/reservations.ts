@@ -9,6 +9,8 @@ export interface ActiveReservationLink {
   reservation_id: string;
   unit_id: string;
   showing_id: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
 }
 
 export interface ActiveReservationDetail extends ActiveReservationLink {
@@ -64,6 +66,68 @@ type CancelUnitReservationRpcReturn =
 
 const ACTIVE_RESERVATION_STATUS = "Aktive";
 
+type ReservationContactSnapshot = {
+  contact_name: string | null;
+  contact_phone: string | null;
+};
+
+type ShowingContactRow = Pick<
+  Tables<"crm_showings">,
+  "id" | "manual_contact_name" | "manual_contact_phone"
+> & {
+  crm_leads: { name: string | null; phone: string | null } | null;
+};
+
+async function appendShowingContactSnapshots<
+  T extends { showing_id: string | null },
+>(rows: T[]): Promise<ApiResult<Array<T & ReservationContactSnapshot>>> {
+  const showingIds = [
+    ...new Set(rows.map((row) => row.showing_id).filter((id): id is string => Boolean(id))),
+  ];
+
+  if (showingIds.length === 0) {
+    return apiOk(
+      rows.map((row) => ({
+        ...row,
+        contact_name: null,
+        contact_phone: null,
+      })),
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("crm_showings")
+    .select("id, manual_contact_name, manual_contact_phone, crm_leads!contact_id(name,phone)")
+    .in("id", showingIds);
+
+  if (error) return apiFail(error.message);
+
+  const contactByShowingId = new Map<string, ReservationContactSnapshot>();
+
+  ((data ?? []) as unknown as ShowingContactRow[]).forEach((row) => {
+    contactByShowingId.set(row.id, {
+      contact_name: row.manual_contact_name ?? row.crm_leads?.name ?? null,
+      contact_phone: row.manual_contact_phone ?? row.crm_leads?.phone ?? null,
+    });
+  });
+
+  return apiOk(
+    rows.map((row) => {
+      const contact = row.showing_id
+        ? contactByShowingId.get(row.showing_id)
+        : null;
+
+      return {
+        ...row,
+        ...(contact ?? {
+          contact_name: null,
+          contact_phone: null,
+        }),
+      };
+    }),
+  );
+}
+
 export async function listActiveReservationLinks(): Promise<
   ApiResult<ActiveReservationLink[]>
 > {
@@ -74,15 +138,15 @@ export async function listActiveReservationLinks(): Promise<
 
   if (error) return apiFail(error.message);
 
-  return apiOk(
-    (
-      (data ?? []) as Array<Pick<UnitReservationRow, "id" | "unit_id" | "showing_id">>
-    ).map((row) => ({
-      reservation_id: row.id,
-      unit_id: row.unit_id,
-      showing_id: row.showing_id,
-    })),
-  );
+  const mapped = (
+    (data ?? []) as Array<Pick<UnitReservationRow, "id" | "unit_id" | "showing_id">>
+  ).map((row) => ({
+    reservation_id: row.id,
+    unit_id: row.unit_id,
+    showing_id: row.showing_id,
+  }));
+
+  return appendShowingContactSnapshots(mapped);
 }
 
 export async function listActiveReservationDetails(): Promise<
@@ -95,34 +159,34 @@ export async function listActiveReservationDetails(): Promise<
 
   if (error) return apiFail(error.message);
 
-  return apiOk(
-    (
-      (data ?? []) as Array<
-        Pick<
-          UnitReservationRow,
-          | "id"
-          | "unit_id"
-          | "showing_id"
-          | "contact_id"
-          | "reserved_at"
-          | "expires_at"
-          | "notes"
-          | "status"
-          | "updated_at"
-        >
+  const mapped = (
+    (data ?? []) as Array<
+      Pick<
+        UnitReservationRow,
+        | "id"
+        | "unit_id"
+        | "showing_id"
+        | "contact_id"
+        | "reserved_at"
+        | "expires_at"
+        | "notes"
+        | "status"
+        | "updated_at"
       >
-    ).map((row) => ({
-      reservation_id: row.id,
-      unit_id: row.unit_id,
-      showing_id: row.showing_id,
-      contact_id: row.contact_id,
-      reserved_at: row.reserved_at,
-      expires_at: row.expires_at,
-      notes: row.notes,
-      status: row.status,
-      updated_at: row.updated_at,
-    })),
-  );
+    >
+  ).map((row) => ({
+    reservation_id: row.id,
+    unit_id: row.unit_id,
+    showing_id: row.showing_id,
+    contact_id: row.contact_id,
+    reserved_at: row.reserved_at,
+    expires_at: row.expires_at,
+    notes: row.notes,
+    status: row.status,
+    updated_at: row.updated_at,
+  }));
+
+  return appendShowingContactSnapshots(mapped);
 }
 
 export async function listShowingReservationDetails(): Promise<
@@ -136,34 +200,34 @@ export async function listShowingReservationDetails(): Promise<
 
   if (error) return apiFail(error.message);
 
-  return apiOk(
-    (
-      (data ?? []) as Array<
-        Pick<
-          UnitReservationRow,
-          | "id"
-          | "unit_id"
-          | "showing_id"
-          | "contact_id"
-          | "reserved_at"
-          | "expires_at"
-          | "notes"
-          | "status"
-          | "updated_at"
-        >
+  const mapped = (
+    (data ?? []) as Array<
+      Pick<
+        UnitReservationRow,
+        | "id"
+        | "unit_id"
+        | "showing_id"
+        | "contact_id"
+        | "reserved_at"
+        | "expires_at"
+        | "notes"
+        | "status"
+        | "updated_at"
       >
-    ).map((row) => ({
-      reservation_id: row.id,
-      unit_id: row.unit_id,
-      showing_id: row.showing_id,
-      contact_id: row.contact_id,
-      reserved_at: row.reserved_at,
-      expires_at: row.expires_at,
-      notes: row.notes,
-      status: row.status,
-      updated_at: row.updated_at,
-    })),
-  );
+    >
+  ).map((row) => ({
+    reservation_id: row.id,
+    unit_id: row.unit_id,
+    showing_id: row.showing_id,
+    contact_id: row.contact_id,
+    reserved_at: row.reserved_at,
+    expires_at: row.expires_at,
+    notes: row.notes,
+    status: row.status,
+    updated_at: row.updated_at,
+  }));
+
+  return appendShowingContactSnapshots(mapped);
 }
 
 export async function findActiveReservationLinkByUnit(
@@ -179,11 +243,17 @@ export async function findActiveReservationLinkByUnit(
   if (error) return apiFail(error.message);
   if (!data) return apiOk(null);
 
-  return apiOk({
-    reservation_id: data.id,
-    unit_id: data.unit_id,
-    showing_id: data.showing_id,
-  });
+  const contactResult = await appendShowingContactSnapshots([
+    {
+      reservation_id: data.id,
+      unit_id: data.unit_id,
+      showing_id: data.showing_id,
+    },
+  ]);
+
+  if (contactResult.error) return apiFail(contactResult.error);
+
+  return apiOk(contactResult.data?.[0] ?? null);
 }
 
 export async function findActiveReservationIdByShowing(

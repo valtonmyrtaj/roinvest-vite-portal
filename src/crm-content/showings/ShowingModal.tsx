@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 import { CustomSelect } from "../../components/CustomSelect";
 import { DatePickerField } from "../../components/ui/DatePickerField";
 import type {
-  CRMLead,
   CRMShowing,
   CreateShowingInput,
   ShowingStatus,
@@ -19,25 +18,29 @@ import type {
 } from "./shared";
 import { SHOWING_STATUSES } from "./shared";
 
+const OUTCOME_LABELS: Record<ShowingOutcomeValue, string> = {
+  "Pa rezultat": "Pa rezultat",
+  Rezervoi: "E rezervuar",
+  Bleu: "E shitur",
+};
+
+const OUTCOME_VALUES_BY_LABEL = Object.fromEntries(
+  Object.entries(OUTCOME_LABELS).map(([value, label]) => [label, value]),
+) as Record<string, ShowingOutcomeValue>;
+
 export function ShowingModal({
   initial,
-  leads,
   unitIds,
   onClose,
   onSave,
   onCompleteSale,
 }: {
   initial?: Partial<CRMShowing>;
-  leads: CRMLead[];
   unitIds: string[];
   onClose: () => void;
   onSave: (data: CreateShowingInput) => Promise<ShowingSaveResult | void>;
   onCompleteSale: (input: ShowingSaleCompletionInput) => Promise<void>;
 }) {
-  const [contactMode, setContactMode] = useState<"existing" | "manual">(
-    initial?.contact_id ? "existing" : "existing",
-  );
-  const [leadId, setLeadId] = useState(initial?.contact_id ?? "");
   const [unitId, setUnitId] = useState(initial?.unit_id ?? "");
   const [date, setDate] = useState(initial?.date ?? "");
   const [time, setTime] = useState(initial?.time ?? "");
@@ -46,39 +49,30 @@ export function ShowingModal({
     (initial?.outcome as ShowingOutcomeValue) ?? "Pa rezultat",
   );
   const [reservationExpiresAt, setReservationExpiresAt] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [clientName, setClientName] = useState(
+    initial?.manual_contact_name ?? (!initial?.contact_id ? initial?.lead_name ?? "" : ""),
+  );
+  const [clientPhone, setClientPhone] = useState(initial?.manual_contact_phone ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saleDraft, setSaleDraft] = useState<ShowingSaleDraft | null>(null);
 
-  const leadOptions = leads.map((lead) => lead.name);
-  const leadIdByName = Object.fromEntries(leads.map((lead) => [lead.name, lead.id]));
-  const selectedLeadName = leads.find((lead) => lead.id === leadId)?.name ?? "";
   const needsReservationExpiry =
     outcome === "Rezervoi" && (initial?.outcome as ShowingOutcomeValue | undefined) !== "Rezervoi";
 
   const handleSave = async () => {
-    if (contactMode === "existing" && !leadId) {
-      setError("Zgjidhni kontaktin.");
+    const trimmedClientName = clientName.trim();
+    const trimmedClientPhone = clientPhone.trim();
+
+    if (!trimmedClientName) {
+      setError("Shkruani klientin.");
       return;
     }
 
-    if (contactMode === "manual") {
-      if (!firstName.trim()) {
-        setError("Plotësoni emrin.");
-        return;
-      }
-      if (!lastName.trim()) {
-        setError("Plotësoni mbiemrin.");
-        return;
-      }
-      if (!phone.trim()) {
-        setError("Plotësoni numrin e telefonit.");
-        return;
-      }
+    if (!trimmedClientPhone) {
+      setError("Shkruani numrin e telefonit.");
+      return;
     }
 
     if (!unitId) {
@@ -108,15 +102,11 @@ export function ShowingModal({
 
     try {
       const result = await onSave({
-        lead_id: contactMode === "existing" ? leadId : "",
-        manual_contact:
-          contactMode === "manual"
-            ? {
-                first_name: firstName.trim(),
-                last_name: lastName.trim(),
-                phone: phone.trim(),
-              }
-            : null,
+        lead_id: null,
+        manual_contact: {
+          name: trimmedClientName,
+          phone: trimmedClientPhone,
+        },
         unit_id: unitId,
         scheduled_at: `${date}T${time || "00:00"}:00`,
         status: normalizedStatus,
@@ -171,11 +161,11 @@ export function ShowingModal({
       >
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <p className="text-[16px] font-semibold tracking-[-0.02em] text-black/90">
+            <p className="text-[16px] font-semibold tracking-[-0.02em] text-[#003883]">
               {initial ? "Ndrysho shfaqjen" : "Regjistro shfaqje të re"}
             </p>
             <p className="mt-0.5 text-[12px] text-black/40">
-              Regjistro kontaktin, njësinë dhe rezultatin komercial në një hyrje të vetme.
+              Regjistro klientin, njësinë dhe rezultatin komercial në një hyrje të vetme.
             </p>
           </div>
           <button
@@ -187,67 +177,42 @@ export function ShowingModal({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 rounded-[14px] border border-black/08 bg-[#fafafc] p-3.5">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="col-span-2 rounded-[14px] border border-[#e8e8ec] bg-[#fbfcff] p-4">
+            <div className="mb-3">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-                Kontakti <span className="text-red-400">*</span>
+                Klienti <span className="text-red-400">*</span>
               </span>
-              <button
-                onClick={() => {
-                  setContactMode((current) => (current === "existing" ? "manual" : "existing"));
-                  setError("");
-                }}
-                className="text-[12px] font-medium text-[#003883] transition hover:opacity-80"
-              >
-                {contactMode === "existing" ? "+ Kontakt i ri" : "Përdor kontakt ekzistues"}
-              </button>
+              <p className="mt-1 text-[11.5px] text-black/35">
+                Shkruaj emrin, mbiemrin dhe numrin e telefonit për këtë shfaqje.
+              </p>
             </div>
 
-            {contactMode === "existing" ? (
-              <CustomSelect
-                value={selectedLeadName}
-                onChange={(value) => setLeadId(leadIdByName[value] ?? "")}
-                options={leadOptions}
-                placeholder="Zgjidh kontaktin"
-                size="md"
-              />
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-                    Emri <span className="text-red-400">*</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(event) => setFirstName(event.target.value)}
-                    className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-                  />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-                    Mbiemri <span className="text-red-400">*</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(event) => setLastName(event.target.value)}
-                    className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-                  />
-                </label>
-                <label className="col-span-2 flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
-                    Numri i telefonit <span className="text-red-400">*</span>
-                  </span>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
-                  />
-                </label>
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
+                  Klienti <span className="text-red-400">*</span>
+                </span>
+                <input
+                  type="text"
+                  value={clientName}
+                  onChange={(event) => setClientName(event.target.value)}
+                  placeholder="Emër dhe mbiemër"
+                  className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/35">
+                  Telefoni <span className="text-red-400">*</span>
+                </span>
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(event) => setClientPhone(event.target.value)}
+                  placeholder="Numri i telefonit"
+                  className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -279,9 +244,9 @@ export function ShowingModal({
               Rezultati
             </span>
             <CustomSelect
-              value={outcome}
-              onChange={(value) => setOutcome(value as ShowingOutcomeValue)}
-              options={["Pa rezultat", "Rezervoi", "Bleu"]}
+              value={OUTCOME_LABELS[outcome]}
+              onChange={(value) => setOutcome(OUTCOME_VALUES_BY_LABEL[value] ?? "Pa rezultat")}
+              options={Object.values(OUTCOME_LABELS)}
               placeholder="Zgjidh rezultatin"
               size="md"
             />

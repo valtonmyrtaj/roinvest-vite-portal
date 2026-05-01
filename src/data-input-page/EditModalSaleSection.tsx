@@ -30,6 +30,9 @@ export function EditModalSaleSection({
   listingPrice,
   buyerName,
   onBuyerNameChange,
+  buyerPhone,
+  onBuyerPhoneChange,
+  onBuyerPhoneBlur,
   saleDate,
   onSaleDateChange,
   finalPrice,
@@ -44,6 +47,9 @@ export function EditModalSaleSection({
   listingPrice: number;
   buyerName: string;
   onBuyerNameChange: (value: string) => void;
+  buyerPhone: string;
+  onBuyerPhoneChange: (value: string) => void;
+  onBuyerPhoneBlur: () => void;
   saleDate: string;
   onSaleDateChange: (value: string) => void;
   finalPrice: string;
@@ -96,6 +102,12 @@ export function EditModalSaleSection({
           value={buyerName}
           onChange={onBuyerNameChange}
         />
+        <TextField
+          label="Telefoni"
+          value={buyerPhone}
+          onChange={onBuyerPhoneChange}
+          onBlur={onBuyerPhoneBlur}
+        />
         <DateField
           label="Data e shitjes"
           value={saleDate}
@@ -111,11 +123,9 @@ export function EditModalSaleSection({
             step="0.01"
             value={finalPrice}
             onChange={(event) => onFinalPriceChange(event.target.value)}
-            placeholder="p.sh. 120000"
             className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
           />
         </label>
-        <div />
       </div>
 
       <AnimatePresence initial={false}>
@@ -128,8 +138,8 @@ export function EditModalSaleSection({
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="mt-3"
             style={{
-              background: "rgba(0,56,131,0.03)",
-              border: "1px solid rgba(0,56,131,0.08)",
+              background: "#eaf0fa",
+              border: "1px solid #d8e1f0",
               borderRadius: 8,
               padding: "12px 16px",
             }}
@@ -318,6 +328,7 @@ export function EditModalSaleSection({
                   value={installment.due_date}
                   onChange={(next) => onUpdateInstallment(index, "due_date", next ?? "")}
                   required
+                  portal
                 />
                 <input
                   type="number"
@@ -327,7 +338,6 @@ export function EditModalSaleSection({
                   onChange={(event) =>
                     onUpdateInstallment(index, "amount", event.target.value)
                   }
-                  placeholder="Shuma"
                   className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
                 />
                 <button

@@ -136,7 +136,7 @@ export function UnitsRegistrySection({
               ? "Duke ngarkuar regjistrin e njësive"
               : `${filteredCount} nga ${registryScopeCount} njësi në listë`
           }
-          className="px-6 pt-4 pb-5"
+          className="bg-[linear-gradient(180deg,#fbfcfe_0%,#f6f9ff_100%)] px-6 pb-5 pt-4"
           titleStyle={{
             fontSize: 16,
             fontWeight: 700,

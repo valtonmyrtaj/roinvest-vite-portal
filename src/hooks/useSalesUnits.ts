@@ -105,6 +105,7 @@ export function mapSalesUnitRowToUnit(row: SalesUnitRow): Unit {
     final_price: row.final_price,
     sale_date: row.sale_date,
     buyer_name: row.buyer_name,
+    buyer_phone: row.buyer_phone,
     payment_type: row.payment_type,
     crm_lead_id: row.crm_lead_id,
   };

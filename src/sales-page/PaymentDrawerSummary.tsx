@@ -1,6 +1,7 @@
 import type { Unit } from "../hooks/useUnits";
 import { getUnitContractValue } from "../lib/unitFinancials";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
+import { formatContactPhone } from "../lib/phoneFormat";
 import { fmtDate, formatPaymentType, GREEN, NAVY } from "./shared";
 
 /**
@@ -19,12 +20,19 @@ export function PaymentDrawerSummary({
 }) {
   const finalPrice = getUnitContractValue(unit);
   const paymentType = formatPaymentType(unit.payment_type);
+  const buyerPhone = formatContactPhone(unit.buyer_phone);
 
   const saleMeta = [
-    unit.buyer_name ? { label: "Blerësi", value: unit.buyer_name } : null,
-    paymentType ? { label: "Lloji i pagesës", value: paymentType } : null,
-    unit.sale_date ? { label: "Data e shitjes", value: fmtDate(unit.sale_date) } : null,
-  ].filter((item): item is { label: string; value: string } => Boolean(item));
+    unit.buyer_name
+      ? { label: "Blerësi", value: unit.buyer_name, detail: buyerPhone || null }
+      : null,
+    paymentType ? { label: "Lloji i pagesës", value: paymentType, detail: null } : null,
+    unit.sale_date
+      ? { label: "Data e shitjes", value: fmtDate(unit.sale_date), detail: null }
+      : null,
+  ].filter((item): item is { label: string; value: string; detail: string | null } =>
+    Boolean(item),
+  );
 
   return (
     <div className="rounded-[24px] border border-[#ececf1] bg-[linear-gradient(180deg,#fcfcfd_0%,#f7f9fc_100%)] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
@@ -48,6 +56,11 @@ export function PaymentDrawerSummary({
                 <p className="mt-1.5 text-[13px] leading-[1.35] text-black/72" style={{ fontWeight: 600 }}>
                   {item.value}
                 </p>
+                {item.detail && (
+                  <p className="mt-1 text-[12px] leading-[1.35] text-black/44">
+                    {item.detail}
+                  </p>
+                )}
               </div>
             ))}
           </div>

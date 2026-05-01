@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarRange, RefreshCw, Undo2, X } from "lucide-react";
 import type { Unit } from "../hooks/useUnits";
@@ -35,6 +35,23 @@ export function ReservationActionDialog({
     () => `${unit.block} · ${unit.level} · ${unit.size} m²`,
     [unit.block, unit.level, unit.size],
   );
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      if (!saving) onClose();
+    };
+
+    window.addEventListener("keydown", handleEscape, true);
+    return () => {
+      window.removeEventListener("keydown", handleEscape, true);
+    };
+  }, [onClose, saving]);
 
   const handleSubmit = async () => {
     if (mode === "extend") {

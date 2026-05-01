@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 
@@ -49,6 +50,7 @@ export interface DatePickerFieldProps {
   id?: string;
   label?: ReactNode;
   labelClassName?: string;
+  portal?: boolean;
 }
 
 function pad2(value: number) {
@@ -131,8 +133,10 @@ export function DatePickerField({
   id,
   label,
   labelClassName = "mb-1 block text-[12px] font-semibold text-black/55",
+  portal = false,
 }: DatePickerFieldProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const selected = parseIsoDate(value);
   const todayIso = getTodayIso();
   const today = parseIsoDate(todayIso) ?? getTodayParts();
@@ -140,6 +144,7 @@ export function DatePickerField({
   const [placement, setPlacement] = useState<"top" | "bottom">("bottom");
   const [density, setDensity] = useState<"regular" | "compact">("regular");
   const [align, setAlign] = useState<"left" | "right">("left");
+  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number } | null>(null);
   const [view, setView] = useState(() => ({
     year: selected?.year ?? today.year,
     month: selected?.month ?? today.month,
@@ -148,11 +153,57 @@ export function DatePickerField({
   const hasValue = Boolean(value);
   const canClear = clearable ?? (hasValue && !required);
 
+  const updatePopoverLayout = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const viewportPadding = 8;
+    const gutter = 6;
+    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const spaceAbove = rect.top - viewportPadding;
+    const fitsRegularBelow = spaceBelow >= REGULAR_POPOVER_HEIGHT;
+    const fitsCompactBelow = spaceBelow >= COMPACT_POPOVER_HEIGHT;
+    const nextPlacement =
+      fitsRegularBelow || fitsCompactBelow || spaceBelow >= spaceAbove ? "bottom" : "top";
+    const availableHeight = nextPlacement === "bottom" ? spaceBelow : spaceAbove;
+    const nextDensity = availableHeight >= REGULAR_POPOVER_HEIGHT ? "regular" : "compact";
+    const nextWidth = nextDensity === "regular" ? REGULAR_POPOVER_WIDTH : COMPACT_POPOVER_WIDTH;
+    const nextHeight = nextDensity === "regular" ? REGULAR_POPOVER_HEIGHT : COMPACT_POPOVER_HEIGHT;
+    const nextAlign =
+      window.innerWidth - rect.left < nextWidth && rect.right >= nextWidth ? "right" : "left";
+
+    setPlacement(nextPlacement);
+    setDensity(nextDensity);
+    setAlign(nextAlign);
+
+    if (!portal) return;
+
+    const unclampedLeft = nextAlign === "right" ? rect.right - nextWidth : rect.left;
+    const unclampedTop =
+      nextPlacement === "bottom" ? rect.bottom + gutter : rect.top - nextHeight - gutter;
+
+    setPortalPosition({
+      left: Math.max(
+        viewportPadding,
+        Math.min(window.innerWidth - nextWidth - viewportPadding, unclampedLeft),
+      ),
+      top: Math.max(
+        viewportPadding,
+        Math.min(window.innerHeight - nextHeight - viewportPadding, unclampedTop),
+      ),
+    });
+  }, [portal]);
+
   useEffect(() => {
     if (!open) return;
 
     const handleMouseDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -167,6 +218,19 @@ export function DatePickerField({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !portal) return;
+
+    const handleViewportChange = () => updatePopoverLayout();
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [open, portal, updatePopoverLayout]);
 
   const calendarDays = useMemo(() => {
     const offset = mondayFirstOffset(view.year, view.month);
@@ -230,26 +294,123 @@ export function DatePickerField({
       month: selected?.month ?? today.month,
     });
 
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (rect) {
-      const spaceBelow = window.innerHeight - rect.bottom - 8;
-      const spaceAbove = rect.top - 8;
-      const fitsRegularBelow = spaceBelow >= REGULAR_POPOVER_HEIGHT;
-      const fitsCompactBelow = spaceBelow >= COMPACT_POPOVER_HEIGHT;
-      const nextPlacement = fitsRegularBelow || fitsCompactBelow || spaceBelow >= spaceAbove ? "bottom" : "top";
-      const availableHeight = nextPlacement === "bottom" ? spaceBelow : spaceAbove;
-      const nextDensity = availableHeight >= REGULAR_POPOVER_HEIGHT ? "regular" : "compact";
-      const nextWidth = nextDensity === "regular" ? REGULAR_POPOVER_WIDTH : COMPACT_POPOVER_WIDTH;
-
-      setPlacement(nextPlacement);
-      setDensity(nextDensity);
-      setAlign(window.innerWidth - rect.left < nextWidth && rect.right >= nextWidth ? "right" : "left");
-    }
+    updatePopoverLayout();
     setOpen(true);
   };
 
   const opensAbove = placement === "top";
   const compact = density === "compact";
+  const popoverWidthClass = compact ? "w-[268px] p-2.5" : "w-[286px] p-3";
+  const popoverPositionClass = portal
+    ? "fixed z-[9999]"
+    : `absolute z-[70] ${
+        opensAbove ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"
+      } ${align === "right" ? "right-0" : "left-0"}`;
+
+  const popover = (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          ref={popoverRef}
+          initial={{ opacity: 0, scale: 0.97, y: opensAbove ? 4 : -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.97, y: opensAbove ? 4 : -4 }}
+          transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+          className={`${popoverPositionClass} rounded-[16px] border border-[#e8e8ec] bg-white shadow-[0_16px_36px_rgba(16,24,40,0.13)] ${popoverWidthClass}`}
+          style={portal && portalPosition ? portalPosition : undefined}
+        >
+          <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between gap-2`}>
+            <p className="text-[13px] tracking-[-0.01em]" style={{ color: NAVY, fontWeight: 750 }}>
+              {MONTHS_SQ[view.month - 1]} {view.year}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setView((current) => addMonths(current.year, current.month, -1))}
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] text-black/45 transition hover:bg-[#f5f7fb] hover:text-black/70"
+                aria-label="Muaji i kaluar"
+              >
+                <ChevronLeft size={15} strokeWidth={2.2} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setView((current) => addMonths(current.year, current.month, 1))}
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] text-black/45 transition hover:bg-[#f5f7fb] hover:text-black/70"
+                aria-label="Muaji tjetër"
+              >
+                <ChevronRight size={15} strokeWidth={2.2} />
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-1 grid grid-cols-7 gap-1">
+            {WEEKDAYS_SQ.map((day, index) => (
+              <div key={`${day}-${index}`} className={`flex ${compact ? "h-6" : "h-7"} items-center justify-center text-[10px] font-semibold text-black/32`}>
+                {day}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((day) => {
+              const selectedDay = day.iso === selectedIso;
+              const todayDay = day.iso === todayIso;
+
+              return (
+                <button
+                  key={day.iso}
+                  type="button"
+                  disabled={day.disabled}
+                  onClick={() => selectDate(day.iso)}
+                  className={`relative flex ${compact ? "h-7" : "h-8"} items-center justify-center rounded-[9px] text-[12px] transition disabled:cursor-default`}
+                  style={{
+                    backgroundColor: selectedDay ? NAVY : "transparent",
+                    color: selectedDay
+                      ? "white"
+                      : day.disabled
+                      ? "rgba(0,0,0,0.24)"
+                      : todayDay
+                      ? NAVY
+                      : "rgba(0,0,0,0.76)",
+                    fontWeight: selectedDay || todayDay ? 700 : 500,
+                    boxShadow: todayDay && !selectedDay ? `inset 0 0 0 1px ${NAVY}33` : "none",
+                  }}
+                >
+                  <span>{day.day}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className={`${compact ? "mt-2 pt-2" : "mt-3 pt-3"} flex items-center justify-between border-t border-black/[0.06]`}>
+            {canClear ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(null);
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[9px] px-2.5 text-[12px] font-semibold text-black/42 transition hover:bg-[#f5f7fb] hover:text-black/65"
+              >
+                <X size={12} strokeWidth={2.2} />
+                Pastro
+              </button>
+            ) : (
+              <span />
+            )}
+            <button
+              type="button"
+              onClick={setToday}
+              disabled={isOutOfRange(todayIso, min, max)}
+              className="h-8 rounded-[9px] px-3 text-[12px] font-semibold transition hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: NAVY }}
+            >
+              Sot
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   return (
     <div ref={rootRef} className={`relative ${className}`.trim()}>
@@ -280,108 +441,9 @@ export function DatePickerField({
         <CalendarDays size={s.icon} strokeWidth={2.1} className="shrink-0 text-black/35" />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: opensAbove ? 4 : -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: opensAbove ? 4 : -4 }}
-            transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-            className={`absolute z-[70] rounded-[16px] border border-[#e8e8ec] bg-white shadow-[0_16px_36px_rgba(16,24,40,0.13)] ${
-              opensAbove ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"
-            } ${align === "right" ? "right-0" : "left-0"} ${compact ? "w-[268px] p-2.5" : "w-[286px] p-3"}`}
-          >
-            <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between gap-2`}>
-              <p className="text-[13px] tracking-[-0.01em]" style={{ color: NAVY, fontWeight: 750 }}>
-                {MONTHS_SQ[view.month - 1]} {view.year}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setView((current) => addMonths(current.year, current.month, -1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-[9px] text-black/45 transition hover:bg-[#f5f7fb] hover:text-black/70"
-                  aria-label="Muaji i kaluar"
-                >
-                  <ChevronLeft size={15} strokeWidth={2.2} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView((current) => addMonths(current.year, current.month, 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-[9px] text-black/45 transition hover:bg-[#f5f7fb] hover:text-black/70"
-                  aria-label="Muaji tjetër"
-                >
-                  <ChevronRight size={15} strokeWidth={2.2} />
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-1 grid grid-cols-7 gap-1">
-              {WEEKDAYS_SQ.map((day, index) => (
-                <div key={`${day}-${index}`} className={`flex ${compact ? "h-6" : "h-7"} items-center justify-center text-[10px] font-semibold text-black/32`}>
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day) => {
-                const selectedDay = day.iso === selectedIso;
-                const todayDay = day.iso === todayIso;
-
-                return (
-                  <button
-                    key={day.iso}
-                    type="button"
-                    disabled={day.disabled}
-                    onClick={() => selectDate(day.iso)}
-                    className={`relative flex ${compact ? "h-7" : "h-8"} items-center justify-center rounded-[9px] text-[12px] transition disabled:cursor-default`}
-                    style={{
-                      backgroundColor: selectedDay ? NAVY : "transparent",
-                      color: selectedDay
-                        ? "white"
-                        : day.disabled
-                        ? "rgba(0,0,0,0.24)"
-                        : todayDay
-                        ? NAVY
-                        : "rgba(0,0,0,0.76)",
-                      fontWeight: selectedDay || todayDay ? 700 : 500,
-                      boxShadow: todayDay && !selectedDay ? `inset 0 0 0 1px ${NAVY}33` : "none",
-                    }}
-                  >
-                    <span>{day.day}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className={`${compact ? "mt-2 pt-2" : "mt-3 pt-3"} flex items-center justify-between border-t border-black/[0.06]`}>
-              {canClear ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(null);
-                  }}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-[9px] px-2.5 text-[12px] font-semibold text-black/42 transition hover:bg-[#f5f7fb] hover:text-black/65"
-                >
-                  <X size={12} strokeWidth={2.2} />
-                  Pastro
-                </button>
-              ) : (
-                <span />
-              )}
-              <button
-                type="button"
-                onClick={setToday}
-                disabled={isOutOfRange(todayIso, min, max)}
-                className="h-8 rounded-[9px] px-3 text-[12px] font-semibold transition hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-40"
-                style={{ color: NAVY }}
-              >
-                Sot
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {portal && typeof document !== "undefined"
+        ? createPortal(popover, document.body)
+        : popover}
     </div>
   );
 }

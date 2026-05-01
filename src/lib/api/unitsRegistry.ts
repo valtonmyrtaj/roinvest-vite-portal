@@ -16,13 +16,17 @@ export type RegistryUnitRow = Pick<
   | "status"
   | "owner_category"
   | "owner_name"
+  | "reservation_expires_at"
   | "created_at"
   | "updated_at"
   | "has_storage"
 > & {
+  active_reservation_id: string | null;
+  active_reservation_showing_id: string | null;
   final_price: number | null;
   sale_date: string | null;
   buyer_name: string | null;
+  buyer_phone: string | null;
   payment_type: string | null;
   crm_lead_id: string | null;
 };
@@ -56,7 +60,7 @@ type FilterableQuery<TQuery> = {
 };
 
 const REGISTRY_SELECT =
-  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,created_at,updated_at,has_storage";
+  "id,unit_id,block,type,level,size,price,status,owner_category,owner_name,reservation_expires_at,created_at,updated_at,has_storage";
 
 function applyRegistryScopeFilters<TQuery extends FilterableQuery<TQuery>>(
   query: TQuery,
@@ -180,6 +184,7 @@ export async function getUnitsRegistrySnapshot(
       | "status"
       | "owner_category"
       | "owner_name"
+      | "reservation_expires_at"
       | "created_at"
       | "updated_at"
       | "has_storage"
@@ -190,28 +195,54 @@ export async function getUnitsRegistrySnapshot(
     string,
     Pick<
       Tables<"unit_sales">,
-      "final_price" | "sale_date" | "buyer_name" | "payment_type" | "crm_lead_id"
+      "final_price" | "sale_date" | "buyer_name" | "buyer_phone" | "payment_type" | "crm_lead_id"
     >
+  >();
+  const reservationTruthByUnitId = new Map<
+    string,
+    {
+      reservationId: string;
+      showingId: string | null;
+      expiresAt: string | null;
+    }
   >();
 
   if (rowIds.length > 0) {
-    const { data: saleRows, error: saleError } = await supabase
-      .from("unit_sales")
-      .select("unit_id,final_price,sale_date,buyer_name,payment_type,crm_lead_id")
-      .eq("status", "active")
-      .in("unit_id", rowIds);
+    const [saleResult, reservationResult] = await Promise.all([
+      supabase
+        .from("unit_sales")
+        .select("unit_id,final_price,sale_date,buyer_name,buyer_phone,payment_type,crm_lead_id")
+        .eq("status", "active")
+        .in("unit_id", rowIds),
+      supabase
+        .from("unit_reservations")
+        .select("id,unit_id,showing_id,expires_at")
+        .eq("status", "Aktive")
+        .in("unit_id", rowIds),
+    ]);
 
-    if (saleError) {
-      return apiFail(saleError.message);
+    const relatedError = saleResult.error ?? reservationResult.error;
+
+    if (relatedError) {
+      return apiFail(relatedError.message);
     }
 
-    (saleRows ?? []).forEach((row) => {
+    (saleResult.data ?? []).forEach((row) => {
       saleTruthByUnitId.set(row.unit_id, {
         final_price: row.final_price,
         sale_date: row.sale_date,
         buyer_name: row.buyer_name,
+        buyer_phone: row.buyer_phone,
         payment_type: row.payment_type,
         crm_lead_id: row.crm_lead_id,
+      });
+    });
+
+    (reservationResult.data ?? []).forEach((row) => {
+      reservationTruthByUnitId.set(row.unit_id, {
+        reservationId: row.id,
+        showingId: row.showing_id,
+        expiresAt: row.expires_at,
       });
     });
   }
@@ -219,11 +250,25 @@ export async function getUnitsRegistrySnapshot(
   return apiOk({
     rows: rows.map((row) => {
       const saleTruth = saleTruthByUnitId.get(row.id);
+      const reservationTruth = reservationTruthByUnitId.get(row.id);
+      const hasActiveReservation =
+        Boolean(reservationTruth) && row.status !== "E shitur";
+
       return {
         ...row,
+        status: hasActiveReservation ? "E rezervuar" : row.status,
+        reservation_expires_at:
+          row.reservation_expires_at ?? reservationTruth?.expiresAt ?? null,
+        active_reservation_id: hasActiveReservation
+          ? reservationTruth?.reservationId ?? null
+          : null,
+        active_reservation_showing_id: hasActiveReservation
+          ? reservationTruth?.showingId ?? null
+          : null,
         final_price: saleTruth?.final_price ?? null,
         sale_date: saleTruth?.sale_date ?? null,
         buyer_name: saleTruth?.buyer_name ?? null,
+        buyer_phone: saleTruth?.buyer_phone ?? null,
         payment_type: saleTruth?.payment_type ?? null,
         crm_lead_id: saleTruth?.crm_lead_id ?? null,
       };

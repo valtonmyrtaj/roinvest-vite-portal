@@ -70,10 +70,11 @@ export function PaymentDrawerTimeline({
         <>
           <div className="relative mt-6 overflow-x-auto pb-2">
             <div className="relative flex min-w-max gap-5 px-1">
-              {payments.map((payment) => {
+              {payments.map((payment, index) => {
                 const isPaid = payment.status === "E paguar";
                 const hasPartialReceipt = payment.paid_amount > 0 && !isPaid;
                 const isHovered = hoveredInstallmentId === payment.id;
+                const displayNumber = index + 1;
                 const nodeBorder = isPaid ? "#2D6A4F" : payment.status === "E vonuar" ? RED : "#B0892F";
                 const nodeBackground = isPaid ? "#2D6A4F" : payment.status === "E vonuar" ? "#fff3f3" : "#ffffff";
                 const displayDate = isPaid || hasPartialReceipt
@@ -103,10 +104,10 @@ export function PaymentDrawerTimeline({
                         color: isPaid ? "#ffffff" : payment.status === "E vonuar" ? RED : "#B0892F",
                       }}
                     >
-                      {payment.installment_number}
+                      {displayNumber}
                     </div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/28">
-                      Kësti #{payment.installment_number}
+                      Kësti #{displayNumber}
                     </p>
                     <p className="mt-1.5 text-[13px] font-semibold text-black/76">{fmtEur(payment.amount)}</p>
                     {hasPartialReceipt && (

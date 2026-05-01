@@ -3,6 +3,7 @@ import { history } from "../lib/api";
 import { useUnits } from "../hooks/useUnits";
 import { Card } from "./primitives";
 import { SkeletonRows } from "../components/SkeletonRows";
+import { CardSectionHeader } from "../components/ui/CardSectionHeader";
 import {
   HISTORY_BORDER,
   NAVY,
@@ -119,14 +120,11 @@ export function ActivityTimeline({ refreshKey = 0 }: { refreshKey?: number }) {
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-[#f0f0f2] px-5 py-3.5">
-        <p className="text-[14px] font-semibold tracking-[-0.2px]" style={{ color: NAVY }}>
-          Aktiviteti i fundit
-        </p>
-        <p className="mt-0.5 text-[12px] text-black/35">
-          50 ndryshimet më të fundit në regjistrin e njësive
-        </p>
-      </div>
+      <CardSectionHeader
+        title="Aktiviteti i fundit"
+        subtitle="50 ndryshimet më të fundit në regjistrin e njësive"
+        className="px-5 py-4"
+      />
       <div className="max-h-[480px] overflow-y-auto px-5 pb-1 pt-3.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {loading ? (
           <SkeletonRows rows={5} className="py-4" />

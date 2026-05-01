@@ -784,7 +784,7 @@ export function MarketingDataWorkspace() {
             <table className="w-full text-[12.5px]">
               <thead>
                 <tr className="border-b border-[#f0f0f2] bg-[#f9f9fb]">
-                  {["Periudha", "Shpenzimi", "Shikime", "Kontaktet", "Veprime"].map((h, i) => (
+                  {["Periudha", "Shpenzimi", "Shikime", "Kontakte", "Veprime"].map((h, i) => (
                     <th
                       key={h}
                       className={`py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35 ${

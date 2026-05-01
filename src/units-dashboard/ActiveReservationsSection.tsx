@@ -16,11 +16,13 @@ export function ActiveReservationsSection({
   loading = false,
   onExtendReservation,
   onReleaseReservation,
+  onOpenUnitDetails,
 }: {
   units: Unit[];
   loading?: boolean;
   onExtendReservation?: (unit: Unit) => void;
   onReleaseReservation?: (unit: Unit) => void;
+  onOpenUnitDetails?: (unit: Unit) => void;
 }) {
   const showActions = Boolean(onExtendReservation || onReleaseReservation);
   const activeReservations = useMemo(
@@ -62,7 +64,7 @@ export function ActiveReservationsSection({
     <div className="mt-6">
       <SectionEyebrow
         className="mb-4"
-        label="Rezervimet aktive"
+        label="Njësitë e rezervuara"
         detail={
           loading
             ? "duke ngarkuar ndjekjen"
@@ -76,6 +78,7 @@ export function ActiveReservationsSection({
         <CardSectionHeader
           title="Afatet e rezervimeve"
           subtitle={subtitle}
+          className="bg-[linear-gradient(180deg,#fbfcfe_0%,#f6f9ff_100%)] px-6 pb-5 pt-4"
           titleStyle={{
             fontSize: 16,
             fontWeight: 700,
@@ -104,7 +107,7 @@ export function ActiveReservationsSection({
               <div className="flex min-h-[148px] items-center justify-center rounded-[14px] border border-dashed border-[#e5eaf1] bg-[#fcfcfd] px-4 text-center">
                 <div>
                   <p className="text-[12.5px] font-medium text-black/42">
-                    Nuk ka rezervime aktive për momentin.
+                    Nuk ka njësi të rezervuara për momentin.
                   </p>
                   <p className="mt-1 text-[11.5px] text-black/28">
                     Sapo një njësi të rezervohet, afati i saj do të shfaqet këtu për ndjekje.
@@ -168,13 +171,32 @@ export function ActiveReservationsSection({
                       : daysLeft === 0
                         ? "Sot"
                         : `${daysLeft} ditë`;
+                  const isClickable = Boolean(onOpenUnitDetails);
 
                   return (
                     <tr
                       key={u.id}
-                      className="border-t border-[#eef0f4] transition hover:bg-[#fafbfd]"
+                      role={isClickable ? "button" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      aria-label={isClickable ? `Hap detajet për ${u.unit_id}` : undefined}
+                      onClick={isClickable ? () => onOpenUnitDetails?.(u) : undefined}
+                      onKeyDown={
+                        isClickable
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                onOpenUnitDetails?.(u);
+                              }
+                            }
+                          : undefined
+                      }
+                      className={`border-t border-[#eef0f4] transition hover:bg-[#fafbfd] ${
+                        isClickable
+                          ? "cursor-pointer focus-visible:bg-[#f8fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#003883]/14"
+                          : ""
+                      }`}
                     >
-                      <td className="px-5 py-3 text-[12.5px] font-semibold text-black/78">
+                      <td className="px-5 py-3 text-[12.5px] font-normal text-black/72">
                         {u.unit_id}
                       </td>
                       <td className="px-5 py-3 text-[12.5px] text-black/58">
@@ -197,7 +219,10 @@ export function ActiveReservationsSection({
                             {onExtendReservation && u.active_reservation_id && (
                               <button
                                 type="button"
-                                onClick={() => onExtendReservation(u)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onExtendReservation(u);
+                                }}
                                 className="rounded-full border border-[#dce4f3] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#003883] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#f6f8fd]"
                               >
                                 Zgjat
@@ -206,7 +231,10 @@ export function ActiveReservationsSection({
                             {onReleaseReservation && u.active_reservation_id && (
                               <button
                                 type="button"
-                                onClick={() => onReleaseReservation(u)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onReleaseReservation(u);
+                                }}
                                 className="rounded-full border border-[#ecd6d6] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#8e4a4a] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:bg-[#fff8f8]"
                               >
                                 Liro

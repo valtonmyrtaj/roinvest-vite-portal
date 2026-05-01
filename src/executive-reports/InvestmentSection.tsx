@@ -1,6 +1,11 @@
-import { useCallback, useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Building2, CheckCircle2 } from "lucide-react";
+import { useCallback, useMemo, type CSSProperties } from "react";
+import { motion } from "framer-motion";
+import {
+  Banknote,
+  CheckCircle2,
+  Clock3,
+  WalletCards,
+} from "lucide-react";
 import type { OwnerCategory, Unit } from "../hooks/useUnits";
 import type { SaleReportingMetrics, SaleReportingTypologyBreakdownItem } from "../hooks/useSaleReporting";
 import { formatEuro as fmtEur } from "../lib/formatCurrency";
@@ -10,12 +15,11 @@ import {
   TABULAR_HEADER_LABEL_CLASS,
   TABULAR_HEADER_ROW_CLASS,
 } from "../components/ui/tabularHeader";
-import { Card, HeroMetricCard, SectionHeader } from "./primitives";
+import { CardSectionHeader } from "../components/ui/CardSectionHeader";
+import { Card } from "./primitives";
 import {
   MONTH_LABELS,
   NAVY,
-  SOFT_EASE,
-  SOLD_COLOR,
   formatCount,
   formatPercent,
   getValue,
@@ -23,10 +27,118 @@ import {
   normalizeTypology,
   sectionMotion,
   toDate,
+  type IconType,
   type UnitTypology,
   useHoldLast,
 } from "./shared";
-import { SummaryPeriodControls } from "./PeriodControls";
+
+const REPORT_CARD_TITLE_STYLE: CSSProperties = {
+  fontSize: 16,
+  fontWeight: 700,
+  letterSpacing: "-0.03em",
+  lineHeight: 1.05,
+};
+
+const REPORT_CARD_SUBTITLE_STYLE: CSSProperties = {
+  fontSize: 11.75,
+  fontWeight: 500,
+  lineHeight: 1.35,
+};
+
+const REPORT_TABLE_HEADER_STYLE: CSSProperties = {
+  backgroundColor: "#f3f6fb",
+};
+
+function safePercent(numerator: number, denominator: number): number {
+  return denominator > 0 ? (numerator / denominator) * 100 : 0;
+}
+
+function formatSignedPercent(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${formatPercent(value)}`;
+}
+
+function relativeDelta(current: number, previous: number | null, previousLabel: string) {
+  if (previous === null) {
+    return {
+      label: "Pa krahasim",
+      tone: "neutral" as const,
+    };
+  }
+
+  if (previous === 0) {
+    return {
+      label: current > 0 ? `Nga 0 në ${previousLabel}` : "Pa ndryshim",
+      tone: current > 0 ? ("positive" as const) : ("neutral" as const),
+    };
+  }
+
+  const delta = ((current - previous) / previous) * 100;
+  return {
+    label: `${formatSignedPercent(delta)} kundrejt ${previousLabel}`,
+    tone:
+      delta > 0 ? ("positive" as const) : delta < 0 ? ("negative" as const) : ("neutral" as const),
+  };
+}
+
+function inverseTrend(trend: ReturnType<typeof relativeDelta>) {
+  if (trend.tone === "neutral") return trend;
+
+  return {
+    ...trend,
+    tone: trend.tone === "positive" ? ("negative" as const) : ("positive" as const),
+  };
+}
+
+function ExecutiveSummaryCard({
+  label,
+  value,
+  detail,
+  trend,
+  icon: Icon,
+  iconTone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  trend: {
+    label: string;
+    tone: "positive" | "negative" | "neutral";
+  };
+  icon: IconType;
+  iconTone: {
+    bg: string;
+    color: string;
+  };
+}) {
+  const trendClass =
+    trend.tone === "positive"
+      ? "text-[#3c7a57]"
+      : trend.tone === "negative"
+        ? "text-[#b14b4b]"
+        : "text-black/36";
+
+  return (
+    <div className="executive-reports-summary-card rounded-[16px] border border-[#edf0f4] bg-white px-5 py-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-[10px]"
+          style={{ backgroundColor: iconTone.bg }}
+        >
+          <Icon size={15} style={{ color: iconTone.color }} strokeWidth={1.9} />
+        </div>
+        <span className={`text-right text-[11px] font-semibold ${trendClass}`}>
+          {trend.label}
+        </span>
+      </div>
+      <div className="text-[25px] font-bold leading-none tracking-[-0.03em] text-[#003883] tabular-nums">
+        {value}
+      </div>
+      <div className="mt-2 text-[12px] font-semibold text-black/52">{label}</div>
+      <div className="mt-1 text-[11.5px] text-black/36">{detail}</div>
+    </div>
+  );
+}
 
 /**
  * "Pasqyra e investimit" — the dominant section of the Executive Reports
@@ -44,10 +156,12 @@ import { SummaryPeriodControls } from "./PeriodControls";
  */
 export function InvestmentSection({
   units,
-  unitsLoading,
   investorMetrics,
   investorMetricsLoading,
   investorMetricsError,
+  investorPreviousMetrics,
+  investorPreviousMetricsLoading,
+  investorPreviousMetricsError,
   landownersMetrics,
   landownersMetricsLoading,
   landownersMetricsError,
@@ -59,14 +173,14 @@ export function InvestmentSection({
   investorTypologyError,
   selectedSummaryMonth,
   selectedSummaryYear,
-  onSummaryMonthChange,
-  onSummaryYearChange,
 }: {
   units: Unit[];
-  unitsLoading: boolean;
   investorMetrics: SaleReportingMetrics | null;
   investorMetricsLoading: boolean;
   investorMetricsError: string | null;
+  investorPreviousMetrics: SaleReportingMetrics | null;
+  investorPreviousMetricsLoading: boolean;
+  investorPreviousMetricsError: string | null;
   landownersMetrics: SaleReportingMetrics | null;
   landownersMetricsLoading: boolean;
   landownersMetricsError: string | null;
@@ -76,18 +190,20 @@ export function InvestmentSection({
   investorTypologyBreakdown: SaleReportingTypologyBreakdownItem[];
   investorTypologyLoading: boolean;
   investorTypologyError: string | null;
-  selectedSummaryMonth: number;
+  selectedSummaryMonth: number | null;
   selectedSummaryYear: number;
-  onSummaryMonthChange: (month: number) => void;
-  onSummaryYearChange: (year: number) => void;
 }) {
-  const reportingMonth = selectedSummaryMonth + 1;
+  const reportingMonth = selectedSummaryMonth === null ? null : selectedSummaryMonth + 1;
 
   // Hold-last-confirmed values so the period picker never flashes zeros while
   // a new RPC is in flight. The underlying hooks null / empty-out their state
   // at the start of each fetch; we display the previous confirmed snapshot
   // until the new one lands.
   const displayInvestorMetrics = useHoldLast(investorMetrics, investorMetricsLoading);
+  const displayInvestorPreviousMetrics = useHoldLast(
+    investorPreviousMetrics,
+    investorPreviousMetricsLoading,
+  );
   const displayLandownersMetrics = useHoldLast(
     landownersMetrics,
     landownersMetricsLoading,
@@ -134,13 +250,33 @@ export function InvestmentSection({
     [units],
   );
 
-  const selectedSummaryPeriodLabel = `${MONTH_LABELS[selectedSummaryMonth]} ${selectedSummaryYear}`;
-  const selectedSummaryMotionKey = `${selectedSummaryYear}-${selectedSummaryMonth}`;
-  const financialSummaryReady =
-    !unitsLoading &&
-    !investorMetricsLoading &&
-    !investorMetricsError &&
-    investorMetrics !== null;
+  const selectedSummaryPeriodLabel =
+    selectedSummaryMonth === null
+      ? `Të gjithë muajt ${selectedSummaryYear}`
+      : `${MONTH_LABELS[selectedSummaryMonth]} ${selectedSummaryYear}`;
+  const previousSummaryMonth =
+    selectedSummaryMonth === null
+      ? null
+      : selectedSummaryMonth === 0
+        ? 11
+        : selectedSummaryMonth - 1;
+  const previousSummaryYear =
+    selectedSummaryMonth === 0 ? selectedSummaryYear - 1 : selectedSummaryYear;
+  const previousSummaryPeriodLabel =
+    previousSummaryMonth === null
+      ? ""
+      : `${MONTH_LABELS[previousSummaryMonth]} ${previousSummaryYear}`;
+  const comparisonLabel =
+    selectedSummaryMonth === null
+      ? `Raporti për ${selectedSummaryPeriodLabel}`
+      : `Raporti për ${selectedSummaryPeriodLabel} · Krahasuar me ${previousSummaryPeriodLabel}`;
+  const previousMetricsReady =
+    selectedSummaryMonth !== null &&
+    !investorPreviousMetricsLoading && !investorPreviousMetricsError;
+  const currentPeriodTrend = {
+    label: "Të gjithë muajt",
+    tone: "neutral" as const,
+  };
 
   const isCurrentlyAvailable = useCallback(
     (unit: (typeof normalizedUnits)[number]) => unit.statusKey === "available",
@@ -154,8 +290,8 @@ export function InvestmentSection({
   );
 
   const totalUnits = investorUnits.length;
-  const soldCountInPeriod = summaryMetricsValue.soldUnits;
-  const soldPercent = totalUnits > 0 ? (soldCountInPeriod / totalUnits) * 100 : 0;
+  const availableCount = investorUnits.filter(isCurrentlyAvailable).length;
+  const availablePercent = safePercent(availableCount, totalUnits);
 
   const typologyRows = useMemo(() => {
     const order: UnitTypology[] = ["Banesë", "Penthouse", "Lokal", "Garazhë"];
@@ -176,6 +312,19 @@ export function InvestmentSection({
       };
     });
   }, [displayInvestorTypologyBreakdown, investorUnits, isCurrentlyAvailable]);
+  const typologyTotals = useMemo(
+    () =>
+      typologyRows.reduce(
+        (totals, row) => ({
+          total: totals.total + row.total,
+          sold: totals.sold + row.sold,
+          available: totals.available + row.available,
+          revenue: totals.revenue + row.revenue,
+        }),
+        { total: 0, sold: 0, available: 0, revenue: 0 },
+      ),
+    [typologyRows],
+  );
 
   const ownerCategoryRows = useMemo(() => {
     const order: OwnerCategory[] = [
@@ -212,251 +361,252 @@ export function InvestmentSection({
 
   const typologyReady = !investorTypologyLoading && !investorTypologyError;
 
-  const investmentCards = [
+  const executiveSummaryCards = [
     {
-      label: "Njësi gjithsej",
-      value: formatCount(totalUnits),
-      footnote: "100% e stokut total të projektit",
-      progress: 100,
-      color: NAVY,
-      icon: Building2,
-      delay: 0,
+      label: "Vlera e kontraktuar",
+      value: fmtEur(summaryMetricsValue.contractedValue),
+      detail: "Vlera e periudhës së zgjedhur",
+      trend:
+        selectedSummaryMonth === null
+          ? currentPeriodTrend
+          : relativeDelta(
+              summaryMetricsValue.contractedValue,
+              previousMetricsReady ? (displayInvestorPreviousMetrics?.contractedValue ?? 0) : null,
+              previousSummaryPeriodLabel,
+            ),
+      icon: Banknote,
+      iconTone: {
+        bg: "#eaf0fa",
+        color: NAVY,
+      },
     },
     {
-      label: "Njësi të shitura",
-      value: formatCount(soldCountInPeriod),
-      footnote: `${formatPercent(soldPercent)} e stokut gjatë ${selectedSummaryPeriodLabel}`,
-      progress: soldPercent,
-      color: SOLD_COLOR,
+      label: "Të arkëtuara",
+      value: fmtEur(summaryMetricsValue.collectedValue),
+      detail: "Pagesa të regjistruara",
+      trend:
+        selectedSummaryMonth === null
+          ? currentPeriodTrend
+          : relativeDelta(
+              summaryMetricsValue.collectedValue,
+              previousMetricsReady ? (displayInvestorPreviousMetrics?.collectedValue ?? 0) : null,
+              previousSummaryPeriodLabel,
+            ),
+      icon: WalletCards,
+      iconTone: {
+        bg: "#eaf6ef",
+        color: "#3c7a57",
+      },
+    },
+    {
+      label: "Në pritje",
+      value: fmtEur(summaryMetricsValue.pendingValue),
+      detail: summaryMetricsValue.hasPaymentData ? "Këste të papaguara" : "Ende pa plan pagese",
+      trend:
+        selectedSummaryMonth === null
+          ? currentPeriodTrend
+          : inverseTrend(
+              relativeDelta(
+                summaryMetricsValue.pendingValue,
+                previousMetricsReady ? (displayInvestorPreviousMetrics?.pendingValue ?? 0) : null,
+                previousSummaryPeriodLabel,
+              ),
+            ),
+      icon: Clock3,
+      iconTone: {
+        bg: "#fbf4df",
+        color: "#b0892f",
+      },
+    },
+    {
+      label: "Stoku në dispozicion",
+      value: formatCount(availableCount),
+      detail: "Njësi të lira për shitje",
+      trend: {
+        label: `${formatPercent(availablePercent)} e stokut`,
+        tone: "neutral" as const,
+      },
       icon: CheckCircle2,
-      delay: 0.05,
+      iconTone: {
+        bg: "#eaf6ef",
+        color: "#3c7a57",
+      },
     },
   ];
 
   return (
-    <motion.section {...sectionMotion(0.02)} className="executive-reports-section mb-10">
-      <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#edf0f4] px-6 py-5">
-          <div>
-            <h2 className="text-[20px] font-bold leading-tight" style={{ color: NAVY }}>
-              Pasqyra e investimit
-            </h2>
-            <p className="mt-[2px] text-[13px] font-normal" style={{ color: "#9ca3af" }}>
-Pamje për pronësinë Investitor · stoku, shitjet, arkëtimet dhe vlera e mbetur.
-            </p>
-            <div className="mt-3 inline-flex items-center rounded-full border border-[#d7deea] bg-[#f7faff] px-3 py-1 text-[11px] font-medium text-[#003883]">
-              Periudha e raportit · {selectedSummaryPeriodLabel}
-            </div>
-            {!financialSummaryReady && (
-              <p className="mt-3 text-[12px] text-black/38">
-                Duke ngarkuar përmbledhjen financiare për periudhën e zgjedhur.
-              </p>
-            )}
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[20px] border border-[#e0e5ed] bg-white px-5 py-4 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/35">
-                  Vlera e kontraktuar
-                </div>
-                {financialSummaryReady ? (
-                  <>
-                    <div className="mt-2 text-[28px] leading-none font-bold tracking-[-0.03em] text-[#003883]">
-                      {fmtEur(summaryMetricsValue.contractedValue)}
-                    </div>
-                    <p className="mt-2 text-[11.5px] text-black/36">
-                      {summaryMetricsValue.soldUnits} njësi të shitura
-                    </p>
-                  </>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    <div className="h-[28px] w-[148px] animate-pulse rounded-full bg-black/[0.08]" />
-                    <div className="h-[11px] w-[110px] animate-pulse rounded-full bg-black/[0.05]" />
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[20px] border border-[#c8e6d5] bg-[#f0fdf4] px-5 py-4 shadow-[0_1px_3px_rgba(60,122,87,0.06)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#3c7a57]/65">
-                  Të arkëtuara
-                </div>
-                {financialSummaryReady ? (
-                  <>
-                    <div className="mt-2 text-[28px] leading-none font-bold tracking-[-0.03em] text-[#3c7a57]">
-                      {fmtEur(summaryMetricsValue.collectedValue)}
-                    </div>
-                    <p className="mt-2 text-[11.5px] text-[#3c7a57]/45">
-                      {summaryMetricsValue.hasPaymentData
-                        ? "Bazuar në pagesat e regjistruara"
-                        : "Ende pa pagesa të regjistruara"}
-                    </p>
-                  </>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    <div className="h-[28px] w-[148px] animate-pulse rounded-full bg-[#3c7a57]/12" />
-                    <div className="h-[11px] w-[118px] animate-pulse rounded-full bg-[#3c7a57]/10" />
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[20px] border border-[#f0dfa0] bg-[#fffbeb] px-5 py-4 shadow-[0_1px_3px_rgba(176,137,47,0.06)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b0892f]/65">
-                  Në pritje
-                </div>
-                {financialSummaryReady ? (
-                  <>
-                    <div className="mt-2 text-[28px] leading-none font-bold tracking-[-0.03em] text-[#b0892f]">
-                      {fmtEur(summaryMetricsValue.pendingValue)}
-                    </div>
-                    <p className="mt-2 text-[11.5px] text-[#b0892f]/45">
-                      {summaryMetricsValue.hasPaymentData
-                        ? "Këste të papaguara"
-                        : "Ende pa plan pagese"}
-                    </p>
-                  </>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    <div className="h-[28px] w-[148px] animate-pulse rounded-full bg-[#b0892f]/14" />
-                    <div className="h-[11px] w-[112px] animate-pulse rounded-full bg-[#b0892f]/10" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <SummaryPeriodControls
-            selectedMonth={selectedSummaryMonth}
-            selectedYear={selectedSummaryYear}
-            onMonthChange={onSummaryMonthChange}
-            onYearChange={onSummaryYearChange}
-          />
-        </div>
-
+    <motion.section
+      {...sectionMotion(0.02)}
+      className="executive-reports-section executive-reports-section-splittable mb-12"
+    >
+      <Card className="mb-6 p-0">
+        <CardSectionHeader
+          title="Pasqyra ekzekutive"
+          subtitle={comparisonLabel}
+          density="spacious"
+          titleStyle={REPORT_CARD_TITLE_STYLE}
+          subtitleStyle={REPORT_CARD_SUBTITLE_STYLE}
+        />
         <div className="px-6 py-6">
-          <div className="grid gap-4 xl:grid-cols-2">
-            {investmentCards.map((card) => (
-              <AnimatePresence key={card.label} mode="wait" initial={false}>
-                <motion.div
-                  className="executive-summary-metric"
-                  key={`${card.label}-${selectedSummaryMotionKey}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: SOFT_EASE }}
-                >
-                  <HeroMetricCard {...card} />
-                </motion.div>
-              </AnimatePresence>
+          <div className="executive-reports-summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {executiveSummaryCards.map((card) => (
+              <ExecutiveSummaryCard key={card.label} {...card} />
             ))}
           </div>
+        </div>
+      </Card>
 
-          <div className="mt-7 border-t border-[#edf0f4] pt-6">
-            <SectionHeader
-              title="Realizimi sipas kategorisë së pronësisë"
-              subtitle={`Shitjet e realizuara dhe vlera e kontraktuar gjatë ${selectedSummaryPeriodLabel}`}
-            />
-            {!ownerCategoryReady && (
-              <p className="mb-3 -mt-1 text-[12px] text-black/38">
-                Duke ngarkuar ndarjen sipas kategorisë së pronësisë për periudhën e zgjedhur.
-              </p>
-            )}
+      <Card className="executive-reports-pagebreak p-0">
+        <CardSectionHeader
+          title="Shitjet dhe stoku"
+          subtitle={`Të dhënat sipas pronësisë dhe tipologjisë për ${selectedSummaryPeriodLabel}.`}
+          density="spacious"
+          titleStyle={REPORT_CARD_TITLE_STYLE}
+          subtitleStyle={REPORT_CARD_SUBTITLE_STYLE}
+        />
 
-            <div className="overflow-hidden rounded-[18px] border border-[#edf0f4]">
-              <div className="executive-reports-scroll overflow-x-auto">
-                <table className="w-full text-[12px]">
-                  <thead>
-                    <tr className={TABULAR_HEADER_ROW_CLASS}>
-                      <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Kategoria e pronësisë
-                      </th>
-                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Njësi të shitura
-                      </th>
-                      <th className={`px-5 py-3 text-right ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Vlera e kontraktuar
-                      </th>
+        {!ownerCategoryReady && (
+          <p className="px-6 pt-5 text-[12px] text-black/38">
+            Duke ngarkuar ndarjen sipas kategorisë së pronësisë për periudhën e zgjedhur.
+          </p>
+        )}
+
+        <div className="px-6 py-6">
+          <div className="mb-3">
+            <p className="text-[12.5px] font-semibold leading-tight text-[#003883]">
+              Shitjet sipas pronësisë
+            </p>
+            <p className="mt-1 text-[11.5px] font-medium leading-[1.35] text-[#003883]/60">
+              Njësitë e shitura dhe vlera e kontraktuar sipas pronësisë.
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-[18px] border border-[#edf0f4]">
+            <div className="executive-reports-scroll overflow-x-auto">
+              <table className="w-full min-w-[720px] text-[12px]">
+                <colgroup>
+                  <col className="w-[50%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[30%]" />
+                </colgroup>
+                <thead>
+                  <tr className={TABULAR_HEADER_ROW_CLASS} style={REPORT_TABLE_HEADER_STYLE}>
+                    <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Kategoria e pronësisë
+                    </th>
+                    <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Njësi të shitura
+                    </th>
+                    <th className={`px-5 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Vlera e kontraktuar
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ownerCategoryRows.map((row) => (
+                    <tr key={row.category} className="border-t border-[#f0f0f2]">
+                      <td className="px-5 py-3 text-[13px] font-medium text-black/70">
+                        {row.category}
+                      </td>
+                      <td className="px-3 py-3 text-center text-[13px] text-black/65 tabular-nums">
+                        {`${formatCount(row.soldCount)} njësi`}
+                      </td>
+                      <td
+                        className="px-5 py-3 text-center text-[13px] font-medium text-black/70 tabular-nums"
+                      >
+                        {fmtEur(row.revenue)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {ownerCategoryRows.map((row) => (
-                      <tr key={row.category} className="border-t border-[#f0f0f2]">
-                        <td className="px-5 py-3 text-[13px] font-medium text-black/70">
-                          {row.category}
-                        </td>
-                        <td className="px-3 py-3 text-center text-[13px] text-black/65">
-                          {`${formatCount(row.soldCount)} njësi`}
-                        </td>
-                        <td
-                          className="px-5 py-3 text-right text-[13px] font-medium"
-                          style={{
-                            color: row.soldCount > 0 ? SOLD_COLOR : "rgba(0,0,0,0.65)",
-                          }}
-                        >
-                          {fmtEur(row.revenue)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
+        </div>
+        <div className="border-t border-[#eef0f4] px-6 py-6">
+          <div className="mb-3">
+            <p className="text-[12.5px] font-semibold leading-tight text-[#003883]">
+              Ndarja sipas tipologjisë
+            </p>
+            <p className="mt-1 text-[11.5px] font-medium leading-[1.35] text-[#003883]/60">
+              Stoku aktual i pronësisë Investitor · Shitjet dhe vlera për {selectedSummaryPeriodLabel}
+            </p>
+          </div>
+          {!typologyReady && (
+            <p className="mb-3 text-[12px] text-black/38">
+              Duke ngarkuar ndarjen sipas tipologjisë për periudhën e zgjedhur.
+            </p>
+          )}
 
-          <div className="mt-7 border-t border-[#edf0f4] pt-6">
-            <SectionHeader
-              title="Ndarja sipas tipologjisë"
-              subtitle={`Gjithsej / Në dispozicion janë aktuale për pronësinë Investitor · Të shitura / Vlera e kontraktuar gjatë ${selectedSummaryPeriodLabel}`}
-            />
-            {!typologyReady && (
-              <p className="mb-3 -mt-1 text-[12px] text-black/38">
-                Duke ngarkuar ndarjen sipas tipologjisë për periudhën e zgjedhur.
-              </p>
-            )}
-
-            <div className="overflow-hidden rounded-[18px] border border-[#edf0f4]">
-              <div className="executive-reports-scroll overflow-x-auto">
-                <table className="w-full text-[12px]">
-                  <thead>
-                    <tr className={TABULAR_HEADER_ROW_CLASS}>
-                      <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Tipologjia
-                      </th>
-                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Gjithsej
-                      </th>
-                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Të shitura
-                      </th>
-                      <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Në dispozicion
-                      </th>
-                      <th className={`px-5 py-3 text-right ${TABULAR_HEADER_LABEL_CLASS}`}>
-                        Vlera e kontraktuar
-                      </th>
+          <div className="overflow-hidden rounded-[18px] border border-[#edf0f4]">
+            <div className="executive-reports-scroll overflow-x-auto">
+              <table className="w-full min-w-[920px] text-[12px]">
+                <colgroup>
+                  <col className="w-[30%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[22%]" />
+                </colgroup>
+                <thead>
+                  <tr className={TABULAR_HEADER_ROW_CLASS} style={REPORT_TABLE_HEADER_STYLE}>
+                    <th className={`px-5 py-3 text-left ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Tipologjia
+                    </th>
+                    <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Gjithsej
+                    </th>
+                    <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Të shitura
+                    </th>
+                    <th className={`px-3 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Në dispozicion
+                    </th>
+                    <th className={`whitespace-nowrap px-5 py-3 text-center ${TABULAR_HEADER_LABEL_CLASS}`}>
+                      Vlera e kontraktuar
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {typologyRows.map((row) => (
+                    <tr key={row.typology} className="border-t border-[#f0f0f2]">
+                      <td className="px-5 py-3 text-[13px] font-medium text-black/70">
+                        {row.typology}
+                      </td>
+                      <td className="px-3 py-3 text-center text-[13px] text-black/65 tabular-nums">
+                        {formatCount(row.total)}
+                      </td>
+                      <td className="px-3 py-3 text-center text-[13px] text-black/65 tabular-nums">
+                        {formatCount(row.sold)}
+                      </td>
+                      <td className="px-3 py-3 text-center text-[13px] text-black/65 tabular-nums">
+                        {formatCount(row.available)}
+                      </td>
+                      <td className="px-5 py-3 text-center text-[13px] font-medium text-black/70 tabular-nums">
+                        {fmtEur(row.revenue)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {typologyRows.map((row) => (
-                      <tr key={row.typology} className="border-t border-[#f0f0f2]">
-                        <td className="px-5 py-3 text-[13px] font-medium text-black/70">
-                          {row.typology}
-                        </td>
-                        <td className="px-3 py-3 text-center text-[13px] text-black/65">
-                          {formatCount(row.total)}
-                        </td>
-                        <td className="px-3 py-3 text-center text-[13px] text-black/65">
-                          {formatCount(row.sold)}
-                        </td>
-                        <td className="px-3 py-3 text-center text-[13px] text-black/65">
-                          {formatCount(row.available)}
-                        </td>
-                        <td className="px-5 py-3 text-right text-[13px] font-medium text-black/70">
-                          {fmtEur(row.revenue)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-[#e5e8ef] bg-[#fbfcff]">
+                    <td className="px-5 py-3 text-[13px] font-semibold text-black/78">
+                      Gjithsej
+                    </td>
+                    <td className="px-3 py-3 text-center text-[13px] font-semibold text-black/72 tabular-nums">
+                      {formatCount(typologyTotals.total)}
+                    </td>
+                    <td className="px-3 py-3 text-center text-[13px] font-semibold text-black/72 tabular-nums">
+                      {formatCount(typologyTotals.sold)}
+                    </td>
+                    <td className="px-3 py-3 text-center text-[13px] font-semibold text-black/72 tabular-nums">
+                      {formatCount(typologyTotals.available)}
+                    </td>
+                    <td className="px-5 py-3 text-center text-[13px] font-semibold text-black/78 tabular-nums">
+                      {fmtEur(typologyTotals.revenue)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </div>

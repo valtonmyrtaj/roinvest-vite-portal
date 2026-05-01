@@ -143,6 +143,8 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          manual_contact_name: string | null
+          manual_contact_phone: string | null
           notes: string | null
           outcome: string
           status: string
@@ -157,6 +159,8 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          manual_contact_name?: string | null
+          manual_contact_phone?: string | null
           notes?: string | null
           outcome?: string
           status?: string
@@ -171,6 +175,8 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          manual_contact_name?: string | null
+          manual_contact_phone?: string | null
           notes?: string | null
           outcome?: string
           status?: string
@@ -297,23 +303,32 @@ export type Database = {
       owner_entities: {
         Row: {
           category: string
+          contact_person: string | null
           created_at: string | null
           id: string
           name: string
+          notes: string | null
+          phone: string | null
           updated_at: string | null
         }
         Insert: {
           category: string
+          contact_person?: string | null
           created_at?: string | null
           id?: string
           name: string
+          notes?: string | null
+          phone?: string | null
           updated_at?: string | null
         }
         Update: {
           category?: string
+          contact_person?: string | null
           created_at?: string | null
           id?: string
           name?: string
+          notes?: string | null
+          phone?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -499,6 +514,7 @@ export type Database = {
       unit_sales: {
         Row: {
           buyer_name: string
+          buyer_phone: string | null
           created_at: string
           crm_lead_id: string | null
           final_price: number
@@ -514,6 +530,7 @@ export type Database = {
         }
         Insert: {
           buyer_name: string
+          buyer_phone?: string | null
           created_at?: string
           crm_lead_id?: string | null
           final_price: number
@@ -529,6 +546,7 @@ export type Database = {
         }
         Update: {
           buyer_name?: string
+          buyer_phone?: string | null
           created_at?: string
           crm_lead_id?: string | null
           final_price?: number
@@ -676,6 +694,7 @@ export type Database = {
       complete_unit_sale: {
         Args: {
           p_buyer_name: string
+          p_buyer_phone?: string
           p_crm_lead_id?: string
           p_final_price: number
           p_installments?: Json
@@ -687,6 +706,16 @@ export type Database = {
           p_unit_id: string
         }
         Returns: string
+      }
+      register_payment_receipt_with_split: {
+        Args: {
+          p_amount: number
+          p_paid_date: string
+          p_payment_id: string
+          p_notes?: string
+          p_remainder_due_date?: string
+        }
+        Returns: string | null
       }
       create_unit_reservation: {
         Args: {
@@ -790,6 +819,7 @@ export type Database = {
           payment_status: string
           payment_unit_id: string
           sale_buyer_name: string | null
+          sale_buyer_phone: string | null
           sale_crm_lead_id: string | null
           sale_date: string | null
           sale_final_price: number | null

@@ -129,6 +129,7 @@ export function KpiCard({
   const iconBg =
     color === GREEN ? "#edf7f1" : color === RED ? "#fbeeee" : color === GOLD ? "#fff8e8" : "#eaf0fa";
   const displayValue = formatValue ? formatValue(animatedValue) : String(animatedValue);
+  const valueClassName = "mt-2 -translate-y-1 text-[34px] leading-none tracking-[-0.04em]";
 
   return (
     <motion.div
@@ -138,30 +139,24 @@ export function KpiCard({
       transition={{ duration: 0.2, ease: SOFT_EASE }}
       className="h-full rounded-[20px] will-change-transform"
     >
-      <Card className="h-full">
+      <Card className="flex h-full min-h-[154px] flex-col">
         <div
           className="mb-4 flex h-10 w-10 items-center justify-center rounded-[12px]"
           style={{ background: iconBg }}
         >
           <Icon size={16} style={{ color }} strokeWidth={1.8} />
         </div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/30">
+        <p className="min-h-[13px] text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-black/30">
           {label}
         </p>
         {loading ? (
           <MetricSkeleton valueClassName="h-[34px] w-[132px]" detailClassName="hidden" />
         ) : displayValueOverride !== undefined ? (
-          <p
-            className="mt-2 text-[34px] leading-none tracking-[-0.04em]"
-            style={{ color, fontWeight: 700 }}
-          >
+          <p className={valueClassName} style={{ color, fontWeight: 700 }}>
             {displayValueOverride}
           </p>
         ) : (
-          <p
-            className="mt-2 text-[34px] leading-none tracking-[-0.04em]"
-            style={{ color, fontWeight: 700 }}
-          >
+          <p className={valueClassName} style={{ color, fontWeight: 700 }}>
             {displayValue}
           </p>
         )}

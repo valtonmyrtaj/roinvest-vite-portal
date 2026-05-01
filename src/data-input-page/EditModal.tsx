@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, BookmarkPlus } from "lucide-react";
 import type { CreateUnitInput, Unit, Block, Level, OwnerCategory, UnitStatus, UnitType } from "../hooks/useUnits";
 import type { SalePaymentType } from "../lib/api/sales";
+import { formatContactPhone } from "../lib/phoneFormat";
 import {
   getUnitContractValue,
   getUnitFinalSalePrice,
@@ -17,6 +18,7 @@ import {
   getOwnerNameOptions,
   LEVELS,
   MANUAL_UNIT_STATUSES,
+  type ManualUnitReservationPayload,
   normalizeOptionalArea,
   ORIENTATION_OPTIONS,
   OWNER_CATEGORIES,
@@ -27,6 +29,7 @@ import {
 } from "./shared";
 import {
   DateField,
+  FIELD_LABEL_CLASS,
   NumberField,
   OptionalNumberField,
   RoomNumberField,
@@ -65,12 +68,14 @@ export function EditModal({
   ownerNameOptionsByCategory,
   onClose,
   onSave,
+  onReserve,
   onSaleSuccessDismiss,
 }: {
   unit: Unit;
   ownerNameOptionsByCategory: Record<OwnerCategory, string[]>;
   onClose: () => void;
   onSave: (payload: EditModalSavePayload) => Promise<void>;
+  onReserve?: (payload: ManualUnitReservationPayload) => Promise<void>;
   onSaleSuccessDismiss?: (unitId: string) => void;
 }) {
   const listingPrice = getUnitListingPrice(unit);
@@ -93,7 +98,6 @@ export function EditModal({
     bathrooms: unit.bathrooms,
     toilets: unit.toilets,
     orientation: unit.orientation ?? null,
-    floorplan_code: unit.floorplan_code ?? "",
     has_storage: unit.has_storage ?? false,
     balcony_area: unit.balcony_area,
     terrace_area: unit.terrace_area,
@@ -102,6 +106,9 @@ export function EditModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [buyerName, setBuyerName] = useState(unit.buyer_name ?? "");
+  const [buyerPhone, setBuyerPhone] = useState(
+    formatContactPhone(unit.buyer_phone ?? unit.active_reservation_contact_phone),
+  );
   const [saleDate, setSaleDate] = useState(unit.sale_date?.slice(0, 10) ?? "");
   const [finalPrice, setFinalPrice] = useState(String(contractValue));
   const [paymentType, setPaymentType] = useState<SalePaymentType>(
@@ -115,11 +122,28 @@ export function EditModal({
     },
   ]);
   const [saleSuccess, setSaleSuccess] = useState<SaleSuccessSnapshot | null>(null);
+  const [reservationFormOpen, setReservationFormOpen] = useState(false);
+  const [reservationName, setReservationName] = useState("");
+  const [reservationPhone, setReservationPhone] = useState("");
+  const [reservationExpiresAt, setReservationExpiresAt] = useState<string | null>(null);
+  const [reservationNotes, setReservationNotes] = useState("");
+  const [isReserving, setIsReserving] = useState(false);
+  const [reservationError, setReservationError] = useState("");
 
   const set = (field: keyof CreateUnitInput, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   const isSaleTransition = unit.status !== "E shitur" && form.status === "E shitur";
   const reservationManagedUnit = unit.status === "E rezervuar" || Boolean(unit.active_reservation_id);
+  const canCreateManualReservation =
+    Boolean(onReserve) &&
+    unit.status === "Në dispozicion" &&
+    form.status === "Në dispozicion" &&
+    !reservationManagedUnit &&
+    !isSaleTransition;
+  const activeReservationContactName =
+    unit.active_reservation_contact_name?.trim() || null;
+  const activeReservationContactPhone =
+    formatContactPhone(unit.active_reservation_contact_phone);
   const ownerCategory = form.owner_category ?? "Investitor";
   const architectureCategory = roomCategory(form.type as string | undefined);
   const ownerNameOptions = getOwnerNameOptions(
@@ -159,6 +183,48 @@ export function EditModal({
     );
   };
 
+  const handleReserve = async () => {
+    if (!onReserve) return;
+
+    const contactName = reservationName.trim().replace(/\s+/g, " ");
+    const contactPhone = formatContactPhone(reservationPhone);
+
+    if (!contactName) {
+      setReservationError("Shkruani emrin dhe mbiemrin.");
+      return;
+    }
+
+    if (!contactPhone) {
+      setReservationError("Shkruani numrin e telefonit.");
+      return;
+    }
+
+    if (!reservationExpiresAt) {
+      setReservationError("Zgjidhni datën e skadimit.");
+      return;
+    }
+
+    setIsReserving(true);
+    setReservationError("");
+    try {
+      await onReserve({
+        contactName,
+        contactPhone,
+        expiresAt: reservationExpiresAt,
+        notes: reservationNotes.trim() || null,
+      });
+      onClose();
+    } catch (caughtError) {
+      setReservationError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Rezervimi nuk u ruajt dot.",
+      );
+    } finally {
+      setIsReserving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!reason.trim()) {
       setError("Ju lutem shkruani arsyen e ndryshimit.");
@@ -189,8 +255,21 @@ export function EditModal({
     }
 
     const normalizedNotes = typeof form.notes === "string" ? form.notes : null;
-    const normalizedFloorplanCode =
-      typeof form.floorplan_code === "string" ? form.floorplan_code.trim() || null : null;
+    const hasValidSize =
+      typeof form.size === "number" && Number.isFinite(form.size) && form.size > 0;
+    const hasValidPrice =
+      typeof form.price === "number" && Number.isFinite(form.price) && form.price > 0;
+
+    if (!hasValidSize) {
+      setError("Vendosni një sipërfaqe të vlefshme.");
+      return;
+    }
+
+    if (!hasValidPrice) {
+      setError("Vendosni një çmim të vlefshëm.");
+      return;
+    }
+
     const isApartment = architectureCategory === "apartment";
     const isLokal = architectureCategory === "lokal";
     const baseChanges: Partial<CreateUnitInput> = {
@@ -198,9 +277,8 @@ export function EditModal({
       notes: normalizedNotes,
       bedrooms: isApartment ? (form.bedrooms ?? null) : null,
       bathrooms: isApartment ? (form.bathrooms ?? null) : null,
-      toilets: isLokal ? (form.toilets ?? null) : null,
+      toilets: isApartment || isLokal ? (form.toilets ?? null) : null,
       orientation: form.orientation ?? null,
-      floorplan_code: normalizedFloorplanCode,
       has_storage: Boolean(form.has_storage),
       balcony_area: isApartment ? normalizeOptionalArea(form.balcony_area) : null,
       terrace_area: isApartment ? normalizeOptionalArea(form.terrace_area) : null,
@@ -210,8 +288,13 @@ export function EditModal({
 
     if (isSaleTransition) {
       const parsedFinalPrice = Number(finalPrice);
+      const normalizedBuyerPhone = formatContactPhone(buyerPhone);
       if (!buyerName.trim()) {
         setError("Plotësoni blerësin.");
+        return;
+      }
+      if (!normalizedBuyerPhone) {
+        setError("Plotësoni telefonin e blerësit.");
         return;
       }
       if (!saleDate) {
@@ -271,6 +354,7 @@ export function EditModal({
             sale_date: saleDate,
             final_price: parsedFinalPrice,
             buyer_name: buyerName.trim(),
+            buyer_phone: normalizedBuyerPhone,
             payment_type: paymentType,
             notes: normalizedNotes,
             installments:
@@ -288,6 +372,7 @@ export function EditModal({
           unitRecordId: unit.id,
           unitId: unit.unit_id,
           buyerName: buyerName.trim(),
+          buyerPhone: normalizedBuyerPhone,
           finalPrice: parsedFinalPrice,
           paymentType,
           saleDate,
@@ -325,16 +410,16 @@ export function EditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div
         className="absolute inset-0 bg-black/25 backdrop-blur-[2px]"
-        onClick={saleSuccess || isSubmitting ? undefined : onClose}
+        onClick={saleSuccess || isSubmitting || isReserving ? undefined : onClose}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.2 }}
-        className="relative z-10 w-[640px] rounded-[20px] bg-white p-6 shadow-2xl"
+        className="relative z-10 max-h-[calc(100dvh-2rem)] w-[min(640px,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-[20px] bg-white p-6 shadow-2xl sm:max-h-[calc(100dvh-3rem)]"
       >
         {saleSuccess ? (
           <EditModalSaleSuccess
@@ -351,7 +436,7 @@ export function EditModal({
             transition={{ duration: 0.2 }}
           >
             <div className="mb-5">
-              <p className="text-[16px] font-semibold tracking-[-0.02em] text-black/90">
+              <p className="text-[16px] font-semibold tracking-[-0.02em] text-[#003883]">
                 Ndrysho njësinë
               </p>
               <p className="mt-0.5 text-[12px] text-black/40">
@@ -444,9 +529,124 @@ export function EditModal({
                 />
               )}
               {reservationManagedUnit && (
-                <p className="col-span-3 -mt-1 text-[11.5px] text-black/40">
-                  Rezervimi administrohet nga rrjedha kanonike e rezervimeve. Kjo dritare nuk e ndryshon statusin ose afatin e rezervimit.
-                </p>
+                <div className="col-span-3 -mt-1 rounded-[13px] border border-[#e7ebf3] bg-[#f8fafd] px-3 py-2.5">
+                  <p className="text-[11.5px] text-black/42">
+                    Rezervimi administrohet nga rrjedha kanonike e rezervimeve. Kjo dritare nuk e ndryshon statusin ose afatin e rezervimit.
+                  </p>
+                  {(activeReservationContactName || activeReservationContactPhone) && (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-black/58">
+                      {activeReservationContactName && (
+                        <span>Rezervuar për: {activeReservationContactName}</span>
+                      )}
+                      {activeReservationContactPhone && (
+                        <span>Tel: {activeReservationContactPhone}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {canCreateManualReservation && (
+                <section className="col-span-3 rounded-[15px] border border-[#d8e1f0] bg-[#eaf0fa] px-3.5 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[12.5px] font-semibold text-[#003883]">
+                        Rezervo njësinë
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-[#003883]/60">
+                        Të dhënat e rezervimit
+                      </p>
+                    </div>
+                    {!reservationFormOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setReservationFormOpen(true)}
+                        disabled={isSubmitting || isReserving}
+                        className="flex items-center gap-1.5 rounded-[11px] bg-[#003883] px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-[#002f6e] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <BookmarkPlus size={13} />
+                        Rezervo
+                      </button>
+                    )}
+                  </div>
+
+                  {reservationFormOpen && (
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <TextField
+                        label="Emri dhe mbiemri"
+                        value={reservationName}
+                        onChange={(v) => {
+                          setReservationName(v);
+                          setReservationError("");
+                        }}
+                      />
+                      <label className="flex flex-col gap-1.5">
+                        <span className={FIELD_LABEL_CLASS}>Telefoni</span>
+                        <input
+                          type="tel"
+                          inputMode="tel"
+                          value={reservationPhone}
+                          onChange={(event) => {
+                            setReservationPhone(event.target.value);
+                            setReservationError("");
+                          }}
+                          onBlur={() =>
+                            setReservationPhone((current) => formatContactPhone(current))
+                          }
+                          className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+                        />
+                      </label>
+                      <DateField
+                        label="Skadon më"
+                        value={reservationExpiresAt}
+                        onChange={(v) => {
+                          setReservationExpiresAt(v);
+                          setReservationError("");
+                        }}
+                      />
+                      <label className="flex flex-col gap-1.5 sm:col-span-3">
+                        <span className={FIELD_LABEL_CLASS}>Shënim</span>
+                        <input
+                          type="text"
+                          value={reservationNotes}
+                          onChange={(event) => setReservationNotes(event.target.value)}
+                          className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] text-black/80 outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
+                        />
+                      </label>
+                      {reservationError && (
+                        <div className="flex items-center gap-1.5 text-[12px] text-red-500 sm:col-span-3">
+                          <AlertCircle size={12} /> {reservationError}
+                        </div>
+                      )}
+                      <div className="flex justify-end gap-2 sm:col-span-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReservationFormOpen(false);
+                            setReservationError("");
+                          }}
+                          disabled={isReserving}
+                          className="rounded-[11px] border border-[#cad5e6] bg-white/70 px-3 py-2 text-[12px] font-semibold text-[#003883]/70 transition hover:bg-white disabled:opacity-60"
+                        >
+                          Anulo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleReserve}
+                          disabled={isReserving || isSubmitting}
+                          className="flex items-center gap-1.5 rounded-[11px] bg-[#003883] px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-[#002f6e] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isReserving && (
+                            <span
+                              aria-hidden="true"
+                              className="inline-block h-[12px] w-[12px] animate-spin rounded-full border-[1.5px] border-white/40 border-t-white"
+                            />
+                          )}
+                          {isReserving ? "Duke rezervuar..." : "Ruaj rezervimin"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
               )}
               <SelectField
                 label="Orientimi"
@@ -454,12 +654,6 @@ export function EditModal({
                 onChange={(v) => set("orientation", v || null)}
                 options={ORIENTATION_OPTIONS}
                 placeholder="Zgjidh"
-              />
-              <TextField
-                label="Planimetria"
-                value={form.floorplan_code ?? ""}
-                onChange={(v) => set("floorplan_code", v)}
-                placeholder="p.sh. A-2.1"
               />
               <SelectField
                 label="Depo"
@@ -474,25 +668,21 @@ export function EditModal({
                     label="Dhoma gjumi"
                     value={form.bedrooms}
                     onChange={(v) => set("bedrooms", v)}
-                    placeholder="p.sh. 2"
                   />
                   <RoomNumberField
                     label="Banjo"
                     value={form.bathrooms}
                     onChange={(v) => set("bathrooms", v)}
-                    placeholder="p.sh. 1"
                   />
-                  <OptionalNumberField
-                    label="Ballkon (m²)"
-                    value={form.balcony_area}
-                    onChange={(v) => set("balcony_area", v)}
-                    placeholder="p.sh. 6"
+                  <RoomNumberField
+                    label="Tualet"
+                    value={form.toilets}
+                    onChange={(v) => set("toilets", v)}
                   />
                   <OptionalNumberField
                     label="Terrasë (m²)"
                     value={form.terrace_area}
                     onChange={(v) => set("terrace_area", v)}
-                    placeholder="p.sh. 12"
                   />
                 </>
               )}
@@ -501,7 +691,6 @@ export function EditModal({
                   label="Tualet"
                   value={form.toilets}
                   onChange={(v) => set("toilets", v)}
-                  placeholder="p.sh. 1"
                 />
               )}
               <label className="col-span-3 flex flex-col gap-1.5">
@@ -522,6 +711,9 @@ export function EditModal({
                 listingPrice={listingPrice}
                 buyerName={buyerName}
                 onBuyerNameChange={setBuyerName}
+                buyerPhone={buyerPhone}
+                onBuyerPhoneChange={setBuyerPhone}
+                onBuyerPhoneBlur={() => setBuyerPhone((prev) => formatContactPhone(prev))}
                 saleDate={saleDate}
                 onSaleDateChange={setSaleDate}
                 finalPrice={finalPrice}
@@ -547,7 +739,6 @@ export function EditModal({
                     setReason(e.target.value);
                     setError("");
                   }}
-                  placeholder="p.sh. Korrigjim sipërfaqeje sipas verifikimit"
                   className="h-10 rounded-[11px] border border-black/10 bg-white px-3 text-[13px] outline-none transition focus:border-[#003883]/30 focus:shadow-[0_0_0_3px_rgba(0,56,131,0.06)]"
                 />
               </label>
@@ -561,14 +752,14 @@ export function EditModal({
             <div className="mt-5 flex justify-end gap-2.5">
               <button
                 onClick={onClose}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isReserving}
                 className="rounded-[11px] border border-black/10 px-4 py-2 text-[13px] text-black/60 transition hover:bg-black/[0.02] disabled:opacity-50"
               >
                 Anulo
               </button>
               <button
                 onClick={handleSave}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isReserving}
                 className={`flex items-center gap-2 rounded-[11px] px-4 py-2 text-[13px] text-white transition hover:opacity-90 disabled:opacity-60 ${
                   isSubmitting ? "cursor-not-allowed" : ""
                 }`}
